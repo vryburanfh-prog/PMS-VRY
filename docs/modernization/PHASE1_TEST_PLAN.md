@@ -100,6 +100,7 @@ These cases cover the focused changes in the public-deck minimization and import
 | ID-12 | Concurrent audit log inserts reuse the same generated Audit_ID | Duplicate audit IDs are rejected; one write may fail and require retry | Not run |
 | ID-13 | Concurrent password-credential/session creation reuses generated ID | Credential_ID and Session_ID duplicates are rejected by insert helper | Not run |
 | ID-14 | Concurrent role-permission insert reuses Permission_ID | Duplicate Permission_ID rejected before insert | Not run |
+| ID-15 | Insert into mapped primary-key table omits key value | Insert helper rejects missing primary-key value before write | Not run |
 
 The primary-key guard draft PR #6 uses the Script Lock around duplicate detection and append. It prevents duplicate keys from being silently inserted, but it does not automatically retry ID generation after a collision; the competing create may return an error and require a retry. Runtime concurrency tests are still needed.
 
