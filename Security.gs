@@ -437,6 +437,26 @@ function findValidAuthSession_(token) {
   return record;
 }
 
+function recordPasswordLoginFailure_(credentialId) {
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const current = findRecordRowById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialId);
+    if (!current) throw new Error('Authentication credential not found.');
+    const attempts = Number(current.Failed_Attempts || 0) + 1;
+    const lockedUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : '';
+    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialId, {
+      Failed_Attempts: attempts,
+      Locked_Until: lockedUntil,
+      Updated_At: getNowTimestamp_()
+    });
+    return { attempts: attempts, lockedUntil: lockedUntil };
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
+}
+
 function apiLoginWithPassword(username, password) {
   ensureHybridAuthTables_();
   const name = String(username || '').trim().toLowerCase();
@@ -450,8 +470,7 @@ function apiLoginWithPassword(username, password) {
   if (!user || !isTruthySheetFlag_(user.Is_Active) || normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') return { success:false, error:'This account is inactive or not eligible for password login.' };
   const candidate = hashPassword_(pass, cred.Password_Salt);
   if (candidate !== String(cred.Password_Hash || '')) {
-    const attempts = Number(cred.Failed_Attempts || 0) + 1;
-    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts: attempts, Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '', Updated_At: getNowTimestamp_() });
+    recordPasswordLoginFailure_(cred.Credential_ID);
     Utilities.sleep(500); return { success:false, error:'Invalid username or password.' };
   }
   updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
