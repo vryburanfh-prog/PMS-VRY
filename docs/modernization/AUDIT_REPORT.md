@@ -196,7 +196,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #11 | Temporary integrated validation | Closed unmerged | CI passed 10/10 static regression tests with all Phase 1 source fixes combined, including locked deletes, escalation scope, and Phase 18/19 helper refactor; closed after validation |
 | #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
 | #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
-| #14 | Phase 18/19 mutation helper integrity | Open draft | Static helper callsite check; runtime concurrency/audit tests pending |
+| #14 | Phase 18/19 mutation helper integrity | Open draft (stacked on #13) | Static helper callsite check; runtime concurrency/audit tests pending |
 
 
 
