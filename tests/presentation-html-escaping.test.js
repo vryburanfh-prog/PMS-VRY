@@ -27,3 +27,18 @@ test('numeric and progress values are escaped at HTML interpolation boundaries',
     assert.ok(presentation.includes('${' + expression + '}'), expression + ' must be HTML-escaped');
   }
 });
+
+test('remaining direct dynamic fields in HTML are escaped', () => {
+  const required = [
+    'escapeHtmlSafe_(a.Activity_Weight || 0)',
+    'escapeHtmlSafe_(a.Baseline_Duration || 0)',
+    'escapeHtmlSafe_(a.Schedule_Variance_Days || 0)',
+    'escapeHtmlSafe_(b.Revision_Number)',
+    'escapeHtmlSafe_(l.Quantity_Accomplished || 0)',
+    'escapeHtmlSafe_(l.Reported_Progress_Pct || 0)',
+    'escapeHtmlSafe_(mod)',
+    'escapeHtmlSafe_(registryKey)',
+    'escapeHtmlSafe_(st.projectId)'
+  ];
+  for (const expression of required) assert.ok(presentation.includes('${' + expression + '}'), expression + ' must be escaped');
+});
