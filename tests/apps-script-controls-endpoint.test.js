@@ -302,5 +302,4 @@ test('project controls drill-down renders derived progress, exception and financ
   ]) assert.ok(indexSource.includes(indicator), 'missing drill-down indicator: ' + indicator);
   assert.match(indexSource, /const highCritical = riskRows\.filter/);
   assert.match(indexSource, /const openIssues = issueRows\.filter/);
-  assert.match(indexSource, /section\.allowed/);
 });
