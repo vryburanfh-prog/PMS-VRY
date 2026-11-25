@@ -68,6 +68,6 @@ test('failed later-tab write restores all touched tabs from backup and invalidat
 
 test('rollback failure reports manual reconciliation warning and backup URL', () => {
   const state = runHarness({failOnB:true, omitBackupB:true});
-  assert.throws(() => state.context.applyDatabaseImportPlanWithRollback_(state.plan, 'backup-id', 'backup-url'), /Rollback was incomplete.*manual reconciliation.*Backup URL: backup-url/);
+  assert.throws(() => state.context.applyDatabaseImportPlanWithRollback_(state.plan, 'backup-id', 'backup-url'), /Rollback was incomplete.*manually reconcile.*Backup URL: backup-url/);
   assert.deepEqual(state.destA.rows, [['A-old-1'],['A-old-2']]);
 });
