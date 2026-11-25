@@ -243,3 +243,11 @@ Draft PR #18 extends the locked delete helper with an optional expected-scope gu
 
 
 **Latest validation note (2026-11-25):** The full temporary integrated validation branch including all Phase 1 code fixes and the atomic-delete-scope regression ran **13 passed, 0 failed, 0 skipped**. The tests-only CI branch ran **1 passed, 0 failed, 12 skipped** on the main baseline. These are static source assertions only; isolated Apps Script/spreadsheet runtime tests remain unexecuted.
+
+## 3.17 Progress-log and schedule-rollup partial-write recovery
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| MUT-24 | Inject a failure after Progress_Updates insert/update and audit but before linked Activity update; separately inject failure after Activity update before project roll-up | Partial state is detected; no blind retry creates duplicate logs; reconciliation identifies log/activity/roll-up state and restores a consistent result through authorized APIs | Not run |
+
+Source review of `apiSaveProgressLog` confirms the progress log is inserted/updated and audit is written before the optional linked-Activity update and project roll-up. These writes are not transactional. A retry of a new log without a stable `Log_ID` can create another record. Recovery guidance is added to draft runbook PR #10; runtime failure injection is still pending.
