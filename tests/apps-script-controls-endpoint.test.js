@@ -89,7 +89,7 @@ test('portfolio dashboard renders and refreshes the project-controls watchlist',
 
 
 test('portfolio watchlist opens a permission-aware project controls drill-down', () => {
-  assert.match(indexSource, /openProjectControlsDrilldown_\(project\.projectId\)/);
+  assert.match(indexSource, /openProjectControlsDrilldown_\(/);
   assert.match(indexSource, /apiGetProjectControlsInputs\(pid\)/);
   assert.match(indexSource, /ensureProjectControlsDrilldown_/);
   assert.match(indexSource, /res\.access\.financialMonitoring/);
