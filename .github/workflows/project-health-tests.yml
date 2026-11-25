@@ -3,29 +3,36 @@ name: Project Health Tests
 on:
   pull_request:
     paths:
+      - 'Code.gs'
       - 'src/project-health.js'
-      - 'src/pms-project-controls.js'
-      - 'src/pms-portfolio-dashboard.js'
+      - 'src/project-controls.js'
+      - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
       - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-health.test.js'
+      - 'tests/project-controls.test.js'
+      - 'tests/project-controls-adapter.test.js'
+      - 'tests/pms-project-controls.test.js'
       - 'tests/pms-portfolio-dashboard.test.js'
+      - 'tests/apps-script-controls-endpoint.test.js'
       - '.github/workflows/project-health-tests.yml'
   push:
     branches:
       - main
       - 'pms-modernization/**'
     paths:
+      - 'Code.gs'
       - 'src/project-health.js'
-      - 'src/pms-project-controls.js'
-      - 'src/pms-portfolio-dashboard.js'
+      - 'src/project-controls.js'
+      - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
       - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-health.test.js'
+      - 'tests/project-controls.test.js'
+      - 'tests/project-controls-adapter.test.js'
       - 'tests/pms-project-controls.test.js'
-      - 'tests/apps-script-controls-endpoint.test.js'
-      - 'Code.gs'
       - 'tests/pms-portfolio-dashboard.test.js'
+      - 'tests/apps-script-controls-endpoint.test.js'
       - '.github/workflows/project-health-tests.yml'
 
 permissions:
