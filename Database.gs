@@ -178,7 +178,8 @@ function updateRecordById_(tabName, idColumn, recordId, updatesObj, expectedScop
         const scopeField = String(expectedScope.field || '').trim();
         const expectedValue = String(expectedScope.value === undefined || expectedScope.value === null ? '' : expectedScope.value).trim();
         const actualValue = String(previous[scopeField] === undefined || previous[scopeField] === null ? '' : previous[scopeField]).trim();
-        const nextScopeValue = String(updated[scopeField] === undefined || updated[scopeField] === null ? '' : updated[scopeField]).trim();\n        if (!scopeField || actualValue !== expectedValue || nextScopeValue !== expectedValue) throw new Error('Record does not belong to the expected scope.');
+        const nextScopeValue = String(updated[scopeField] === undefined || updated[scopeField] === null ? '' : updated[scopeField]).trim();
+        if (!scopeField || actualValue !== expectedValue || nextScopeValue !== expectedValue) throw new Error('Record does not belong to the expected scope.');
       }
       // Write contiguous changed-column runs only; preserve formulas and avoid one RPC per cell.
       changed.sort((a,b) => a.index-b.index);
