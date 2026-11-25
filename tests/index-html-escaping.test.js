@@ -9,7 +9,7 @@ function extractFunction(source, name) {
   const marker = 'function ' + name + '(';
   const start = source.indexOf(marker);
   assert.ok(start >= 0, name + ' must exist');
-  const next = source.slice(start + marker.length).search(/^function\s+\w+\s*\(/m);
+  const next = source.slice(start + marker.length).search(/^[ \t]*function\s+\w+\s*\(/m);
   return source.slice(start, next < 0 ? undefined : start + marker.length + next);
 }
 
