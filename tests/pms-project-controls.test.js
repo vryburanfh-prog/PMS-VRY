@@ -119,6 +119,21 @@ test('summarizes open risks, high/critical exposure and unresolved issues', () =
   assert.ok(report.warnings.some(x => x.includes('open issues')));
 });
 
+
+test('parses numeric-only PMS risk ratings into the configured severity bands', () => {
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-02-01', activities,
+    risks: [
+      { Project_ID: 'P-1', Risk_ID: 'R-15', Risk_Rating: '15', Current_Status: 'Open' },
+      { Project_ID: 'P-1', Risk_ID: 'R-10', Risk_Rating: '10', Current_Status: 'Open' },
+      { Project_ID: 'P-1', Risk_ID: 'R-05', Risk_Rating: '5', Current_Status: 'Open' }
+    ]
+  });
+  assert.deepEqual(report.riskSummary.records.map(row => row.band), ['critical', 'high', 'medium']);
+  assert.deepEqual(report.riskSummary.records.map(row => row.score), [15, 10, 5]);
+  assert.equal(report.riskSummary.highOrCriticalOpen, 2);
+});
+
 test('excludes archived risks and issues from management summaries', () => {
   const report = buildPmsProjectControlsReport({
     project, statusDate: '2026-02-01', activities,
