@@ -200,7 +200,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             </div>
             <span class="text-[10px] uppercase tracking-wide text-slate-400">Read-only summary</span>
           </div>
-          <div id="project-controls-kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5"></div>
+          <div id="project-controls-kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2.5"></div>
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
@@ -210,6 +210,8 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                   <th class="py-2 px-3">Open Issues</th>
                   <th class="py-2 px-3">Overdue Milestones</th>
                   <th class="py-2 px-3">Delayed Activities</th>
+                  <th class="py-2 px-3">Baseline Drift</th>
+                  <th class="py-2 px-3">Unbaselined</th>
                   <th class="py-2 px-3">Budget Status</th>
                   <th class="py-2 px-3">Commitment Status</th>
                   <th class="py-2 px-3">Drill-down</th>
@@ -2178,7 +2180,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       if (!data || data.success !== true) {
         status.textContent = 'Project controls indicators are currently unavailable.';
         grid.innerHTML = '';
-        if (projectRows) projectRows.innerHTML = '<tr><td colspan="8" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
+        if (projectRows) projectRows.innerHTML = '<tr><td colspan="10" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
         return;
       }
       status.textContent = 'Read-only summary as of ' + (data.statusDate || 'the current reporting date') +
@@ -2188,6 +2190,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         { label: 'Open Issues', value: data.openIssues, color: 'text-amber-700' },
         { label: 'Overdue Milestones', value: data.overdueMilestones, color: 'text-rose-700' },
         { label: 'Delayed Activities', value: data.delayedActivities, color: 'text-orange-700' },
+        { label: 'Baseline-drifted Projects', value: data.projectsWithBaselineDrift, color: 'text-amber-700' },
+        { label: 'Activities with Baseline Date Changes', value: data.baselineDriftActivities, color: 'text-amber-700' },
+        { label: 'Active Activities Missing from Baseline', value: data.unbaselinedActivities, color: 'text-orange-700' },
         { label: 'Projects Over Budget', value: data.projectsOverBudget, color: 'text-rose-700' },
         { label: 'Projects Over-committed', value: data.projectsOverCommitted, color: 'text-amber-700' }
       ];
@@ -2209,11 +2214,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             '<td class="py-2 px-3">' + metric(project.openIssues) + '</td>' +
             '<td class="py-2 px-3">' + metric(project.overdueMilestones) + '</td>' +
             '<td class="py-2 px-3">' + metric(project.delayedActivities) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.baselineDriftActivities) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.unbaselinedActivities) + '</td>' +
             '<td class="py-2 px-3">' + flag(project.overBudget) + '</td>' +
             '<td class="py-2 px-3">' + flag(project.overCommitment) + '</td>' +
             '<td class="py-2 px-3"><button type="button" onclick="openProjectControlsDrilldown_(' + safeJsArg_(project.projectId) + ')" class="text-indigo-600 hover:underline font-semibold">Details</button></td>' +
             '</tr>';
-        }).join('') : '<tr><td colspan="8" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
+        }).join('') : '<tr><td colspan="10" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
       }
     }
 
