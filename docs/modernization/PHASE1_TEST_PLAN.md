@@ -232,3 +232,11 @@ These workflows span multiple sheets and are not transactional in the inspected 
 ## 6. Current limitations
 
 This matrix has not been executed. The current audit is source-level inspection using repository files. Runtime behavior, deployment configuration, spreadsheet permissions, Script Properties, OAuth configuration, and real concurrency behavior require an authorized isolated test environment.
+
+## 3.16 Atomic project-scope validation for deletes
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| DEL-04 | Concurrently move/change a record's project scope while a scoped delete request is in flight (test-only harness or controlled fault injection) | The delete helper re-reads the stable-ID record while holding the Script Lock and rejects deletion if its current scope does not match the caller's expected project; no other-project record is deleted | Not run |
+
+Draft PR #18 extends the locked delete helper with an optional expected-scope guard and passes the expected project field/value from the scoped delete endpoints. The pre-lock API ownership check remains for fast rejection; the helper repeats the scope check under lock to close the stale-row race. This static safeguard still requires an isolated concurrency/fault-injection test.
