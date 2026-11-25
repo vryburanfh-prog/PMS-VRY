@@ -42,3 +42,39 @@ test('rejects malformed portfolio API responses and duplicate visible projects',
     success: true, projects: [{ Project_ID: 'P-1' }, { Project_ID: 'P-1' }]
   }, []), /missing or duplicate Project_ID/);
 });
+
+test('prioritizes observable project exceptions without numeric health thresholds', () => {
+  const { prioritizeProjectExceptions, sortProjectsByExceptionPriority } = require('../src/pms-portfolio-dashboard');
+  const urgent = prioritizeProjectExceptions({ controls: {
+    highOrCriticalOpenRisks: 1, overBudget: false, overdueMilestones: 0,
+    overCommitment: false, delayedActivities: 0, openIssues: 0,
+    availability: { schedule: true, milestones: true, risks: true, issues: true, financialMonitoring: true }
+  } });
+  assert.equal(urgent.level, 'urgent');
+  assert.match(urgent.reasons.join(' '), /high\/critical risk/);
+
+  const incomplete = prioritizeProjectExceptions({ controls: {
+    highOrCriticalOpenRisks: null, overBudget: null, overdueMilestones: null,
+    overCommitment: null, delayedActivities: null, openIssues: null,
+    availability: { schedule: false, milestones: false, risks: false, issues: false, financialMonitoring: false }
+  } });
+  assert.equal(incomplete.level, 'incomplete');
+
+  const ordered = sortProjectsByExceptionPriority([
+    { projectId: 'monitor', controls: { highOrCriticalOpenRisks: 0, overBudget: false, overdueMilestones: 0, overCommitment: false, delayedActivities: 0, openIssues: 0, availability: {} } },
+    { projectId: 'urgent', controls: { highOrCriticalOpenRisks: 1, overBudget: false, overdueMilestones: 0, overCommitment: false, delayedActivities: 0, openIssues: 0, availability: {} } },
+    { projectId: 'none', controls: null }
+  ]);
+  assert.deepEqual(ordered.map(project => project.projectId), ['urgent', 'monitor', 'none']);
+  assert.equal(ordered[0].exceptionPriority.level, 'urgent');
+});
+
+test('ranks over-budget and overdue milestones ahead of routine open issues', () => {
+  const { prioritizeProjectExceptions } = require('../src/pms-portfolio-dashboard');
+  const base = { highOrCriticalOpenRisks: 0, overBudget: false, overdueMilestones: 0,
+    overCommitment: false, delayedActivities: 0, openIssues: 1, availability: {} };
+  assert.equal(prioritizeProjectExceptions({ controls: Object.assign({}, base, { overBudget: true }) }).level, 'urgent');
+  assert.equal(prioritizeProjectExceptions({ controls: Object.assign({}, base, { overdueMilestones: 1 }) }).level, 'urgent');
+  assert.equal(prioritizeProjectExceptions({ controls: base }).level, 'attention');
+});
+
