@@ -6,6 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'Code.gs'), 'utf8');
 const db = fs.readFileSync(path.join(root, 'Database.gs'), 'utf8');
+const security = fs.readFileSync(path.join(root, 'Security.gs'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const presentationHtml = fs.readFileSync(path.join(root, 'Presentation.html'), 'utf8');
 
@@ -106,4 +107,14 @@ test('client deck generation inserts through locked helper with Deck_ID key', { 
   const body = section(code, 'function apiGenerateClientPresentation', 'function generateAiSlideDeckWithGemini_');
   assert.ok(body.includes('insertRecord_(CLIENT_DECKS_SHEET_'));
   assert.ok(body.includes('Deck_ID: deckId'));
+});
+
+
+test('password-login failure counter is read-modify-write under Script Lock', { skip: !(security.includes('function recordPasswordLoginFailure_(') && code.includes('recordPasswordLoginFailure_(cred.Credential_ID)')) && 'Pending login-failure atomicity remediation PR' }, () => {
+  const helper = section(security, 'function recordPasswordLoginFailure_', 'function apiLoginWithPassword');
+  assert.ok(helper.includes('LockService.getScriptLock()'));
+  assert.ok(helper.includes('waitLock(10000)'));
+  assert.ok(helper.includes('findRecordRowById_'));
+  assert.ok(helper.includes('updateRecordById_'));
+  assert.ok(helper.includes('attempts >= 5'));
 });
