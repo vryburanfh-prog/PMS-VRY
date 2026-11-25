@@ -194,6 +194,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
 | #10 | Backup/recovery runbook | Open draft | Source-based guidance; runtime recovery and failure-injection tests not run |
 | #11 | Temporary integrated validation | Closed unmerged | CI passed 7/7 static regression tests with all Phase 1 source fixes combined; closed after validation |
+| #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
 
 
 
