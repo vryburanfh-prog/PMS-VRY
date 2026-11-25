@@ -60,6 +60,40 @@ test('reports missing baseline and missing weights as data-quality gaps', () => 
   assert.ok(report.warnings.length >= 3);
 });
 
+
+test('reports schedule slippage, overdue milestones and financial overruns', () => {
+  const delayedActivities = activities.map((row, index) => ({
+    ...row,
+    Forecast_Finish_Date: index === 0 ? '2026-01-10' : '2026-01-06',
+    Actual_Finish_Date: '',
+    Status: 'In Progress'
+  }));
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-01-08',
+    activities: delayedActivities,
+    baselines: [baseline],
+    milestones: [
+      { Project_ID: 'P-1', Milestone_ID: 'M-1', Milestone_Name: 'Approval', Forecast_Date: '2026-01-07', Milestone_Status: 'In Progress' },
+      { Project_ID: 'P-1', Milestone_ID: 'M-2', Milestone_Name: 'Handover', Forecast_Date: '2026-01-12', Milestone_Status: 'Not Started' }
+    ],
+    financialItems: [{ Project_ID: 'P-1', Budget_Amount: 100, Committed_Amount: 120, Actual_Spend: 130 }]
+  });
+  assert.equal(report.scheduleAlerts.overdueMilestoneCount, 1);
+  assert.equal(report.scheduleAlerts.delayedActivityCount, 1);
+  assert.equal(report.scheduleAlerts.overdueMilestones[0].id, 'M-1');
+  assert.equal(report.finance.overBudget, true);
+  assert.equal(report.finance.overCommitment, true);
+  assert.ok(report.warnings.some(x => x.includes('Actual spending exceeds')));
+});
+
+test('does not flag completed milestones as overdue', () => {
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-02-01', activities,
+    milestones: [{ Project_ID: 'P-1', Milestone_ID: 'M-1', Forecast_Date: '2026-01-01', Milestone_Status: 'Completed' }]
+  });
+  assert.equal(report.scheduleAlerts.overdueMilestoneCount, 0);
+});
+
 test('validates status date and malformed baseline JSON', () => {
   assert.throws(() => buildPmsProjectControlsReport({ project, statusDate: '02/01/2026', activities }), /YYYY-MM-DD/);
   assert.throws(() => buildPmsProjectControlsReport({
