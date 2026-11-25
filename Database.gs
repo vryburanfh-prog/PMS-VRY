@@ -225,7 +225,7 @@ function deleteRecordsByIds_(tabName, idColumn, recordIds) {
 
 
 /** Physically removes one record by ID under a script lock. */
-function deleteRecordById_(tabName, idColumn, recordId) {
+function deleteRecordById_(tabName, idColumn, recordId, expectedScope) {
   const lock = LockService.getScriptLock();
   const ownsLock = !lock.hasLock();
   if (ownsLock) lock.waitLock(10000);
@@ -243,6 +243,14 @@ function deleteRecordById_(tabName, idColumn, recordId) {
       if (String(values[r][idIndex]).trim() === String(recordId).trim()) {
         const previous = {};
         headers.forEach((h, c) => previous[h] = values[r][c]);
+        if (expectedScope) {
+          const scopeField = String(expectedScope.field || '').trim();
+          const expectedValue = String(expectedScope.value || '').trim();
+          const actualValue = String(previous[scopeField] || '').trim();
+          if (!scopeField || actualValue !== expectedValue) {
+            throw new Error('Record does not belong to the expected scope.');
+          }
+        }
         sheet.deleteRow(r + 1);
         // Compact fully empty rows below the header after a physical deletion.
         // A row is considered blank only when every cell has neither a value nor a formula.
