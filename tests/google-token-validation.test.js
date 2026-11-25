@@ -8,7 +8,7 @@ const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf
 test('Google ID token validation handles fetch and malformed JSON failures safely', () => {
   const login = security.slice(security.indexOf('function apiLoginWithGoogleCredential('), security.indexOf('\nfunction ', security.indexOf('function apiLoginWithGoogleCredential(') + 20));
   assert.match(login, /try\s*\{\s*const response = UrlFetchApp\.fetch/);
-  assert.match(login, /JSON\.parse\(response\.getContentText\(\) \|\| '\\{\\}'\)/);
+  assert.ok(login.includes("JSON.parse(response.getContentText() || '{}')"));
   assert.match(login, /catch \(verificationError\)/);
   assert.match(login, /verification is temporarily unavailable/);
 });
