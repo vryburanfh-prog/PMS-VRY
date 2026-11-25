@@ -946,7 +946,7 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
     const deps = getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES).filter(d => String(d.Project_ID) === pid && isActiveDependencyRecord_(d));
     if (deps.some(d => String(d.Predecessor_ID) === String(recordId) || String(d.Successor_ID) === String(recordId))) throw new Error('Cannot delete this Activity because it is referenced by a schedule dependency. Remove or update the dependency first.');
   }
-  const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
+  const previous = deleteRecordById_(cfg[0], cfg[1], recordId, { field: 'Project_ID', value: pid });
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
 }
@@ -1618,6 +1618,7 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
  * Deletes a record from a Phase 7 Project Controls registry (requires Can_Delete permission)
  * and records the deleted snapshot in Audit_Logs.
  */
+// Validation-only integration branch includes the locked-delete-helper regression fix.
 function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
   const cfg = CONTROLS_REGISTRY_CONFIG[registryKey];
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
@@ -1632,11 +1633,9 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
     throw new Error('Record does not belong to the active project.');
   }
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(cfg.tab);
-  sheet.deleteRow(existing._rowIndex);
-
-  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
+  const deleted = deleteRecordById_(cfg.tab, cfg.idCol, recordId, { field: 'Project_ID', value: pid });
+  delete deleted._rowIndex;
+  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, deleted, null, 'Deleted ' + registryKey + ' record');
   return { success: true };
 }
 
@@ -2033,9 +2032,7 @@ function apiDeleteWeeklyReport(projectId, reportId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.WEEKLY_REPORTS);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
@@ -2293,9 +2290,7 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.TEAM_WORKLOAD);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId, { field: 'Assigned_Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
@@ -2524,8 +2519,7 @@ function apiDeleteProcurementItem(projectId, procurementId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(procTab).deleteRow(existing._rowIndex);
+  deleteRecordById_(procTab, 'Procurement_ID', procurementId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
@@ -2599,8 +2593,7 @@ function apiDeleteFinancialItem(projectId, financialId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(finTab).deleteRow(existing._rowIndex);
+  deleteRecordById_(finTab, 'Financial_ID', financialId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
@@ -3883,24 +3876,16 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
     throw new Error('Escalation title is required.');
   }
 
-  var sheet = ensurePhase18Sheet_();
-  var lastRow = sheet.getLastRow();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colIdx = {};
-  headers.forEach(function(h, i) { colIdx[String(h).trim()] = i + 1; });
-
+  ensurePhase18Sheet_();
   var nowIso = new Date().toISOString();
   var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
   var escId = String(p.Escalation_ID || '').trim();
-
-  var existingRowIndex = -1;
-  if (escId && lastRow >= 2 && colIdx['Escalation_ID']) {
-    var ids = sheet.getRange(2, colIdx['Escalation_ID'], lastRow - 1, 1).getValues();
-    for (var r = 0; r < ids.length; r++) {
-      if (String(ids[r][0]).trim() === escId) {
-        existingRowIndex = r + 2;
-        break;
-      }
+  var existingEscalation = escId ? findRecordRowById_('Escalations', 'Escalation_ID', escId) : null;
+  if (existingEscalation) {
+    var storedProjectId = String(existingEscalation.Project_ID || '').trim();
+    var requestedProjectId = targetPid || 'PORTFOLIO';
+    if (storedProjectId !== requestedProjectId) {
+      throw new Error('Escalation does not belong to the active project or portfolio scope.');
     }
   }
 
@@ -3913,40 +3898,32 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
     Owner_Email: String(p.Owner_Email || actor).trim(),
     Status: String(p.Status || 'OPEN').trim().toUpperCase(),
     Notes: String(p.Notes || '').trim(),
-    Created_By: actor,
-    Created_At: nowIso,
+    Created_By: existingEscalation ? (existingEscalation.Created_By || actor) : actor,
+    Created_At: existingEscalation ? (existingEscalation.Created_At || nowIso) : nowIso,
     Updated_At: nowIso
   };
 
-  if (existingRowIndex > 0) {
-    if (colIdx['Created_By']) {
-      record.Created_By = sheet.getRange(existingRowIndex, colIdx['Created_By']).getValue() || actor;
-    }
-    if (colIdx['Created_At']) {
-      record.Created_At = sheet.getRange(existingRowIndex, colIdx['Created_At']).getValue() || nowIso;
-    }
-    Object.keys(record).forEach(function(k) {
-      if (colIdx[k]) {
-        sheet.getRange(existingRowIndex, colIdx[k]).setValue(record[k]);
-      }
-    });
-  } else {
-    var newRowValues = headers.map(function(h) {
-      var key = String(h).trim();
-      return record[key] !== undefined ? record[key] : '';
-    });
-    sheet.appendRow(newRowValues);
-  }
-
-  if (typeof writeAuditLog_ === 'function') {
+  if (existingEscalation) {
+    var updateResult = updateRecordById_('Escalations', 'Escalation_ID', record.Escalation_ID, record);
     writeAuditLog_(
       ctx,
-      existingRowIndex > 0 ? 'UPDATE_ESCALATION' : 'CREATE_ESCALATION',
+      'UPDATE_ESCALATION',
       'Escalations',
-      record.Project_ID,
+      record.Escalation_ID,
+      updateResult.previous,
+      updateResult.updated,
+      'Updated escalation ' + record.Escalation_ID
+    );
+  } else {
+    insertRecord_('Escalations', record);
+    writeAuditLog_(
+      ctx,
+      'CREATE_ESCALATION',
+      'Escalations',
+      record.Escalation_ID,
       null,
       record,
-      (existingRowIndex > 0 ? 'Updated' : 'Created') + ' escalation ' + record.Escalation_ID
+      'Created escalation ' + record.Escalation_ID
     );
   }
 
@@ -4127,7 +4104,6 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
   var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var metrics = computePhase19CurrentMetrics_(targetPid);
 
   var now = new Date();
@@ -4151,11 +4127,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
-  sheet.appendRow(rowValues);
+  insertRecord_('PMO_Snapshots', record);
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(
@@ -4899,25 +4871,24 @@ function apiGenerateClientPresentation(config) {
     audienceTone: audienceTone,
     generatedAt: nowIso,
     executiveSummary: aiDeck.executiveSummary || '',
-    slides: aiDeck.slides || [],
-    rawMetrics: factPacket
+    slides: aiDeck.slides || []
   };
 
-  sh.appendRow([
-    deckId,
-    pid,
-    deckTitle,
-    focusScope,
-    JSON.stringify(selectedWbsIds),
-    audienceTone,
-    customPrompt,
-    JSON.stringify(fullDeckPayload),
-    shareToken,
-    actor,
-    nowIso,
-    nowIso,
-    'PUBLISHED'
-  ]);
+  insertRecord_(CLIENT_DECKS_SHEET_, {
+    Deck_ID: deckId,
+    Project_ID: pid,
+    Deck_Title: deckTitle,
+    Focus_Scope: focusScope,
+    Selected_WBS_JSON: JSON.stringify(selectedWbsIds),
+    Audience_Tone: audienceTone,
+    Custom_Prompt: customPrompt,
+    Deck_JSON: JSON.stringify(fullDeckPayload),
+    Share_Token: shareToken,
+    Created_By: actor,
+    Created_At: nowIso,
+    Updated_At: nowIso,
+    Status: 'PUBLISHED'
+  });
 
   return {
     success: true,
@@ -4999,9 +4970,14 @@ function apiGetPublishedClientDeckByToken(token) {
   const found = decks.find(d => String(d.Share_Token) === cleanToken && String(d.Status || 'PUBLISHED') === 'PUBLISHED');
   if (!found) return { success: false, error: 'Presentation not found or link has been archived.' };
 
+  const deck = JSON.parse(found.Deck_JSON || '{}');
+  // Defense in depth: older published snapshots may contain source metrics.
+  // Public token access returns only curated presentation content.
+  if (deck && typeof deck === 'object' && !Array.isArray(deck)) delete deck.rawMetrics;
+
   return {
     success: true,
-    deck: JSON.parse(found.Deck_JSON || '{}')
+    deck: deck
   };
 }
 
@@ -5227,7 +5203,16 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
         throw new Error('Header mismatch in tab "' + tabName + '". No import was applied.');
       }
       var srcLast = src.getLastRow();
-      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [] });
+      var importedRows = srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [];
+      // Treat formula-like imported strings as literal text in the destination.
+      // Numeric/date values are preserved; source formulas are imported as values.
+      importedRows = importedRows.map(function(row) {
+        return row.map(function(value) {
+          if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(value)) return "'" + value;
+          return value;
+        });
+      });
+      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: importedRows });
     });
     if (!plan.length) throw new Error('No matching database tabs were found in the source spreadsheet.');
     // Always create a full backup only after all source headers have passed validation.
