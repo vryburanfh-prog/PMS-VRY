@@ -691,7 +691,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
   document.getElementById('ws-project-id').textContent = proj.Project_ID + ' • ' + (proj.Project_Category || 'General');
   document.getElementById('ws-project-name').textContent = proj.Project_Name;
   document.getElementById('ws-project-meta').textContent =
-    `Client: ${escapeHtmlSafe_(proj.Client || '-')} | PM: ${escapeHtmlSafe_(proj.Project_Manager || '-')} | Location: ${proj.Project_Location || '-'}`;
+    `Client: ${proj.Client || '-'} | PM: ${proj.Project_Manager || '-'} | Location: ${proj.Project_Location || '-'}`;
   document.getElementById('ws-status-badge').textContent = proj.Project_Status || 'Active';
   document.getElementById('ws-health-badge').textContent = proj.Project_Health || 'On Track';
   document.getElementById('ws-tab-heading').textContent = tabName;
@@ -1966,7 +1966,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Health || '-')}</td>
             <td class="py-2 px-3">${p.Overall_Actual_Progress || 0}% / ${p.Overall_Planned_Progress || 0}%</td>
             <td class="py-2 px-3 text-right space-x-2">
-              <button onclick='startEditProject(${escapeHtmlSafe_(JSON.stringify(p))})' class="text-indigo-600 hover:underline font-medium">Edit</button>
+              <button onclick='startEditProject(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(p)))}))' class="text-indigo-600 hover:underline font-medium">Edit</button>
               <button onclick="archiveProject(${safeJsArg_(p.Project_ID)}, ${!archived})" class="text-amber-700 hover:underline font-medium">${archived ? 'Restore' : 'Archive'}</button>
             </td>
           </tr>
