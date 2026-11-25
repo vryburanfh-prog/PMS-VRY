@@ -2704,7 +2704,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
     function openControlsRegistryModule(registryKey) {
       const container = document.getElementById('ws-tab-content');
-      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${registryKey} registry from Google Sheets...</div>`;
+      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${escapeHtmlSafe_(registryKey)} registry from Google Sheets...</div>`;
 
       PMS_SERVER_RUN
         .withSuccessHandler(res => {
@@ -2946,7 +2946,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       });
 
       if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="${schema.columns.length + 1}" class="py-5 text-center text-slate-400">No ${st.key.toLowerCase()} found for this project.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${schema.columns.length + 1}" class="py-5 text-center text-slate-400">No ${escapeHtmlSafe_(st.key.toLowerCase())} found for this project.</td></tr>`;
         return;
       }
 
