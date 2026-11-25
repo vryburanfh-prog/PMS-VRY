@@ -9,6 +9,7 @@ on:
       - 'tests/presentation-html-escaping.test.js'
       - 'tests/project-control-field-authorization.test.js'
       - 'tests/spreadsheet-formula-safety.test.js'
+      - 'tests/spreadsheet-formula-safety.test.js'
       - 'tests/api-authorization-coverage.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
   push:
