@@ -98,3 +98,10 @@ The dashboard model now exposes `prioritizedProjects` in addition to the origina
 5. **Incomplete / unavailable** — controls are missing or one or more module datasets are unavailable and no higher-priority exception can be established.
 
 Each project includes reason text explaining its priority. Projects with equal priority retain their original portfolio order. The dashboard does not label a project Green/Amber/Red from this prioritizer; configurable health thresholds remain a separate, explicitly configured feature. Unavailable module data is never interpreted as evidence of good health.
+
+## Project-level drill-down model
+
+For each project with an authorized detailed report, the portfolio model now includes a compact `drilldown` object containing status date, planned/actual progress and variance, approved baseline revision/date, critical-activity count and working-day duration, delayed-activity/overdue-milestone counts, risk and issue totals, and financial budget/commitment/spend balances. It includes module availability so consumers can show unavailable sections distinctly. It deliberately excludes raw risk records, issue narratives, and activity/milestone row details from this cross-project model. The detailed project report remains available only to the caller that obtained the corresponding project-scoped, permission-checked API data.
+
+Priority classification also treats missing metric coverage or missing financial data as `Incomplete`, rather than `Monitor`. A higher-priority exception that is positively observed still retains its priority while the reason text notes any unavailable coverage.
+
