@@ -300,20 +300,26 @@ function apiUpdateUser(userId, payload) {
 
 function apiAdminResetPassword(userId, newPassword) {
   const ctx = assertAdministrator_();
-  const user = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
-  if (!user) throw new Error('User not found.');
-  if (normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') throw new Error('Administrator accounts must use Google authentication.');
   if (String(newPassword || '').length < 12) throw new Error('Password must be at least 12 characters.');
-  const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  const credential = creds.find(r => String(r.User_ID) === String(userId));
-  if (!credential) throw new Error('This user does not have a password login.');
-  const salt = authRandomToken_();
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credential.Credential_ID, {
-    Password_Salt: salt, Password_Hash: hashPassword_(newPassword, salt), Failed_Attempts: 0, Locked_Until: '', Updated_At: getNowTimestamp_()
-  });
-  revokeUserAuthSessions_(userId);
-  writeAuditLog_(ctx, 'RESET_PASSWORD', 'Users_Admin', userId, null, { Password_Reset: true }, 'Administrator reset password');
-  return { success: true };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const user = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
+    if (!user) throw new Error('User not found.');
+    if (normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') throw new Error('Administrator accounts must use Google authentication.');
+    const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+    const credential = creds.find(r => String(r.User_ID) === String(userId));
+    if (!credential) throw new Error('This user does not have a password login.');
+    const salt = authRandomToken_();
+    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credential.Credential_ID, {
+      Password_Salt: salt, Password_Hash: hashPassword_(newPassword, salt), Failed_Attempts: 0, Locked_Until: '', Updated_At: getNowTimestamp_()
+    });
+    revokeUserAuthSessions_(userId);
+    writeAuditLog_(ctx, 'RESET_PASSWORD', 'Users_Admin', userId, null, { Password_Reset: true }, 'Administrator reset password');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
