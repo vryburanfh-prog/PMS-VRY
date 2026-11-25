@@ -4293,7 +4293,7 @@ button, input, select, textarea { min-height: 2.25rem; }
 
           <div class="flex items-center justify-between border-b border-slate-200 pb-2">
             <h3 class="text-sm font-bold text-slate-900">${sectionTitle}</h3>
-            <button onclick="openProcurementAndFinancialsModule('${activeSub}')"
+            <button onclick="openProcurementAndFinancialsModule(${safeJsArg_(activeSub)})"
               class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-medium">
               ↻ Refresh
             </button>
@@ -7592,9 +7592,9 @@ function canManageProject_() {
 
         const safeUid = uid.replace(/'/g, "\\'");
         const statusAction = isActive
-          ? `<button type="button" onclick="handleToggleUserStatus('${safeUid}', false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
-          : `<button type="button" onclick="handleToggleUserStatus('${safeUid}', true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
-        const actionBtn = `<button type="button" onclick="openEditUserModal_('${safeUid}')" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${u.Has_Password_Login && role.toLowerCase() !== 'administrator' ? `<button type="button" onclick="resetPasswordForUser_('${safeUid}')" class="text-xs font-semibold text-amber-700 hover:underline mr-2">Reset Password</button>` : ''}${statusAction}<button type="button" onclick="deleteUserAccount_('${safeUid}')" class="ml-2 text-xs font-semibold text-rose-700 hover:underline">Delete</button>`;
+          ? `<button type="button" onclick="handleToggleUserStatus(${safeJsArg_(uid)}, false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
+          : `<button type="button" onclick="handleToggleUserStatus(${safeJsArg_(uid)}, true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
+        const actionBtn = `<button type="button" onclick="openEditUserModal_(${safeJsArg_(uid)})" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${u.Has_Password_Login && role.toLowerCase() !== 'administrator' ? `<button type="button" onclick="resetPasswordForUser_(${safeJsArg_(uid)})" class="text-xs font-semibold text-amber-700 hover:underline mr-2">Reset Password</button>` : ''}${statusAction}<button type="button" onclick="deleteUserAccount_(${safeJsArg_(uid)})" class="ml-2 text-xs font-semibold text-rose-700 hover:underline">Delete</button>`;
 
         return `
           <tr class="hover:bg-slate-50">
