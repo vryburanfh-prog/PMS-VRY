@@ -1,0 +1,28 @@
+name: Client Presentations Empty Sheet Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/client-presentations-empty-sheet.test.js'
+      - '.github/workflows/client-presentations-empty-sheet-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/client-presentations-empty-sheet.test.js'
+      - '.github/workflows/client-presentations-empty-sheet-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: client-presentations-empty-sheet-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  client-presentations-empty-sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/client-presentations-empty-sheet.test.js
