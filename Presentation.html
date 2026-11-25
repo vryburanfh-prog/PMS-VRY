@@ -3330,8 +3330,8 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                   <div>
                     <span class="font-mono text-slate-500 mr-2">${escapeHtmlSafe_(r.Report_ID)}</span>
-                    <strong class="text-slate-900">${r.Reporting_Week || 'Weekly Report'}</strong>
-                    <span class="text-slate-500 ml-2">(${r.Reporting_Period || '-'})</span>
+                    <strong class="text-slate-900">${escapeHtmlSafe_(r.Reporting_Week || 'Weekly Report')}</strong>
+                    <span class="text-slate-500 ml-2">(${escapeHtmlSafe_(r.Reporting_Period || '-')})</span>
                     ${r.Main_WBS_ID ? `<span class="ml-2 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">${escapeHtmlSafe_(r.Main_WBS_ID)}</span>` : ''}
                   </div>
                   <div class="flex items-center gap-3">
@@ -3341,13 +3341,13 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                  <div><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</div>
-                  <div><strong>Ongoing:</strong> ${r.Ongoing_Activities || '-'}</div>
-                  <div><strong>Pending:</strong> ${r.Pending_Activities || '-'}</div>
-                  <div><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</div>
-                  <div><strong>Issues:</strong> ${r.Issues_Encountered || '-'}</div>
-                  <div><strong>Mitigation:</strong> ${r.Mitigation_Measures || '-'}</div>
-                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</div>
+                  <div><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</div>
+                  <div><strong>Ongoing:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</div>
+                  <div><strong>Pending:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</div>
+                  <div><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</div>
+                  <div><strong>Issues:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</div>
+                  <div><strong>Mitigation:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</div>
+                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</div>
                 </div>
                 <div class="text-[11px] text-slate-400">Lead: ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')}${escapeHtmlSafe_(r.Remarks ? ' • Remarks: ' + r.Remarks : '')}</div>
               </div>
@@ -3508,15 +3508,15 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           ${st.weeklyReports.map(r => `
             <div style="border:1px solid #cbd5e1;padding:12px;margin-bottom:14px;border-radius:6px;font-size:12px;">
               <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">
-                ${escapeHtmlSafe_(r.Report_ID)} — ${r.Reporting_Week || ''} (${r.Reporting_Period || ''}) | Planned: ${r.Overall_Planned_Progress || 0}% / Actual: ${r.Overall_Actual_Progress || 0}%
+                ${escapeHtmlSafe_(r.Report_ID)} — ${escapeHtmlSafe_(r.Reporting_Week || '')} (${escapeHtmlSafe_(r.Reporting_Period || '')}) | Planned: ${r.Overall_Planned_Progress || 0}% / Actual: ${r.Overall_Actual_Progress || 0}%
               </div>
-              <p><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</p>
-              <p><strong>Ongoing Activities:</strong> ${r.Ongoing_Activities || '-'}</p>
-              <p><strong>Pending Activities:</strong> ${r.Pending_Activities || '-'}</p>
-              <p><strong>Issues Encountered:</strong> ${r.Issues_Encountered || '-'}</p>
-              <p><strong>Mitigation Measures:</strong> ${r.Mitigation_Measures || '-'}</p>
-              <p><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</p>
-              <p><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</p>
+              <p><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</p>
+              <p><strong>Ongoing Activities:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</p>
+              <p><strong>Pending Activities:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</p>
+              <p><strong>Issues Encountered:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</p>
+              <p><strong>Mitigation Measures:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</p>
+              <p><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</p>
+              <p><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</p>
               <p style="color:#64748b;"><strong>Lead:</strong> ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')} | <strong>Remarks:</strong> ${escapeHtmlSafe_(r.Remarks || '-')}</p>
             </div>
           `).join('')}
@@ -3797,7 +3797,7 @@ button, input, select, textarea { min-height: 2.25rem; }
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(w.Employee_Name)} <span class="text-[10px] font-mono text-slate-400">${escapeHtmlSafe_(w.Employee_ID ? '(' + w.Employee_ID + ')' : '')}</span></td>
             <td class="py-2 px-3">${[w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-'}</td>
             <td class="py-2 px-3 font-mono text-[11px]">${wbsStr}</td>
-            <td class="py-2 px-3 max-w-xs truncate" title="${w.Main_Scope_Of_Responsibility || ''}">${w.Main_Scope_Of_Responsibility || '-'}</td>
+            <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '')}">${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '-')}</td>
             <td class="py-2 px-3 font-bold text-indigo-700">${w.Workload_Allocation_Pct || 0}%</td>
             <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(dateStr)}</td>
             <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(w.Assignment_Status || 'Active')}</span></td>
@@ -3836,7 +3836,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(r.employeeName)} <span class="text-[10px] font-mono text-slate-400">${r.employeeId !== '-' ? '(' + escapeHtmlSafe_(r.employeeId) + ')' : ''}</span></td>
             <td class="py-2 px-3">${[r.position, r.department].filter(Boolean).join(' • ') || '-'}</td>
-            <td class="py-2 px-3">${r.activeProjectsSummary || '<span class="text-slate-400">None active</span>'}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(r.activeProjectsSummary || 'None active')}</td>
             <td class="py-2 px-3 font-bold ${pct > 100 ? 'text-rose-700' : 'text-slate-900'}">${pct}%</td>
             <td class="py-2 px-3">${statusBadge}</td>
           </tr>
@@ -4132,12 +4132,12 @@ button, input, select, textarea { min-height: 2.25rem; }
                       return `
                         <tr class="hover:bg-slate-50">
                           <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(p.Procurement_ID) }</td>
-                          <td class="py-2 px-3 font-mono">${p.PO_Or_Reference || '-'}</td>
+                          <td class="py-2 px-3 font-mono">${escapeHtmlSafe_(p.PO_Or_Reference || '-')}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(p.Item_Description)}</td>
                           <td class="py-2 px-3">${escapeHtmlSafe_(p.Vendor_Or_Carrier || '-')}</td>
                           <td class="py-2 px-3">${p.Quantity ?? 0}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${formatCurrencyNum(p.Total_Cost)}</td>
-                          <td class="py-2 px-3 whitespace-nowrap">${p.Expected_Delivery_Date || '-'}</td>
+                          <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(p.Expected_Delivery_Date || '-')}</td>
                           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(p.Delivery_Status || 'Pending')}</span></td>
                           <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${editBtn}${delBtn}</td>
                         </tr>
@@ -4246,7 +4246,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                       return `
                         <tr class="hover:bg-slate-50">
                           <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(f.Financial_ID) }</td>
-                          <td class="py-2 px-3 font-semibold text-slate-900">${f.Cost_Category}</td>
+                          <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(f.Cost_Category)}</td>
                           <td class="py-2 px-3">${escapeHtmlSafe_(f.Line_Item_Description || '-')}</td>
                           <td class="py-2 px-3">${formatCurrencyNum(f.Budget_Amount)}</td>
                           <td class="py-2 px-3">${formatCurrencyNum(f.Committed_Amount)}</td>
@@ -4618,13 +4618,13 @@ button, input, select, textarea { min-height: 2.25rem; }
                       const v = Number(r.Variance_Amount || 0);
                       return `
                         <tr class="hover:bg-slate-50">
-                          <td class="py-2 px-3 font-mono font-semibold text-indigo-700">${r.Project_ID}</td>
+                          <td class="py-2 px-3 font-mono font-semibold text-indigo-700">${escapeHtmlSafe_(r.Project_ID)}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(r.Project_Name)}</td>
                           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">${escapeHtmlSafe_(r.Status)}</span></td>
                           <td class="py-2 px-3">${Number(r.Budget_Amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3 font-semibold">${Number(r.Actual_Spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3 ${v < 0 ? 'text-rose-700 font-bold' : 'text-emerald-700 font-semibold'}">${v >= 0 ? '+' : ''}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td class="py-2 px-3">${r.Latest_Progress}</td>
+                          <td class="py-2 px-3">${escapeHtmlSafe_(r.Latest_Progress)}</td>
                           <td class="py-2 px-3 font-bold ${r.Overallocated_Resources > 0 ? 'text-rose-700' : 'text-slate-600'}">${r.Overallocated_Resources}</td>
                         </tr>
                       `;
@@ -6757,7 +6757,7 @@ function openClientDeckModal() {
     })
     .withFailureHandler(err => {
       document.getElementById('deck-history-list').innerHTML =
-        `<div class="text-rose-600">Failed to load scope options: ${err && err.message ? err.message : err}</div>`;
+        `<div class="text-rose-600">Failed to load scope options: ${escapeHtmlSafe_(err && err.message ? err.message : err)}</div>`;
     })
     .apiGetPresentationScopeOptions(pid);
 }
