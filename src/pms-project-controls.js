@@ -52,10 +52,6 @@ function buildPmsProjectControlsReport(input) {
 
   const activities = (input.activities || []).filter(row =>
     String(row.Project_ID || '').trim() === projectId && !['true', '1', 'yes'].includes(String(row.Is_Archived || '').trim().toLowerCase()));
-  if (!activities.length) {
-    return { projectId, statusDate, schedule: null, progress: { planned: null, actual: null }, finance: null,
-      warnings: ['No active schedule activities are available'] };
-  }
   const activityIds = new Set(activities.map(row => text(row.Activity_ID, 'Activity_ID')));
   if (activityIds.size !== activities.length) throw new Error('Duplicate Activity_ID values in project schedule');
 
@@ -95,7 +91,7 @@ function buildPmsProjectControlsReport(input) {
     duration: number(row.Baseline_Duration, 'Baseline_Duration'),
     predecessors: predecessors.get(String(row.Activity_ID))
   }));
-  const cpm = calculateCpm(cpmInput);
+  const cpm = activities.length ? calculateCpm(cpmInput) : null;
   const planned = weightedProgress(activities, 'Planned_Progress');
   const actual = weightedProgress(activities, 'Actual_Progress');
 
@@ -188,6 +184,7 @@ function buildPmsProjectControlsReport(input) {
   }
 
   const warnings = [];
+  if (!activities.length) warnings.push('No active schedule activities are available');
   if (!baseline) warnings.push('No approved Project_Baselines snapshot was found');
   else if (baselineComparison.some(row => !row.hasSnapshotMatch)) warnings.push('Some active activities are absent from the latest approved baseline snapshot');
   if (!finance) warnings.push('No Financial_Monitoring rows are available');
@@ -201,7 +198,7 @@ function buildPmsProjectControlsReport(input) {
   return {
     projectId, projectName: String(project.Project_Name || ''),
     statusDate,
-    schedule: { durationInWorkingDays: cpm.projectDuration, criticalActivities: cpm.criticalActivities, activities: cpm.activities },
+    schedule: cpm ? { durationInWorkingDays: cpm.projectDuration, criticalActivities: cpm.criticalActivities, activities: cpm.activities } : null,
     progress: { planned, actual, variancePercentagePoints: planned.available && actual.available ? actual.value - planned.value : null },
     baseline: baseline ? { id: baseline.Baseline_ID, revision: Number(baseline.Revision_Number) || null, name: baseline.Baseline_Name || '', approvedDate: date(baseline.Approved_Date) } : null,
     baselineComparison,
