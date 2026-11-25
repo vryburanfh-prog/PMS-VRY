@@ -28,6 +28,8 @@ test('combines existing portfolio KPIs with project controls and warnings', () =
   assert.equal(model.projects[0].controls.highOrCriticalOpenRisks, 1);
   assert.deepEqual(model.projects[0].warnings, ['One overdue milestone']);
   assert.equal(model.projects[1].controls, null);
+  assert.equal(model.prioritizedProjects[0].projectId, 'P-1');
+  assert.equal(model.prioritizedProjects[0].exceptionPriority.level, 'urgent');
 });
 
 test('rejects reports for projects outside the authorized portfolio', () => {
