@@ -1,0 +1,32 @@
+name: Scoped Update Helper Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Database.gs'
+      - 'tests/database-scoped-update.test.js'
+      - '.github/workflows/scoped-update-helper-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Database.gs'
+      - 'tests/database-scoped-update.test.js'
+      - '.github/workflows/scoped-update-helper-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scoped-update-helper-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scoped-update-helper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/database-scoped-update.test.js

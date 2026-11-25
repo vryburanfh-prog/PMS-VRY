@@ -3911,7 +3911,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   };
 
   if (existingEscalation) {
-    var updateResult = updateRecordById_('Escalations', 'Escalation_ID', record.Escalation_ID, record);
+    var updateResult = updateRecordById_('Escalations', 'Escalation_ID', record.Escalation_ID, record, { field: 'Project_ID', value: record.Project_ID });
     writeAuditLog_(
       ctx,
       'UPDATE_ESCALATION',
