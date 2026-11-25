@@ -110,3 +110,7 @@ Targeted remediation has addressed additional findings discovered during the fin
 - The scheduled digest status/save API declaration boundary was repaired.
 
 These are code-review/static-validation results from draft PRs, not production verification. GitHub Actions runner allocation has blocked actual CI jobs, and staging role/CRUD/import/restore/quota tests remain outstanding. Audit status: static review substantially complete; Phase 1 acceptance pending runtime gates.
+
+## Expanded main UI audit update (November 2026)
+
+The audit extended to index.html and found raw dynamic HTML interpolation in project metadata, WBS/activity/baseline fields, project register fields, registry labels, progress/report values, workload employee/scope fields, generated client-deck labels and share-link hrefs. Draft PR #98 escapes these values and restricts share-link hrefs to HTTPS before attribute encoding. The dedicated index HTML regression tests parse the inline script after Apps Script template directives are replaced and test the share URL sanitizer. The local mock harness now reports 24/24 passing tests; GitHub Actions and browser/staging validation remain pending.
