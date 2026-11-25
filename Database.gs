@@ -166,7 +166,7 @@ function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
 function sanitizeSpreadsheetCellValue_(value) {
   if (typeof value !== 'string') return value;
   const trimmed = value.replace(/^\s+/, '');
-  const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?d+)?$/i.test(trimmed);
+  const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(trimmed);
   const formulaLike = /^[=+@]/.test(trimmed) || (trimmed.charAt(0) === '-' && !numeric);
   return formulaLike ? "'" + value : value;
 }
