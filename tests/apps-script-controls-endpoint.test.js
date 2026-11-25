@@ -303,3 +303,53 @@ test('project controls drill-down renders derived progress, exception and financ
   assert.match(indexSource, /const highCritical = riskRows\.filter/);
   assert.match(indexSource, /const openIssues = issueRows\.filter/);
 });
+
+
+function runAppsScriptCpm(activities, dependencies, projectId) {
+  const fn = extractFunction('buildAppsScriptCpmSummary_');
+  const context = {
+    isTruthySheetFlag_: value => value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase())
+  };
+  return vm.runInNewContext('(' + fn + ')', context)(activities, dependencies, projectId || 'P-1');
+}
+
+test('Apps Script CPM calculates duration, float and critical activities', () => {
+  const activities = [
+    { Project_ID: 'P-1', Activity_ID: 'A', Baseline_Duration: 3 },
+    { Project_ID: 'P-1', Activity_ID: 'B', Baseline_Duration: 4 },
+    { Project_ID: 'P-1', Activity_ID: 'C', Baseline_Duration: 2 }
+  ];
+  const result = runAppsScriptCpm(activities, [
+    { Project_ID: 'P-1', Predecessor_ID: 'A', Successor_ID: 'B', Dependency_Type: 'FS', Lag_Or_Lead_Days: 0 },
+    { Project_ID: 'P-1', Predecessor_ID: 'A', Successor_ID: 'C', Dependency_Type: 'FS', Lag_Or_Lead_Days: 0 }
+  ]);
+  assert.equal(result.available, true);
+  assert.equal(result.durationWorkingDays, 7);
+  assert.equal(result.criticalActivityCount, 2);
+  assert.deepEqual(Array.from(result.criticalActivityIds), ['A', 'B']);
+  assert.equal(result.activities.find(row => row.activityId === 'C').totalFloat, 2);
+});
+
+test('Apps Script CPM rejects invalid links, cycles and incomplete durations', () => {
+  const activities = [
+    { Project_ID: 'P-1', Activity_ID: 'A', Baseline_Duration: 2 },
+    { Project_ID: 'P-1', Activity_ID: 'B', Baseline_Duration: 3 }
+  ];
+  assert.throws(() => runAppsScriptCpm(activities, [
+    { Project_ID: 'P-1', Predecessor_ID: 'A', Successor_ID: 'B', Dependency_Type: 'SS', Lag_Or_Lead_Days: 0 }
+  ]), /only Finish-to-Start/);
+  assert.throws(() => runAppsScriptCpm(activities, [
+    { Project_ID: 'P-1', Predecessor_ID: 'A', Successor_ID: 'B', Dependency_Type: 'FS', Lag_Or_Lead_Days: 0 },
+    { Project_ID: 'P-1', Predecessor_ID: 'B', Successor_ID: 'A', Dependency_Type: 'FS', Lag_Or_Lead_Days: 0 }
+  ]), /cycle detected/);
+  assert.throws(() => runAppsScriptCpm([
+    { Project_ID: 'P-1', Activity_ID: 'A', Baseline_Duration: '' }
+  ], []), /invalid Baseline_Duration/);
+});
+
+test('project controls API exposes CPM only when schedule permission is granted', () => {
+  const fn = extractFunction('apiGetProjectControlsInputs');
+  assert.match(fn, /buildAppsScriptCpmSummary_\(activities, dependencies, pid\)/);
+  assert.match(fn, /cpm: cpm/);
+  assert.match(fn, /if \(scheduleAllowed\)/);
+});
