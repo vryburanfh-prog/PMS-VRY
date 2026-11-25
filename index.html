@@ -201,6 +201,22 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <span class="text-[10px] uppercase tracking-wide text-slate-400">Read-only summary</span>
           </div>
           <div id="project-controls-kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                  <th class="py-2 px-3">Project</th>
+                  <th class="py-2 px-3">High / Critical Risks</th>
+                  <th class="py-2 px-3">Open Issues</th>
+                  <th class="py-2 px-3">Overdue Milestones</th>
+                  <th class="py-2 px-3">Delayed Activities</th>
+                  <th class="py-2 px-3">Budget Status</th>
+                  <th class="py-2 px-3">Commitment Status</th>
+                </tr>
+              </thead>
+              <tbody id="project-controls-project-rows" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2157,9 +2173,11 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       const grid = document.getElementById('project-controls-kpi-grid');
       const status = document.getElementById('project-controls-status');
       if (!grid || !status) return;
+      const projectRows = document.getElementById('project-controls-project-rows');
       if (!data || data.success !== true) {
         status.textContent = 'Project controls indicators are currently unavailable.';
         grid.innerHTML = '';
+        if (projectRows) projectRows.innerHTML = '<tr><td colspan="7" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
         return;
       }
       status.textContent = 'Read-only summary as of ' + (data.statusDate || 'the current reporting date') +
@@ -2179,6 +2197,22 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           '<div class="mt-1 text-xl font-bold ' + card.color + '">' + value + '</div>' +
           '</div>';
       }).join('');
+      if (projectRows) {
+        const projects = Array.isArray(data.projects) ? data.projects : [];
+        const metric = value => value === null || value === undefined ? '—' : String(value);
+        const flag = value => value === null || value === undefined ? '—' : (value ? 'Over limit' : 'Within limit');
+        projectRows.innerHTML = projects.length ? projects.map(function (project) {
+          return '<tr class="hover:bg-slate-50">' +
+            '<td class="py-2 px-3"><div class="font-mono text-slate-500">' + escapeHtmlSafe_(project.projectId) + '</div><div class="font-semibold text-slate-800">' + escapeHtmlSafe_(project.projectName || '') + '</div></td>' +
+            '<td class="py-2 px-3">' + metric(project.criticalRisks) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.openIssues) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.overdueMilestones) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.delayedActivities) + '</td>' +
+            '<td class="py-2 px-3">' + flag(project.overBudget) + '</td>' +
+            '<td class="py-2 px-3">' + flag(project.overCommitment) + '</td>' +
+            '</tr>';
+        }).join('') : '<tr><td colspan="7" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
+      }
     }
 
     function renderCharts(projects) {
