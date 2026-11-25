@@ -50,3 +50,24 @@ test('share URL sanitizer accepts HTTPS only and escapes attributes', () => {
   assert.equal(helpers.safeHttpsUrl_('https://example.com'), 'https://example.com');
   assert.ok(indexHtml.includes('safeHttpsUrl_(res.shareUrl)'));
 });
+
+test('index inline JSON handlers serialize safely and print fields are escaped', () => {
+  assert.ok(indexHtml.includes('onclick="startEditProject(${escapeHtmlSafe_(JSON.stringify(p))})"'));
+  assert.ok(indexHtml.includes('onclick="promoteCandidateToEscalation_(${escapeHtmlSafe_(JSON.stringify(cand))})"'));
+  assert.ok(indexHtml.includes('onclick="editEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})"'));
+  assert.ok(indexHtml.includes('onclick="resolveEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})"'));
+  assert.ok(indexHtml.includes('onclick="escalateWorkItem_(${escapeHtmlSafe_(JSON.stringify(it))})"'));
+  assert.ok(indexHtml.includes('safeJsArg_(userId)'));
+  for (const field of ['escapeHtmlSafe_(r.Accomplishments || \'-\')','escapeHtmlSafe_(r.Remarks || \'-\')','escapeHtmlSafe_(l.Log_ID || \'\')','escapeHtmlSafe_(l.Submitted_By || \'\')']) assert.ok(indexHtml.includes('${' + field + '}'), field + ' must be escaped');
+});
+
+test('client CSV export neutralizes formula-like values', () => {
+  const neutralizer = extractFunction(indexHtml, 'neutralizeCsvFormula_');
+  const csvHelper = extractFunction(indexHtml, 'escapeCsvCell_');
+  const helpers = new Function(neutralizer + csvHelper + '; return {neutralizeCsvFormula_, escapeCsvCell_};')();
+  assert.equal(helpers.neutralizeCsvFormula_('=SUM(A1)'), "'=SUM(A1)");
+  assert.equal(helpers.neutralizeCsvFormula_('-cmd'), "'-cmd");
+  assert.equal(helpers.neutralizeCsvFormula_('-12'), '-12');
+  assert.equal(helpers.neutralizeCsvFormula_('+12'), '+12');
+  assert.equal(helpers.escapeCsvCell_('=HYPERLINK("x")'), "\"'=HYPERLINK(\"\"x\"\")\"");
+});
