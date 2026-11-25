@@ -59,6 +59,10 @@ function runProjectControlsEndpoint(options) {
     '(' + extractFunction('buildAppsScriptCpmSummary_') + ')',
     { isTruthySheetFlag_: context.isTruthySheetFlag_ }
   );
+  context.buildAppsScriptBaselineSummary_ = vm.runInNewContext(
+    '(' + extractFunction('buildAppsScriptBaselineSummary_') + ')',
+    { isTruthySheetFlag_: context.isTruthySheetFlag_ }
+  );
   return { result: vm.runInNewContext('(' + fn + ')', context)(opts.projectId || 'P-1'), reads };
 }
 
