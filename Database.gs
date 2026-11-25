@@ -185,6 +185,7 @@ function insertRecords_(tabName, records) {
     assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, list);
     const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
+    invalidateTableCache_(tabName);
     return rows.length;
   } finally { if (ownsLock) lock.releaseLock(); }
 }
