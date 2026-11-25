@@ -983,6 +983,93 @@ function apiGetPortfolioControlsSummary(filters) {
   };
 }
 
+
+/**
+ * Read-only CPM summary for the project controls view.
+ * Supports Finish-to-Start links with zero lag and baseline durations in working-day units.
+ * Invalid/incomplete networks are reported as unavailable; no guessed calendar is applied.
+ */
+function buildAppsScriptCpmSummary_(activities, dependencies, projectId) {
+  const rows = (activities || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      !isTruthySheetFlag_(row.Is_Archived);
+  });
+  if (!rows.length) return { available: false, reason: 'No active schedule activities are available' };
+  const byId = {};
+  const indegree = {};
+  const successors = {};
+  const predecessors = {};
+  rows.forEach(function (row) {
+    const id = String(row.Activity_ID || '').trim();
+    const duration = Number(row.Baseline_Duration);
+    if (!id || byId[id]) throw new Error('CPM unavailable: missing or duplicate Activity_ID');
+    if (!Number.isFinite(duration) || duration < 0) throw new Error('CPM unavailable: invalid Baseline_Duration for ' + id);
+    byId[id] = { id: id, duration: duration, row: row };
+    indegree[id] = 0;
+    successors[id] = [];
+    predecessors[id] = [];
+  });
+  const addLink = function (from, to, type, lag) {
+    if (!byId[from] || !byId[to]) throw new Error('CPM unavailable: dependency references an activity outside this project schedule');
+    if (String(type || 'FS').trim().toUpperCase() !== 'FS' || Number(lag || 0) !== 0) {
+      throw new Error('CPM unavailable: only Finish-to-Start dependencies with zero lag are supported');
+    }
+    if (from === to || predecessors[to].indexOf(from) !== -1) throw new Error('CPM unavailable: self or duplicate dependency');
+    predecessors[to].push(from);
+    successors[from].push(to);
+    indegree[to] += 1;
+  };
+  const activeLinks = (dependencies || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      String(row.Is_Active == null ? 'true' : row.Is_Active).trim().toLowerCase() !== 'false' &&
+      String(row.Is_Active == null ? 'true' : row.Is_Active).trim() !== '0';
+  });
+  const represented = {};
+  activeLinks.forEach(function (row) {
+    addLink(String(row.Predecessor_ID || '').trim(), String(row.Successor_ID || '').trim(),
+      row.Dependency_Type, row.Lag_Or_Lead_Days);
+    represented[String(row.Successor_ID || '').trim()] = true;
+  });
+  rows.forEach(function (row) {
+    const id = String(row.Activity_ID).trim();
+    const legacy = String(row.Predecessor_ID || '').trim();
+    if (legacy && !represented[id]) addLink(legacy, id, row.Dependency_Type, row.Lag_Or_Lead_Days);
+  });
+  const queue = Object.keys(byId).filter(function (id) { return indegree[id] === 0; }).sort();
+  const order = [];
+  while (queue.length) {
+    const id = queue.shift();
+    order.push(id);
+    successors[id].forEach(function (next) {
+      indegree[next] -= 1;
+      if (indegree[next] === 0) { queue.push(next); queue.sort(); }
+    });
+  }
+  if (order.length !== rows.length) throw new Error('CPM unavailable: dependency cycle detected');
+  const es = {}, ef = {}, ls = {}, lf = {};
+  order.forEach(function (id) {
+    es[id] = predecessors[id].reduce(function (max, pred) { return Math.max(max, ef[pred]); }, 0);
+    ef[id] = es[id] + byId[id].duration;
+  });
+  const projectDuration = order.reduce(function (max, id) { return Math.max(max, ef[id]); }, 0);
+  order.slice().reverse().forEach(function (id) {
+    lf[id] = successors[id].length ? successors[id].reduce(function (min, next) { return Math.min(min, ls[next]); }, Infinity) : projectDuration;
+    ls[id] = lf[id] - byId[id].duration;
+  });
+  const critical = order.filter(function (id) { return Math.abs(ls[id] - es[id]) < 1e-9; });
+  return {
+    available: true,
+    durationWorkingDays: projectDuration,
+    activityCount: rows.length,
+    criticalActivityCount: critical.length,
+    criticalActivityIds: critical,
+    activities: order.map(function (id) {
+      return { activityId: id, earlyStart: es[id], earlyFinish: ef[id], lateStart: ls[id], lateFinish: lf[id], totalFloat: ls[id] - es[id], isCritical: critical.indexOf(id) !== -1 };
+    }),
+    calendarNote: 'Durations are baseline working-day units; weekends, holidays, and resource calendars are not applied.'
+  };
+}
+
 function apiGetProjectControlsInputs(projectId) {
   const pid = String(projectId || '').trim();
   if (!pid) throw new Error('Project_ID is required.');
@@ -1015,6 +1102,19 @@ function apiGetProjectControlsInputs(projectId) {
   const issuesAllowed = canView('Issues');
   const financeAllowed = canView('Financial_Monitoring');
 
+  const activities = readRows(DB_CONFIG.TABS.ACTIVITIES, scheduleAllowed, true);
+  const dependencies = readRows(DB_CONFIG.TABS.DEPENDENCIES, scheduleAllowed, false);
+  const baselines = readRows(DB_CONFIG.TABS.BASELINES, scheduleAllowed, false);
+  const milestones = readRows(DB_CONFIG.TABS.MILESTONES, milestonesAllowed, true);
+  const risks = readRows(DB_CONFIG.TABS.RISKS, risksAllowed, true);
+  const issues = readRows(DB_CONFIG.TABS.ISSUES, issuesAllowed, true);
+  const financialItems = readRows(DB_CONFIG.TABS.FINANCIAL, financeAllowed, false);
+  let cpm = null;
+  if (scheduleAllowed) {
+    try { cpm = buildAppsScriptCpmSummary_(activities, dependencies, pid); }
+    catch (error) { cpm = { available: false, reason: String(error && error.message || error) }; }
+  }
+
   return {
     success: true,
     project: {
@@ -1031,13 +1131,14 @@ function apiGetProjectControlsInputs(projectId) {
       issues: issuesAllowed,
       financialMonitoring: financeAllowed
     },
-    activities: readRows(DB_CONFIG.TABS.ACTIVITIES, scheduleAllowed, true),
-    dependencies: readRows(DB_CONFIG.TABS.DEPENDENCIES, scheduleAllowed, false),
-    baselines: readRows(DB_CONFIG.TABS.BASELINES, scheduleAllowed, false),
-    milestones: readRows(DB_CONFIG.TABS.MILESTONES, milestonesAllowed, true),
-    risks: readRows(DB_CONFIG.TABS.RISKS, risksAllowed, true),
-    issues: readRows(DB_CONFIG.TABS.ISSUES, issuesAllowed, true),
-    financialItems: readRows(DB_CONFIG.TABS.FINANCIAL, financeAllowed, false)
+    activities: activities,
+    dependencies: dependencies,
+    baselines: baselines,
+    milestones: milestones,
+    risks: risks,
+    issues: issues,
+    financialItems: financialItems,
+    cpm: cpm
   };
 }
 
