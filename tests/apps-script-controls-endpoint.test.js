@@ -193,3 +193,95 @@ test('legacy portfolio KPI response hides module metrics without view permission
   assert.match(indexSource, /k\.openIssues == null \? '—'/);
 });
 
+
+
+function runPortfolioControlsSummary(options) {
+  const opts = options || {};
+  const fn = extractFunction('apiGetPortfolioControlsSummary');
+  const reads = [];
+  const tabs = {
+    RISKS: 'Risks', ISSUES: 'Issues', MILESTONES: 'Milestones',
+    ACTIVITIES: 'Activities', FINANCIAL: 'Financial'
+  };
+  const context = {
+    DB_CONFIG: { TABS: tabs },
+    apiGetPortfolioData: function (filters) {
+      assert.deepEqual(JSON.parse(JSON.stringify(filters)), opts.filters || {});
+      return { context: opts.context || { isAdmin: false, permissions: {} }, projects: opts.projects || [] };
+    },
+    getTableRecords_: function (tab) { reads.push(tab); return (opts.datasets || {})[tab] || []; },
+    isTruthySheetFlag_: function (value) {
+      return value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase());
+    },
+    Utilities: { formatDate: () => opts.today || '2026-11-25' },
+    Date
+  };
+  return { result: vm.runInNewContext('(' + fn + ')', context)(opts.filters || {}), reads };
+}
+
+test('runtime: portfolio summary only reads authorized modules and scopes rows to authorized portfolio projects', () => {
+  const projects = [{ Project_ID: 'P-1', Project_Name: 'Alpha' }];
+  const datasets = {
+    Risks: [
+      { Project_ID: 'P-1', Risk_Rating: '10 - High', Current_Status: 'Open' },
+      { Project_ID: 'P-1', Risk_Rating: '15 - Critical', Current_Status: 'Closed' },
+      { Project_ID: 'P-2', Risk_Rating: '15 - Critical', Current_Status: 'Open' }
+    ],
+    Issues: [{ Project_ID: 'P-1', Issue_Status: 'Open' }, { Project_ID: 'P-2', Issue_Status: 'Open' }],
+    Milestones: [{ Project_ID: 'P-1', Milestone_Status: 'In Progress', Forecast_Date: '2026-11-24' }],
+    Activities: [{ Project_ID: 'P-1', Status: 'In Progress', Forecast_Finish_Date: '2026-11-20' }],
+    Financial: [{ Project_ID: 'P-1', Budget_Amount: 100, Committed_Amount: 120, Actual_Spend: 110 }]
+  };
+  const permissions = Object.fromEntries(['Risks','Issues','Milestones','WBS_Schedule','Financial_Monitoring'].map(k => [k, { view: true }]));
+  const { result, reads } = runPortfolioControlsSummary({ projects, datasets, context: { isAdmin: false, permissions }, filters: { includeArchived: false } });
+  assert.deepEqual(reads, ['Risks','Issues','Milestones','Activities','Financial']);
+  assert.equal(result.projectCount, 1);
+  assert.equal(result.criticalRisks, 1);
+  assert.equal(result.openIssues, 1);
+  assert.equal(result.overdueMilestones, 1);
+  assert.equal(result.delayedActivities, 1);
+  assert.equal(result.projectsOverBudget, 1);
+  assert.equal(result.projectsOverCommitted, 1);
+  assert.equal(result.projects[0].projectId, 'P-1');
+  assert.equal(JSON.stringify(result).includes('Risk_Rating'), false);
+  assert.equal(JSON.stringify(result).includes('Issue_Status'), false);
+});
+
+test('runtime: portfolio summary performs no source-tab reads for an empty authorized portfolio', () => {
+  const { result, reads } = runPortfolioControlsSummary({ projects: [] });
+  assert.equal(result.projectCount, 0);
+  assert.deepEqual(reads, []);
+});
+
+test('runtime: inaccessible modules are not read and their indicators remain unavailable', () => {
+  const projects = [{ Project_ID: 'P-1', Project_Name: 'Alpha' }];
+  const { result, reads } = runPortfolioControlsSummary({
+    projects,
+    context: { isAdmin: false, permissions: { Risks: { view: true } } },
+    datasets: { Risks: [{ Project_ID: 'P-1', Risk_Rating: '15 - Critical', Current_Status: 'Open' }] }
+  });
+  assert.deepEqual(reads, ['Risks']);
+  assert.equal(result.criticalRisks, 1);
+  for (const key of ['openIssues','overdueMilestones','delayedActivities']) assert.equal(result[key], null);
+  assert.equal(result.projects[0].availability.issues, false);
+  assert.equal(result.projects[0].overBudget, null);
+  assert.equal(result.projectsOverBudget, null);
+});
+
+test('runtime: archived records are excluded and financial aggregates remain null without finance rows', () => {
+  const projects = [{ Project_ID: 'P-1', Project_Name: 'Alpha' }];
+  const permissions = Object.fromEntries(['Risks','Issues','Milestones','WBS_Schedule','Financial_Monitoring'].map(k => [k, { view: true }]));
+  const { result } = runPortfolioControlsSummary({
+    projects, context: { isAdmin: false, permissions },
+    datasets: {
+      Risks: [{ Project_ID: 'P-1', Risk_Rating: '15 - Critical', Current_Status: 'Open', Is_Archived: true }],
+      Issues: [], Milestones: [], Activities: [], Financial: []
+    }
+  });
+  assert.equal(result.criticalRisks, 0);
+  assert.equal(result.openIssues, 0);
+  assert.equal(result.overdueMilestones, 0);
+  assert.equal(result.delayedActivities, 0);
+  assert.equal(result.projects[0].overBudget, null);
+  assert.equal(result.projectsOverBudget, null);
+});
