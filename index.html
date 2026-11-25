@@ -7223,10 +7223,13 @@ function ensureClientDeckModal_() {
   return modal;
 }
 
-function sanitizeShareUrlForHtml_(value) {
+function safeHttpsUrl_(value) {
   const url = String(value || '').trim();
-  if (!/^https:\/\/[^\s"'<>]+$/i.test(url)) return '';
-  return escapeHtmlSafe_(url);
+  return /^https:\/\/[^\s"'<>]+$/i.test(url) ? url : '';
+}
+
+function sanitizeShareUrlForHtml_(value) {
+  return escapeHtmlSafe_(safeHttpsUrl_(value));
 }
 
 
@@ -7349,14 +7352,14 @@ function submitGenerateClientDeck() {
       box.classList.remove('hidden');
       document.getElementById('deck-res-title').textContent = `Published: ${res.deck.deckTitle} (${res.deckId})`;
       document.getElementById('deck-res-url').value = res.shareUrl;
-      document.getElementById('deck-res-open-link').href = res.shareUrl;
+      document.getElementById('deck-res-open-link').href = safeHttpsUrl_(res.shareUrl);
 
       const slides = res.deck.slides || [];
       document.getElementById('deck-res-slides-preview').innerHTML = slides.map((s, i) => `
         <div class="p-2 rounded bg-white border border-emerald-200">
           <span class="font-bold text-indigo-700">Slide ${i + 1}:</span>
           <span class="font-semibold text-slate-900">${escapeHtmlSafe_(s.title || '')}</span>
-          ${s.headlineTakeaway ? `<div class="text-[11px] text-slate-500 mt-0.5">${s.headlineTakeaway}</div>` : ''}
+          ${s.headlineTakeaway ? `<div class="text-[11px] text-slate-500 mt-0.5">${escapeHtmlSafe_(s.headlineTakeaway)}</div>` : ''}
         </div>
       `).join('');
 
