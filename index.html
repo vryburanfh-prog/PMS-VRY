@@ -212,6 +212,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                   <th class="py-2 px-3">Delayed Activities</th>
                   <th class="py-2 px-3">Budget Status</th>
                   <th class="py-2 px-3">Commitment Status</th>
+                  <th class="py-2 px-3">Drill-down</th>
                 </tr>
               </thead>
               <tbody id="project-controls-project-rows" class="divide-y divide-slate-100"></tbody>
@@ -2210,9 +2211,75 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             '<td class="py-2 px-3">' + metric(project.delayedActivities) + '</td>' +
             '<td class="py-2 px-3">' + flag(project.overBudget) + '</td>' +
             '<td class="py-2 px-3">' + flag(project.overCommitment) + '</td>' +
+            '<td class="py-2 px-3"><button type="button" onclick="openProjectControlsDrilldown_(' + safeJsArg_(project.projectId) + ')" class="text-indigo-600 hover:underline font-semibold">Details</button></td>' +
             '</tr>';
         }).join('') : '<tr><td colspan="7" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
       }
+    }
+
+    function ensureProjectControlsDrilldown_() {
+      let modal = document.getElementById('project-controls-drilldown');
+      if (modal) return modal;
+      modal = document.createElement('div');
+      modal.id = 'project-controls-drilldown';
+      modal.className = 'fixed inset-0 z-50 hidden bg-slate-900/60 flex items-center justify-center p-4';
+      modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden text-xs">' +
+        '<div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between"><div><h2 id="project-controls-drilldown-title" class="text-sm font-bold">Project controls detail</h2><p class="text-[11px] text-slate-300">Permission-aware, read-only project summary</p></div>' +
+        '<button type="button" onclick="closeProjectControlsDrilldown_()" class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Close</button></div>' +
+        '<div id="project-controls-drilldown-body" class="p-5 overflow-y-auto space-y-4"><p class="text-slate-500">Loading project controls...</p></div></div>';
+      document.body.appendChild(modal);
+      return modal;
+    }
+
+    function closeProjectControlsDrilldown_() {
+      const modal = document.getElementById('project-controls-drilldown');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function openProjectControlsDrilldown_(projectId) {
+      const pid = String(projectId || '');
+      const authorizedProject = (APP_STATE.allProjects || []).find(p => String(p.Project_ID) === pid);
+      if (!authorizedProject) { alert('Project access denied. Refresh the portfolio and try again.'); return; }
+      const modal = ensureProjectControlsDrilldown_();
+      modal.classList.remove('hidden');
+      document.getElementById('project-controls-drilldown-title').textContent =
+        (authorizedProject.Project_ID || pid) + ' — ' + (authorizedProject.Project_Name || 'Project controls');
+      const body = document.getElementById('project-controls-drilldown-body');
+      body.textContent = 'Loading permission-aware project controls...';
+      PMS_SERVER_RUN.withSuccessHandler(function (res) {
+        if (!res || res.success !== true || !res.access) {
+          body.textContent = 'Project controls are unavailable for this project.';
+          return;
+        }
+        if (String(APP_STATE.selectedProjectId || '') !== pid && !(APP_STATE.allProjects || []).some(p => String(p.Project_ID) === pid)) {
+          body.textContent = 'Project access changed. Close this view and refresh the portfolio.';
+          return;
+        }
+        const count = rows => Array.isArray(rows) ? rows.length : null;
+        const metric = value => value === null ? 'Not available' : String(value);
+        const sections = [
+          { title: 'Schedule & baselines', allowed: res.access.schedule, rows: res.activities, detail: 'Activities', extra: 'Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
+          { title: 'Milestones', allowed: res.access.milestones, rows: res.milestones, detail: 'Milestones', extra: '' },
+          { title: 'Risks', allowed: res.access.risks, rows: res.risks, detail: 'Risk records', extra: '' },
+          { title: 'Issues', allowed: res.access.issues, rows: res.issues, detail: 'Issue records', extra: '' },
+          { title: 'Financial monitoring', allowed: res.access.financialMonitoring, rows: res.financialItems, detail: 'Financial records', extra: '' }
+        ];
+        const cards = sections.map(function (section) {
+          const value = section.allowed ? metric(count(section.rows)) : 'Restricted';
+          return '<div class="rounded-lg border border-slate-200 p-3"><div class="font-semibold text-slate-800">' + section.title + '</div>' +
+            '<div class="mt-1 text-lg font-bold text-indigo-700">' + escapeHtmlSafe_(value) + '</div>' +
+            '<div class="text-[11px] text-slate-500">' + section.detail + (section.extra ? ' · ' + escapeHtmlSafe_(section.extra) : '') + '</div></div>';
+        }).join('');
+        const project = res.project || {};
+        const meta = '<div class="rounded-lg bg-slate-50 border border-slate-200 p-3"><div class="font-semibold">' +
+          escapeHtmlSafe_(project.Project_Name || pid) + '</div><div class="text-[11px] text-slate-500 mt-1">Status: ' +
+          escapeHtmlSafe_(project.Project_Status || 'Not recorded') + ' · Health: ' +
+          escapeHtmlSafe_(project.Project_Health || 'Not recorded') + ' · As of ' + escapeHtmlSafe_(res.statusDate || 'unknown') + '</div></div>';
+        body.innerHTML = meta + '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">' + cards + '</div>' +
+          '<p class="text-[11px] text-slate-500">Counts reflect records visible to your account. “Restricted” means the module is not available to your role; it is not a zero-record result. This view does not modify project data.</p>';
+      }).withFailureHandler(function (err) {
+        body.textContent = 'Unable to load project controls: ' + (err && err.message ? err.message : 'Request failed.');
+      }).apiGetProjectControlsInputs(pid);
     }
 
     function renderCharts(projects) {
