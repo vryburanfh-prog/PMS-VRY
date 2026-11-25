@@ -1291,7 +1291,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <tr class="bg-indigo-50/40 font-semibold text-slate-900">
             <td class="py-2 px-3 font-mono">
               <button type="button" aria-label="${collapsed ? 'Expand' : 'Collapse'} Main WBS ${escapeHtmlSafe_(m.Main_WBS_ID)}" aria-expanded="${!collapsed}" title="${collapsed ? 'Expand' : 'Collapse'} Main WBS" onclick="toggleMainWbsCollapse(${safeJsArg_(m.Main_WBS_ID)})" class="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900">${collapsed ? '▸' : '▾'}</button>
-              ${m.Main_WBS_ID}
+              ${escapeHtmlSafe_(m.Main_WBS_ID)}
             </td>
             <td class="py-2 px-3">${escapeHtmlSafe_(m.Module_Name)}</td>
             <td class="py-2 px-3 font-normal">${escapeHtmlSafe_(m.Responsible_Team_Lead || '-')}</td>
@@ -2956,9 +2956,10 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           const val = rec[col.key] || '-';
           const safeVal = escapeHtmlSafe_(val);
           if (col.isLink) {
-            return val !== '-'
-              ? `<td class="py-2 px-3"><a href="${val}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
-              : `<td class="py-2 px-3 text-slate-400">-</td>`;
+            const safeHref = safeExternalHref_(val);
+            return safeHref
+              ? `<td class="py-2 px-3"><a href="${escapeHtmlSafe_(safeHref)}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
+              : `<td class="py-2 px-3">${safeVal}</td>`;
           }
           if (col.riskBadge) {
             const s = String(val);
@@ -5035,7 +5036,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                           <td class="py-2 px-3 font-semibold">${Number(r.Actual_Spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3 ${v < 0 ? 'text-rose-700 font-bold' : 'text-emerald-700 font-semibold'}">${v >= 0 ? '+' : ''}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3">${r.Latest_Progress}</td>
-                          <td class="py-2 px-3 font-bold ${r.Overallocated_Resources > 0 ? 'text-rose-700' : 'text-slate-600'}">${r.Overallocated_Resources}</td>
+                          <td class="py-2 px-3 font-bold ${r.Overallocated_Resources > 0 ? 'text-rose-700' : 'text-slate-600'}">${escapeHtmlSafe_(r.Overallocated_Resources)}</td>
                         </tr>
                       `;
                     }).join('')}
