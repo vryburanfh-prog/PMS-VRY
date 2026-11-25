@@ -1,0 +1,80 @@
+# Phase 1 — Security, Integrity & Validation Test Plan
+
+**Status:** Prepared for execution. This is a test plan, not evidence that tests have passed.  
+**Scope:** Google Apps Script backend, Google Sheets data store, web UI, published client deck endpoint.  
+**Environment requirement:** Run tests only in a dedicated copy of the spreadsheet and Apps Script deployment. Never use production records for destructive or concurrency tests.
+
+## 1. Test prerequisites and safety
+
+- [ ] Create a test spreadsheet copy and record its ID in a restricted test log (do not commit IDs or credentials).
+- [ ] Create a test deployment/environment with separate script properties, OAuth configuration, and test users.
+- [ ] Export a pre-test backup and verify that it can be opened and restored into a disposable test copy.
+- [ ] Identify test accounts for Administrator, Project Director, Project Manager, Assistant Project Manager, Management, and Project Team Member.
+- [ ] Confirm test project assignments, unassigned projects, and a second project for cross-project access tests.
+- [ ] Ensure logs and screenshots contain no passwords, session tokens, Google ID tokens, or sensitive personal data.
+
+## 2. Verification matrix
+
+| ID | Area | Test | Expected result | Status |
+|---|---|---|---|---|
+| SEC-01 | Login | Valid credentials | Authenticated session created; role and scope correct | Not run |
+| SEC-02 | Login | Invalid password / unknown account | Generic failure; no account enumeration | Not run |
+| SEC-03 | Login throttle | Repeated failures, threshold and lock window | Lockout enforced; behavior is atomic; no easy reset/bypass | Not run |
+| SEC-04 | Sessions | Expired, revoked, malformed, or replayed session | Rejected consistently | Not run |
+| SEC-05 | Google sign-in | Bad signature/audience/issuer, expired token, unverified email, malformed tokeninfo response | Rejected; no token/secret logged | Not run |
+| AUTH-01 | Endpoint guards | Invoke every API without a session | Protected endpoints reject; documented public endpoints only | Not run |
+| AUTH-02 | Role policy | Call each API as each role, including UI-bypassed calls | Server policy enforced, not just hidden UI | Not run |
+| AUTH-03 | Project scoping | Read and mutate records in assigned and unassigned projects | No cross-project access; mutation rejects unauthorized IDs | Not run |
+| AUTH-04 | Privilege boundaries | Attempt to assign Administrator role, edit permissions, or alter protected settings as lower role | Denied server-side | Not run |
+| DB-01 | IDs | Simultaneous creates for each ID-prefixed entity | Unique IDs, no overwritten or duplicate records | Not run |
+| DB-02 | CRUD | Create/update/delete using missing, duplicate, malformed, and unknown fields | Clear validation; no unintended field/row mutation | Not run |
+| DB-03 | Audit | Force audit write failure after business mutation | Defined transaction/compensation behavior; no silent unaudited critical change | Not run |
+| DB-04 | Cache | Update/delete then immediately read cached table/API | Fresh values returned; cache invalidated consistently | Not run |
+| DB-05 | Formula injection | Submit text beginning with =, +, -, or @ into free-text fields; inspect exported/opened sheet behavior | Text remains inert; no executable formula injection | Not run |
+| IMP-01 | Import | Malformed file, missing/extra columns, invalid types, duplicate IDs | Import rejected or safely normalized; error report identifies issue | Not run |
+| IMP-02 | Import | Import with formula payloads and cross-project values | No formulas execute; scope/validation enforced | Not run |
+| IMP-03 | Backup/restore | Create backup; restore into a disposable copy; compare tables and key counts | Backup is complete and usable; documented restore steps succeed | Not run |
+| IMP-04 | Destructive reset | Confirm authorization, exact confirmation text, backup prerequisite, lock behavior | Reset blocked unless all controls pass; backup completed first | Not run |
+| PUB-01 | Client deck | Valid published token | Only intended published content returned | Not run |
+| PUB-02 | Client deck | Invalid, revoked, unpublished, expired (if expiry supported) tokens | Rejected; no private project data leaks | Not run |
+| UI-01 | XSS | Insert hostile strings into names, descriptions, comments, imported values; render in each relevant view | No script execution; safe contextual rendering | Not run |
+| UI-02 | UX/errors | Malformed server response, timeout, permission failure | Safe and understandable error; no sensitive details exposed | Not run |
+| PERF-01 | Scale | Representative dataset sizes; profile reads, writes, cache, exports | Execution time/quota headroom documented; no truncation or timeout | Not run |
+| REG-01 | Regression | Smoke test all main modules and navigation | Existing behavior preserved in test environment | Not run |
+
+## 3. Preliminary confirmed source observation: ID allocation is not atomic
+
+Database.gs contains generateNextId_(), which scans current records and returns max numeric suffix + 1. The helper insertRecord_() independently serializes row appends using a Script Lock. Since ID generation and insertion are separate operations, that append lock does not by itself guarantee unique ID allocation across concurrent requests.
+
+**Risk:** concurrent requests for the same table can read the same maximum suffix and compute the same ID before either inserts.
+
+**Proposed remediation (separate code PR after call-site inventory):**
+1. Identify every generateNextId_() call and its subsequent write path.
+2. Refactor allocation + insertion into a single lock-protected operation, or introduce a lock-protected per-entity counter with recovery/consistency checks.
+3. Ensure all code paths (single insert, bulk insert, imports, retries) follow the same allocation policy.
+4. Add a concurrency test that launches simultaneous creates and asserts all IDs are unique and all expected rows exist.
+5. Avoid broad mechanical replacements; review each entity's prefix, padding, and legacy ID format.
+
+## 4. Execution order
+
+1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
+2. **Authorization:** endpoint/role coverage, project ownership and scope, admin-only operations.
+3. **Data integrity:** CRUD validation, IDs, audit logs, cache consistency.
+4. **Import/export/reset:** backups, recovery, destructive controls, formula safety.
+5. **Published deck:** token validation and disclosure boundaries.
+6. **UI security:** contextual escaping/XSS tests across rendering paths.
+7. **Performance and regression:** dataset scale, quotas, and full module smoke test.
+
+## 5. Exit criteria for Phase 1
+
+- All critical/high-risk test cases pass in the isolated environment, or have an explicitly accepted mitigation and owner.
+- No unresolved critical security or data-loss issue remains.
+- ID allocation is proven unique under concurrent creates.
+- Backup and restore are demonstrated, not merely documented.
+- API authorization and project scoping are tested directly against server endpoints.
+- Findings are linked to evidence and a remediation PR; all source changes receive review.
+- Production rollout plan includes backup, change window, rollback, and post-deploy smoke tests.
+
+## 6. Current limitations
+
+This matrix has not been executed. The current audit is source-level inspection using repository files. Runtime behavior, deployment configuration, spreadsheet permissions, Script Properties, OAuth configuration, and real concurrency behavior require an authorized isolated test environment.
