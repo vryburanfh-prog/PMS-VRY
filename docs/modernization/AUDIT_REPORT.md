@@ -171,3 +171,10 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Remediation:** Draft PR #7 adds a Node 20 GitHub Actions workflow and source-level tests for the focused Phase 1 fixes. Tests for code fixes not yet merged into `main` skip with explicit pending-remediation messages; they will activate when the corresponding code is merged.
 **CI evidence:** Run `Static Security Checks` on PR #7 completed successfully. The job reported 1 passing baseline test, 0 failures, and 6 skipped tests (skips correspond to remediation branches not yet in main). This is not runtime validation of Apps Script.
 **Status:** CI workflow and runner are functional; fix-specific checks remain pending until their implementation PRs merge.
+
+
+### S12 — P2 investigation: multi-step mutations and audit-log failure boundaries
+**Evidence:** `apiCreateProject` inserts the project and then the creator's project-assignment record; the mutation and subsequent audit logging are separate helper calls without a visible transaction/compensation boundary. The audit writer generates an `Audit_ID` and inserts the audit record separately. Similar multi-step workflows require endpoint-by-endpoint review.
+**Impact:** If a later write or audit-log write fails, an earlier business mutation may already be committed, while the caller receives an error or the operation may be incompletely represented in the audit trail. This is a data-integrity and accountability risk; failure scenarios have not been reproduced.
+**Recommendation:** Add fault-injection tests for each step; define required mutation/audit guarantees; use a lock around logical multi-record operations where safe; design explicit compensating rollback or status/reconciliation records instead of assuming Sheets supports transactions. Add Audit_Logs to primary-key uniqueness checks (implemented in draft PR #6).
+**Status:** Investigation; runtime fault-injection and recovery design pending.
