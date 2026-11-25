@@ -939,6 +939,9 @@ function assertPrivilegedWbsRole_(projectId, action) {
 
 /** Archive or restore a Main WBS, Sub WBS, or Activity. */
 function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'edit');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -949,11 +952,17 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
   const flag = archiveFlag ? 'TRUE' : 'FALSE';
   const result = updateRecordById_(cfg[0], cfg[1], recordId, { Is_Archived: flag });
   writeAuditLog_(ctx, archiveFlag ? 'ARCHIVE_WBS_RECORD' : 'RESTORE_WBS_RECORD', 'WBS_Structure', recordId, result.previous, result.updated, reason || (archiveFlag ? 'Archived WBS record' : 'Restored WBS record'));
-  return { success: true, recordType: type, recordId: String(recordId), isArchived: Boolean(archiveFlag) };
+  return { success: true, recordType: type, recordId: String(recordId), isArchived: Boolean(archiveFlag) };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /** Permanently delete a WBS record only when no dependent records remain. */
 function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'delete');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -975,8 +984,11 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   }
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
-  return { success: true, recordType: type, recordId: String(recordId) };
+  return { success: true, recordType: type, recordId: String(recordId) };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
@@ -994,6 +1006,9 @@ function assertScheduleActivityPermission_(projectId, action, existingActivity) 
 }
 
 function apiSaveMainWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Main_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Main WBS record');
@@ -1057,13 +1072,19 @@ function apiSaveMainWbs(payload) {
     writeAuditLog_(ctx, 'CREATE_MAIN_WBS', 'WBS_Schedule', record.Main_WBS_ID, null, record, 'Created Main WBS');
   }
 
-  return { success: true, mainWbs: record };
+  return { success: true, mainWbs: record };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /**
  * Creates or updates a Sub WBS task under a parent Main WBS.
  */
 function apiSaveSubWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Sub_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Sub WBS record');
@@ -1134,8 +1155,11 @@ function apiSaveSubWbs(payload) {
     writeAuditLog_(ctx, 'CREATE_SUB_WBS', 'WBS_Schedule', record.Sub_WBS_ID, null, record, 'Created Sub WBS');
   }
 
-  return { success: true, subWbs: record };
+  return { success: true, subWbs: record };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 function apiSaveProjectWbsDepth(projectId, depth) {
   // Backward-compatible endpoint retained; the active dashboard uses a fixed two-tier hierarchy.
@@ -1179,6 +1203,9 @@ function wouldCreateDependencyCycle_(projectId, predecessorId, successorId) {
 }
 
 function apiSaveActivity(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
@@ -1297,8 +1324,11 @@ function apiSaveActivity(payload) {
     }
   }
 
-  return { success: true, activity: record };
+  return { success: true, activity: record };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /**
  * Returns full Gantt dataset, saved baselines, and project weighting method.
@@ -1418,6 +1448,9 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
  * then automatically rolls up weighted progress.
  */
 function apiQuickUpdateGanttActivity(activityId, updates) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', activityId);
   if (!existing) throw new Error('Activity not found: ' + activityId);
 
@@ -1454,8 +1487,11 @@ function apiQuickUpdateGanttActivity(activityId, updates) {
   const rollSummary = recalculateProjectProgressEngine_(existing.Project_ID);
 
   writeAuditLog_(ctx, 'GANTT_UPDATE_ACTIVITY', 'WBS_Schedule', activityId, res.previous, res.updated, 'Updated via Interactive Gantt Chart');
-  return { success: true, activity: res.updated, rollSummary: rollSummary };
+  return { success: true, activity: res.updated, rollSummary: rollSummary };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 // ============================================================================
 // PHASE 7: PROJECT CONTROLS REGISTRIES (MILESTONES, DELIVERABLES, PERMITS,
