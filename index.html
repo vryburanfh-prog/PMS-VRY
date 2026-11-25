@@ -851,9 +851,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-3 items-stretch">
             <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Actual Progress</div><div class="text-2xl leading-none font-bold tabular-nums text-indigo-700">${Number(p.Overall_Actual_Progress || 0).toFixed(1)}%</div><div class="text-[11px] leading-4 text-slate-500">Planned output: ${Number(p.Overall_Planned_Progress || 0).toFixed(1)}%</div></div>
             <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-emerald-800">Overall Earned Weighted Progress</div><div id="overview-earned-weight" class="text-2xl leading-none font-bold tabular-nums text-emerald-700">—</div><div class="text-[11px] leading-4 text-emerald-700/80">Earned project weight</div></div>
-            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Pending Deliverables</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${data.deliverables.pending}</div><div class="text-[11px] leading-4 text-slate-500">${data.deliverables.total} total · ${escapeHtmlSafe_(Object.entries(data.deliverables.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No pending status')}</div></div>
-            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Open Risks</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${data.risks.open}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(Object.entries(data.risks.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open risks')}</div></div>
-            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Open Issues</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${data.issues.open}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(Object.entries(data.issues.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open issues')}</div></div>
+            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Pending Deliverables</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${escapeHtmlSafe_(data.deliverables.pending)}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(data.deliverables.total)} total · ${escapeHtmlSafe_(Object.entries(data.deliverables.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No pending status')}</div></div>
+            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Open Risks</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${escapeHtmlSafe_(data.risks.open)}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(Object.entries(data.risks.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open risks')}</div></div>
+            <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Open Issues</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${escapeHtmlSafe_(data.issues.open)}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(Object.entries(data.issues.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open issues')}</div></div>
             <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Milestones Achieved</div><div class="text-2xl leading-none font-bold tabular-nums text-slate-800">${Number((data.milestoneSummary || {}).achieved || 0)} / ${Number((data.milestoneSummary || {}).total || 0)}</div><div class="text-[11px] leading-4 text-slate-500">${Number((data.milestoneSummary || {}).delayed || 0)} delayed</div></div>
             <div class="min-w-0 min-h-[112px] flex flex-col justify-between p-4 rounded-xl border border-slate-200 bg-white shadow-sm"><div class="text-[11px] leading-4 font-semibold uppercase tracking-wide text-slate-500">Project Status</div><div class="text-lg leading-tight font-bold text-slate-800 break-words">${escapeHtmlSafe_(p.Project_Status || '—')}</div><div class="text-[11px] leading-4 text-slate-500">${escapeHtmlSafe_(p.Project_Health || '')}</div></div>
           </div>
@@ -2795,7 +2795,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             </div>
           ` : `
             <div class="p-3 rounded bg-slate-50 border border-slate-200 text-slate-500">
-              View-only mode: your role does not have create/edit permissions for <strong>${st.key}</strong>.
+              View-only mode: your role does not have create/edit permissions for <strong>${escapeHtmlSafe_(st.key)}</strong>.
             </div>
           `}
 
@@ -2810,7 +2810,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
               </select>
             </div>
             <button onclick="openControlsRegistryModule(${escapeHtmlSafe_(safeJsArg_(st.key))})" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
-              ↻ Reload ${st.key}
+              ↻ Reload ${escapeHtmlSafe_(st.key)}
             </button>
           </div>
 
@@ -2861,7 +2861,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       const kpiEl = document.getElementById('reg-kpi-strip');
       if (kpiEl) {
         kpiEl.innerHTML = `
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${st.key}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${total}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${escapeHtmlSafe_(st.key)}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${total}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Active / Open</div><div class="text-lg font-bold text-indigo-700 mt-0.5">${openCount}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Completed / Closed</div><div class="text-lg font-bold text-emerald-700 mt-0.5">${closedCount}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">${alertLabel}</div><div class="text-lg font-bold text-rose-700 mt-0.5">${alertCount}</div></div>
@@ -3062,7 +3062,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
     function deleteControlsRegistryRecord(recordId) {
       const st = APP_STATE.registryState;
-      if (!confirm(`Delete ${recordId} from ${st.key}? This action will be recorded in Audit_Logs.`)) return;
+      if (!confirm(`Delete ${recordId} from ${escapeHtmlSafe_(st.key)}? This action will be recorded in Audit_Logs.`)) return;
 
       PMS_SERVER_RUN
         .withSuccessHandler(() => {
@@ -4262,15 +4262,15 @@ button, input, select, textarea { min-height: 2.25rem; }
           <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Total Budget</div>
-              <div class="text-base font-bold text-slate-900 mt-0.5">${formatCurrencyNum(sum.totalBudget)}</div>
+              <div class="text-base font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(formatCurrencyNum(sum.totalBudget))}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Committed</div>
-              <div class="text-base font-bold text-indigo-700 mt-0.5">${formatCurrencyNum(sum.totalCommitted)}</div>
+              <div class="text-base font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(formatCurrencyNum(sum.totalCommitted))}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Actual Spend (${escapeHtmlSafe_(sum.overallBurnPct || 0)}%)</div>
-              <div class="text-base font-bold text-slate-900 mt-0.5">${formatCurrencyNum(sum.totalActual)}</div>
+              <div class="text-base font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(formatCurrencyNum(sum.totalActual))}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Budget Variance</div>
@@ -4935,7 +4935,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         body.innerHTML = `
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="font-bold text-slate-900">Recent Governance &amp; Change Audit Logs (${logs.length})</h3>
+              <h3 class="font-bold text-slate-900">Recent Governance &amp; Change Audit Logs (${escapeHtmlSafe_(logs.length)})</h3>
               <span class="text-[11px] text-slate-500">Newest events first</span>
             </div>
             <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -4997,7 +4997,7 @@ button, input, select, textarea { min-height: 2.25rem; }
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Actual / Variance</div>
               <div class="text-lg font-bold ${pVar < 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">
                 ${Number(sum.portfolioActual || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span class="text-xs font-semibold">(${pVar >= 0 ? '+' : ''}${pVar.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                <span class="text-xs font-semibold">(${pVar >= 0 ? '+' : ''}${escapeHtmlSafe_(pVar.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))})</span>
               </div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
@@ -5290,7 +5290,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Role Permissions Matrix (${roleRows.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Role Permissions Matrix (${escapeHtmlSafe_(roleRows.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -5312,7 +5312,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">User Access &amp; Project Scopes (${userRows.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">User Access &amp; Project Scopes (${escapeHtmlSafe_(userRows.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -5567,19 +5567,19 @@ button, input, select, textarea { min-height: 2.25rem; }
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">High Severity</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${counts.high || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(counts.high || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Budget Burn Warnings</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${counts.medium || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(counts.medium || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Procurement</div>
-            <div class="text-lg font-bold text-indigo-700 mt-0.5">${counts.openProcurement || 0}</div>
+            <div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(counts.openProcurement || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Displayed Alerts</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${items.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(items.length)}</div>
           </div>
         </div>
 
@@ -5744,7 +5744,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Flagged</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${filtered.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(filtered.length)}</div>
           </div>
         </div>
 
@@ -5875,19 +5875,19 @@ button, input, select, textarea { min-height: 2.25rem; }
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Projects</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${c.projects || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(c.projects || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">High Alerts</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.highAlerts || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.highAlerts || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue Items</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.overdue || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.overdue || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Soon</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${c.dueSoon || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(c.dueSoon || 0)}</div>
           </div>
         </div>
 
@@ -6081,7 +6081,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         ${adminFormHtml}
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Recent Digest Dispatch History (${history.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Recent Digest Dispatch History (${escapeHtmlSafe_(history.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -6218,19 +6218,19 @@ button, input, select, textarea { min-height: 2.25rem; }
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Escalations</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.open || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.open || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Critical / High Open</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${c.criticalOrHigh || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(c.criticalOrHigh || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Logged</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${c.total || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(c.total || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Live Exceptions</div>
-            <div class="text-lg font-bold text-indigo-700 mt-0.5">${c.suggested || 0}</div>
+            <div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(c.suggested || 0)}</div>
           </div>
         </div>
 
@@ -6319,7 +6319,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         ` : ''}
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Escalation Register (${list.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Escalation Register (${escapeHtmlSafe_(list.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -6579,15 +6579,15 @@ button, input, select, textarea { min-height: 2.25rem; }
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Escalations</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${cur.openEscalations || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(cur.openEscalations || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue Items</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${cur.overdueItems || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(cur.overdueItems || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Saved Snapshots</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${snaps.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(snaps.length)}</div>
           </div>
         </div>
 
@@ -6624,7 +6624,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Archived Snapshots (${snaps.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Archived Snapshots (${escapeHtmlSafe_(snaps.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -6800,19 +6800,19 @@ button, input, select, textarea { min-height: 2.25rem; }
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Tracked Items</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${counts.total || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(counts.total || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${counts.overdue || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(counts.overdue || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Soon</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${counts.dueSoon || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(counts.dueSoon || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Completed / Closed</div>
-            <div class="text-lg font-bold text-emerald-700 mt-0.5">${counts.done || 0}</div>
+            <div class="text-lg font-bold text-emerald-700 mt-0.5">${escapeHtmlSafe_(counts.done || 0)}</div>
           </div>
         </div>
 
@@ -7034,15 +7034,15 @@ button, input, select, textarea { min-height: 2.25rem; }
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Workbook Tabs</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${res.totalSheetsInWorkbook || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(res.totalSheetsInWorkbook || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Missing Critical Tabs</div>
-            <div class="text-lg font-bold ${(res.missingCriticalTabs || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${res.missingCriticalTabs || 0}</div>
+            <div class="text-lg font-bold ${(res.missingCriticalTabs || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${escapeHtmlSafe_(res.missingCriticalTabs || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Active Triggers</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${res.activeProjectTriggers || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(res.activeProjectTriggers || 0)}</div>
           </div>
         </div>
 
