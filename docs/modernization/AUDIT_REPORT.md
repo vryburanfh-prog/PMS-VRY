@@ -201,3 +201,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** Source includes full spreadsheet backup-copy endpoint, import header checks and pre-import backup, and Start Fresh allowlist/backup. Import replaces matching tabs and skips missing source tabs; the multi-tab write loop has no rollback boundary. No dedicated atomic restore endpoint is present in the inspected source.
 **Remediation:** Draft PR #10 documents pre-change backup verification, isolated recovery, import/reset safeguards, post-change reconciliation, and evidence retention. Draft PR #2 now includes BAK-01 through BAK-07.
 **Status:** Runbook documentation exists on a draft branch; backup/restore and failure-injection tests have not been executed.
+
+
+### S14 — P2 data integrity: five deletion APIs bypass the locked delete helper
+**Evidence:** Direct `deleteRow(existing._rowIndex)` calls were found in Project Controls registry, Weekly Reports, Team Workload, Procurement, and Financial Monitoring deletion endpoints. These paths read a row index before deletion and delete directly without the shared Script Lock/ID re-lookup helper.
+**Remediation:** Draft PR #12 routes those five endpoints through `deleteRecordById_`, which performs stable-ID lookup under Script Lock and existing cleanup/cache-invalidation behavior. The registry delete audit snapshot is cleaned of the internal row index.
+**Limitations:** The business deletion and subsequent audit-log insert remain separate operations; no transaction/compensation is implemented. Runtime concurrency/fault-injection tests are pending.
