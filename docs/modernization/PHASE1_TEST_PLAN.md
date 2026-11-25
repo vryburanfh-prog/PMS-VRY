@@ -171,6 +171,16 @@ Draft PR #12 routes five direct-delete paths through `deleteRecordById_`. This i
 
 Draft PR #13 adds a stored-project-versus-requested-project check before the upsert's row update/append path. Runtime authorization tests remain pending.
 
+## 3.12 Phase 18/19 mutation helper regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| MUT-19 | Create/update escalation through PMO management | Insert/update uses shared locked helper; ID uniqueness and row lookup protected; audit contains actual previous/updated snapshots | Not run |
+| MUT-20 | Capture PMO snapshot concurrently with another capture | Snapshot insert uses shared locked helper; Snapshot_ID uniqueness enforced when primary-key guard is merged | Not run |
+| MUT-21 | Fault injection after escalation/snapshot mutation but before audit insert | Failure boundary and compensation/reconciliation procedure verified | Not run |
+
+Draft PR #14 refactors Phase 18/19 direct mutations to the shared insert/update helpers. Primary-key enforcement for these custom tables is included in draft PR #6 and should be merged/reviewed before the helper-integrity refactor.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
