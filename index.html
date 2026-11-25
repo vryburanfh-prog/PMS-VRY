@@ -2266,7 +2266,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         const rowsFor = key => Array.isArray(res[key]) ? res[key] : [];
         const isOpen = value => !['closed', 'resolved', 'completed', 'complete', 'achieved'].includes(String(value || '').trim().toLowerCase());
         const overdue = (rows, dateField, statusField) => rows.filter(row =>
-          isOpen(row[statusField]) && /^\\d{4}-\\d{2}-\\d{2}$/.test(String(row[dateField] || '')) &&
+          isOpen(row[statusField]) && /^\d{4}-\d{2}-\d{2}$/.test(String(row[dateField] || '')) &&
           String(row[dateField]) < String(res.statusDate || '')).length;
         const weightedProgress = (rows, field) => {
           const eligible = rows.filter(row => number(row.Activity_Weight) > 0 && row[field] !== '' && row[field] != null);
@@ -2281,7 +2281,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         const highCritical = riskRows.filter(row => {
           const status = String(row.Current_Status || row.Status || '').toLowerCase();
           const rating = String(row.Risk_Rating || '').toUpperCase();
-          const score = Number((rating.match(/^\\s*(\\d+(?:\\.\\d+)?)/) || [])[1]);
+          const score = Number((rating.match(/^\s*(\d+(?:\.\d+)?)/) || [])[1]);
           return isOpen(status) && (rating.includes('HIGH') || rating.includes('CRITICAL') || score >= 10);
         }).length;
         const openIssues = issueRows.filter(row => isOpen(row.Issue_Status || row.Status)).length;
