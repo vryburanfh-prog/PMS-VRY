@@ -69,11 +69,11 @@ test('reports schedule slippage, overdue milestones and financial overruns', () 
     Status: 'In Progress'
   }));
   const report = buildPmsProjectControlsReport({
-    project, statusDate: '2026-01-08',
+    project, statusDate: '2026-01-05',
     activities: delayedActivities,
     baselines: [baseline],
     milestones: [
-      { Project_ID: 'P-1', Milestone_ID: 'M-1', Milestone_Name: 'Approval', Forecast_Date: '2026-01-07', Milestone_Status: 'In Progress' },
+      { Project_ID: 'P-1', Milestone_ID: 'M-1', Milestone_Name: 'Approval', Forecast_Date: '2026-01-04', Milestone_Status: 'In Progress' },
       { Project_ID: 'P-1', Milestone_ID: 'M-2', Milestone_Name: 'Handover', Forecast_Date: '2026-01-12', Milestone_Status: 'Not Started' }
     ],
     financialItems: [{ Project_ID: 'P-1', Budget_Amount: 100, Committed_Amount: 120, Actual_Spend: 130 }]
