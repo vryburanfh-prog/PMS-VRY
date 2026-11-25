@@ -5381,7 +5381,7 @@ function apiCreateDatabaseBackupCopy() {
 function apiCreateDatabaseTemplateCopy() {
   assertDatabaseTransferAdmin_();
   var source = getMasterSpreadsheet_();
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var template = SpreadsheetApp.create('PMO_DATABASE_TEMPLATE_' + stamp);
   var first = template.getSheets()[0];
   var usedFirst = false;
