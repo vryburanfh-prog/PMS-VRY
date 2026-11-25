@@ -2217,6 +2217,8 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       }
     }
 
+    let activeProjectControlsDrilldownId_ = null;
+
     function ensureProjectControlsDrilldown_() {
       let modal = document.getElementById('project-controls-drilldown');
       if (modal) return modal;
@@ -2234,12 +2236,14 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
     function closeProjectControlsDrilldown_() {
       const modal = document.getElementById('project-controls-drilldown');
       if (modal) modal.classList.add('hidden');
+      activeProjectControlsDrilldownId_ = null;
     }
 
     function openProjectControlsDrilldown_(projectId) {
       const pid = String(projectId || '');
       const authorizedProject = (APP_STATE.allProjects || []).find(p => String(p.Project_ID) === pid);
       if (!authorizedProject) { alert('Project access denied. Refresh the portfolio and try again.'); return; }
+      activeProjectControlsDrilldownId_ = pid;
       const modal = ensureProjectControlsDrilldown_();
       modal.classList.remove('hidden');
       document.getElementById('project-controls-drilldown-title').textContent =
@@ -2251,7 +2255,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           body.textContent = 'Project controls are unavailable for this project.';
           return;
         }
-        if (String(APP_STATE.selectedProjectId || '') !== pid && !(APP_STATE.allProjects || []).some(p => String(p.Project_ID) === pid)) {
+        if (activeProjectControlsDrilldownId_ !== pid || !(APP_STATE.allProjects || []).some(p => String(p.Project_ID) === pid)) {
           body.textContent = 'Project access changed. Close this view and refresh the portfolio.';
           return;
         }
@@ -2278,6 +2282,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         body.innerHTML = meta + '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">' + cards + '</div>' +
           '<p class="text-[11px] text-slate-500">Counts reflect records visible to your account. “Restricted” means the module is not available to your role; it is not a zero-record result. This view does not modify project data.</p>';
       }).withFailureHandler(function (err) {
+        if (activeProjectControlsDrilldownId_ !== pid) return;
         body.textContent = 'Unable to load project controls: ' + (err && err.message ? err.message : 'Request failed.');
       }).apiGetProjectControlsInputs(pid);
     }
