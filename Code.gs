@@ -5502,7 +5502,9 @@ function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupU
       : 'Rollback was attempted for all touched tabs from the backup copy.';
     throw new Error('Database import failed: ' + importError.message + '. ' + detail + ' Backup URL: ' + backupUrl);
   }
-}function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
+}
+
+function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
   var ctx = assertDatabaseTransferAdmin_();
   var sourceId = String(sourceSpreadsheetId || '').trim().match(/[-\w]{25,}/);
   if (!sourceId) throw new Error('Enter a valid Google Sheets URL or spreadsheet ID.');
