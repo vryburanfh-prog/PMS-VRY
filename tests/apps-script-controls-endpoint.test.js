@@ -55,6 +55,7 @@ test('portfolio controls endpoint derives projects from the authorized portfolio
   assert.match(fn, /canView\('WBS_Schedule'\)/);
   assert.match(fn, /canView\('Financial_Monitoring'\)/);
   assert.doesNotMatch(fn, /insertRecord_|updateRecordById_|deleteRecordById_|writeAuditLog_/);
+  assert.doesNotMatch(fn, /canViewRisks|canViewIssues/);
 });
 
 test('portfolio controls endpoint returns aggregate indicators, not source records', () => {
