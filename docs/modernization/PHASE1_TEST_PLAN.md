@@ -151,6 +151,16 @@ Draft PR #7 adds a Node 20 GitHub Actions workflow to run source-level checks. T
 
 Draft backup/recovery runbook PR #10 describes these procedures. Do not run destructive or recovery tests against live production; the Apps Script import is not transactional across tabs and no atomic restore endpoint exists.
 
+## 3.10 Delete-helper consistency regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| DEL-01 | Delete records from control registry, weekly report, workload, procurement, and financial modules | Each API uses the locked database delete helper; record lookup is by stable ID inside helper, not stale row index | Not run |
+| DEL-02 | Delete with concurrent row changes in the same table | Helper locates record by ID under Script Lock; no wrong-row deletion from stale index | Not run |
+| DEL-03 | Delete succeeds but audit-log write fails (fault injection in isolated copy) | Failure boundary is documented; recovery/compensation policy is validated | Not run |
+
+Draft PR #12 routes five direct-delete paths through `deleteRecordById_`. This improves lock/cache-helper consistency but does not make the deletion and audit-log write transactional.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
