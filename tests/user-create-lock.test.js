@@ -30,3 +30,16 @@ test('project references are validated before the user record is inserted', () =
   const insertion = fn.indexOf('insertRecord_(DB_CONFIG.TABS.USERS, newUser)');
   assert.ok(validation >= 0 && insertion > validation);
 });
+
+test('partial account-creation failures trigger compensating cleanup across dependent tables', () => {
+  const catchStart = fn.indexOf('catch (creationError)');
+  const assignmentCleanup = fn.indexOf("deleteRecordsByIds_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS", catchStart);
+  const credentialCleanup = fn.indexOf("deleteRecordsByIds_(DB_CONFIG.TABS.AUTH_CREDENTIALS", catchStart);
+  const trustedCleanup = fn.indexOf("removeTrustedAdminEmail_(email)", catchStart);
+  const userCleanup = fn.indexOf("deleteRecordsByIds_(DB_CONFIG.TABS.USERS", catchStart);
+  const rethrow = fn.indexOf('throw creationError', catchStart);
+  assert.ok(catchStart > 0 && assignmentCleanup > catchStart);
+  assert.ok(credentialCleanup > assignmentCleanup && trustedCleanup > credentialCleanup);
+  assert.ok(userCleanup > trustedCleanup && rethrow > userCleanup);
+  assert.match(fn, /cleanupErrors\.length/);
+});
