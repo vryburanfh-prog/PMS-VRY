@@ -24,3 +24,15 @@ test('manual PMO digest dispatch serializes authorization, validation, email and
   assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
   assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1, 'exactly one lock release');
 });
+
+test('scheduled PMO digest dispatch is serialized', () => {
+  const body = bodyFor('runScheduledPmoDigestTrigger_');
+  const lock = body.indexOf('LockService.getScriptLock()');
+  const wait = body.indexOf('lock.waitLock(15000)');
+  const send = body.indexOf('MailApp.sendEmail(');
+  const release = body.lastIndexOf('lock.releaseLock()');
+  assert.ok(lock >= 0 && wait > lock, 'acquires script lock');
+  assert.ok(send > wait && release > send, 'scheduled email is protected and lock released afterward');
+  assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
+  assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1, 'exactly one lock release');
+});

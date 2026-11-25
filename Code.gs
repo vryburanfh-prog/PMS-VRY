@@ -3890,6 +3890,9 @@ function runScheduledPmoDigestTrigger(e) {
 }
 
 function runScheduledPmoDigestTrigger_() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   var cfg = readPhase17Config_();
   if (!cfg.enabled || !cfg.recipients) return;
 
@@ -3909,26 +3912,11 @@ function runScheduledPmoDigestTrigger_() {
   if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
     MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
   }
+
+  } finally {
+    lock.releaseLock();
+  }
 }
-
-// ============================================================================
-// PHASE 18: EXCEPTION & ESCALATION WORKFLOW RULES
-// ============================================================================
-
-var PHASE18_HEADERS_ = [
-  'Escalation_ID',
-  'Project_ID',
-  'Source_Type',
-  'Severity',
-  'Title',
-  'Owner_Email',
-  'Status',
-  'Notes',
-  'Created_By',
-  'Created_At',
-  'Updated_At'
-];
-
 function resolvePhase18TabName_() {
   var tabs = (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.TABS) ? DB_CONFIG.TABS : {};
   return tabs.ESCALATIONS || tabs.EXCEPTION_ESCALATIONS || 'Escalations';
