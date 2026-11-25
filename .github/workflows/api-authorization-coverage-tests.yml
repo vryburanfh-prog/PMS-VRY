@@ -14,8 +14,6 @@ on:
       - 'tests/import-formula-preservation.test.js'
       - 'tests/index-html-escaping.test.js'
       - 'tests/api-authorization-coverage.test.js'
-      - 'index.html'
-      - 'tests/index-html-escaping.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
   push:
     paths:
