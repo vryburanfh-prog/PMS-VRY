@@ -1618,6 +1618,7 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
  * Deletes a record from a Phase 7 Project Controls registry (requires Can_Delete permission)
  * and records the deleted snapshot in Audit_Logs.
  */
+// Validation-only integration branch includes the locked-delete-helper regression fix.
 function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
   const cfg = CONTROLS_REGISTRY_CONFIG[registryKey];
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
