@@ -3797,7 +3797,7 @@ button, input, select, textarea { min-height: 2.25rem; }
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(w.Assignment_ID) }</td>
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(w.Employee_Name)} <span class="text-[10px] font-mono text-slate-400">${escapeHtmlSafe_(w.Employee_ID ? '(' + w.Employee_ID + ')' : '')}</span></td>
             <td class="py-2 px-3">${escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')}</td>
-            <td class="py-2 px-3 font-mono text-[11px]">${wbsStr}</td>
+            <td class="py-2 px-3 font-mono text-[11px]">${escapeHtmlSafe_(wbsStr)}</td>
             <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '')}">${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '-')}</td>
             <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(w.Workload_Allocation_Pct || 0)}%</td>
             <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(dateStr)}</td>
@@ -4626,7 +4626,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                           <td class="py-2 px-3 font-semibold">${Number(r.Actual_Spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3 ${v < 0 ? 'text-rose-700 font-bold' : 'text-emerald-700 font-semibold'}">${v >= 0 ? '+' : ''}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td class="py-2 px-3">${escapeHtmlSafe_(r.Latest_Progress)}</td>
-                          <td class="py-2 px-3 font-bold ${r.Overallocated_Resources > 0 ? 'text-rose-700' : 'text-slate-600'}">${r.Overallocated_Resources}</td>
+                          <td class="py-2 px-3 font-bold ${r.Overallocated_Resources > 0 ? 'text-rose-700' : 'text-slate-600'}">${escapeHtmlSafe_(r.Overallocated_Resources)}</td>
                         </tr>
                       `;
                     }).join('')}
