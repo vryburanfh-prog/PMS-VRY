@@ -1,0 +1,25 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const source = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+function bodyFor(name) {
+  const m = source.match(new RegExp('function ' + name + '\\([^)]*\\)\\s*\\{[\\s\\S]*?\\r?\\n\\}'));
+  assert.ok(m, name + ' should exist');
+  return m[0];
+}
+test('manual PMO digest dispatch serializes authorization, validation, email and audit', () => {
+  const body = bodyFor('apiDispatchPmoDigestEmail');
+  const lock = body.indexOf('LockService.getScriptLock()');
+  const wait = body.indexOf('lock.waitLock(15000)');
+  const auth = body.indexOf('assertPrivilegedManagementRole_(');
+  const validation = body.indexOf('if (!toList.length)');
+  const send = body.indexOf('MailApp.sendEmail(');
+  const audit = body.indexOf('writeAuditLog_(');
+  const release = body.lastIndexOf('lock.releaseLock()');
+  assert.ok(lock >= 0 && wait > lock, 'acquires script lock');
+  assert.ok(auth > wait, 'authorization inside lock');
+  assert.ok(validation > auth && send > validation, 'validates recipient/content before send');
+  assert.ok(audit > send && release > audit, 'audit and release follow email send');
+  assert.ok(body.includes('finally') && body.includes('lock.releaseLock()'), 'release in finally');
+});
