@@ -81,3 +81,8 @@ The endpoint returns aggregate-only indicators (not source risk, issue, schedule
 Each metric is independently gated by its module view permission. A metric is `null` when the user lacks access or there are no source rows from which to assess it; zero is reserved for an available metric with no matching exceptions. The portfolio page displays unavailable metrics as an em dash. The watchlist is read-only and refreshes with the existing portfolio refresh action.
 
 The portfolio endpoint uses the PMS risk score bands: scores 10–14 are High and 15+ are Critical. This is aligned with `computeRiskRatingLabel_` and the risk registry's stored rating labels.
+
+
+The existing portfolio KPI response was also tightened so delayed-milestone, critical-risk, and open-issue totals are permission-gated. When a user lacks the relevant module permission, the API returns `null` and the dashboard displays an em dash rather than a misleading zero.
+
+The watchlist now includes a project-level exceptions table alongside the portfolio totals. It shows only aggregate counts and budget/commitment flags for each project in the already-authorized portfolio. It does not expose raw risk descriptions, issue narratives, or financial line items.
