@@ -899,6 +899,11 @@ function apiGetPortfolioControlsSummary(filters) {
     });
   };
   const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+  if (!ids.size) return {
+    success: true, statusDate: today, projectCount: 0,
+    criticalRisks: 0, openIssues: 0, overdueMilestones: 0, delayedActivities: 0,
+    projectsOverBudget: 0, projectsOverCommitted: 0, projects: []
+  };
   const risks = readScoped(DB_CONFIG.TABS.RISKS, 'Risks', 'Project_ID', true);
   const issues = readScoped(DB_CONFIG.TABS.ISSUES, 'Issues', 'Project_ID', true);
   const milestones = readScoped(DB_CONFIG.TABS.MILESTONES, 'Milestones', 'Project_ID', true);
