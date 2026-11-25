@@ -262,14 +262,20 @@ function buildPmsPortfolioControlsSummary(reports) {
     if (seen.has(projectId)) throw new Error('Duplicate project report: ' + projectId);
     seen.add(projectId);
     const finance = report.finance;
-    const highRisk = Number(report.riskSummary && report.riskSummary.highOrCriticalOpen) || 0;
-    const openIssues = Number(report.issueSummary && report.issueSummary.open) || 0;
-    const overdueMilestones = Number(report.scheduleAlerts && report.scheduleAlerts.overdueMilestoneCount) || 0;
-    const delayedActivities = Number(report.scheduleAlerts && report.scheduleAlerts.delayedActivityCount) || 0;
-    const overBudget = Boolean(finance && finance.overBudget);
-    const overCommitment = Boolean(finance && finance.overCommitment);
-    const alertCount = highRisk + openIssues + overdueMilestones + delayedActivities +
-      Number(overBudget) + Number(overCommitment);
+    const availability = report.availability || {};
+    const highRisk = report.riskSummary ? Number(report.riskSummary.highOrCriticalOpen) || 0
+      : (availability.risks === false ? null : 0);
+    const openIssues = report.issueSummary ? Number(report.issueSummary.open) || 0
+      : (availability.issues === false ? null : 0);
+    const overdueMilestones = availability.milestones === false ? null
+      : Number(report.scheduleAlerts && report.scheduleAlerts.overdueMilestoneCount) || 0;
+    const delayedActivities = availability.schedule === false ? null
+      : Number(report.scheduleAlerts && report.scheduleAlerts.delayedActivityCount) || 0;
+    const overBudget = finance ? Boolean(finance.overBudget) : null;
+    const overCommitment = finance ? Boolean(finance.overCommitment) : null;
+    const alertCount = [highRisk, openIssues, overdueMilestones, delayedActivities]
+      .reduce((sum, value) => sum + (value == null ? 0 : value), 0) +
+      Number(overBudget === true) + Number(overCommitment === true);
     return {
       projectId,
       projectName: String(report.projectName || ''),
@@ -280,16 +286,27 @@ function buildPmsPortfolioControlsSummary(reports) {
       delayedActivities,
       overBudget,
       overCommitment,
-      hasFinancialData: Boolean(finance)
+      hasFinancialData: Boolean(finance),
+      availability: {
+        schedule: availability.schedule !== false,
+        milestones: availability.milestones !== false,
+        risks: availability.risks !== false,
+        issues: availability.issues !== false,
+        financialMonitoring: availability.financialMonitoring !== false
+      }
     };
   });
   return {
     projectCount: projects.length,
     projectsWithAlerts: projects.filter(project => project.alertCount > 0).length,
-    highOrCriticalOpenRisks: projects.reduce((sum, project) => sum + project.highOrCriticalOpenRisks, 0),
-    openIssues: projects.reduce((sum, project) => sum + project.openIssues, 0),
-    overdueMilestones: projects.reduce((sum, project) => sum + project.overdueMilestones, 0),
-    delayedActivities: projects.reduce((sum, project) => sum + project.delayedActivities, 0),
+    highOrCriticalOpenRisks: projects.some(project => project.highOrCriticalOpenRisks != null)
+      ? projects.reduce((sum, project) => sum + (project.highOrCriticalOpenRisks == null ? 0 : project.highOrCriticalOpenRisks), 0) : null,
+    openIssues: projects.some(project => project.openIssues != null)
+      ? projects.reduce((sum, project) => sum + (project.openIssues == null ? 0 : project.openIssues), 0) : null,
+    overdueMilestones: projects.some(project => project.overdueMilestones != null)
+      ? projects.reduce((sum, project) => sum + (project.overdueMilestones == null ? 0 : project.overdueMilestones), 0) : null,
+    delayedActivities: projects.some(project => project.delayedActivities != null)
+      ? projects.reduce((sum, project) => sum + (project.delayedActivities == null ? 0 : project.delayedActivities), 0) : null,
     projectsOverBudget: projects.filter(project => project.overBudget).length,
     projectsOverCommitted: projects.filter(project => project.overCommitment).length,
     projects
