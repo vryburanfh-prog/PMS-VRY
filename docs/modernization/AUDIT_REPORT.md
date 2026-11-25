@@ -192,6 +192,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #7 | Static security CI | Open draft | GitHub Actions run succeeded; 1 baseline test passed, 6 fix-specific tests skipped until implementation PRs merge |
 | #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
 | #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
+| #10 | Backup/recovery runbook | Open draft | Source-based guidance; runtime recovery and failure-injection tests not run |
 
 
 
