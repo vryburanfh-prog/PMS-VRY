@@ -249,6 +249,9 @@ function apiCreateUser(userPayload) {
 
 function apiUpdateUser(userId, payload) {
   const ctx = assertAdministrator_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   ensureHybridAuthTables_();
   if (!userId) throw new Error('User_ID is required.');
   payload = payload || {};
@@ -296,6 +299,9 @@ function apiUpdateUser(userId, payload) {
   const assigned = syncUserProjectAssignments_(result.updated, payload.assignedProjectIds !== undefined ? payload.assignedProjectIds : getUserAssignedProjectIds_(userId, email), ctx);
   writeAuditLog_(ctx, 'UPDATE_USER', 'Users_Admin', userId, result.previous, result.updated, 'Updated user profile and project assignments');
   return { success: true, user: result.updated, assignedProjectIds: assigned };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiAdminResetPassword(userId, newPassword) {
