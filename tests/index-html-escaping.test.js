@@ -9,7 +9,7 @@ function extractFunction(source, name) {
   const marker = 'function ' + name + '(';
   const start = source.indexOf(marker);
   assert.ok(start >= 0, name + ' must exist');
-  const next = source.slice(start + marker.length).search(/\\n\\s*function\\s+\\w+\\s*\\(/);
+  const next = source.slice(start + marker.length).search(/\n\s*function\s+\w+\s*\(/);
   return source.slice(start, next < 0 ? undefined : start + marker.length + next);
 }
 
@@ -31,9 +31,9 @@ test('index HTML project, WBS, registry, workload and report fields are escaped'
 });
 
 test('inline index JavaScript parses after HTML escaping changes', () => {
-  const scriptTags = [...indexHtml.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)].filter(m => !/\\bsrc\\s*=/.test(m[1]));
+  const scriptTags = [...indexHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m => !/\bsrc\s*=/.test(m[1]));
   assert.equal(scriptTags.length, 1, 'expected one main inline script');
-  new Function(scriptTags[0][2]);
+  const templatedScript = scriptTags[0][2].replace(/<\\?!=[\\s\\S]*?\\?>/g, '""').replace(/<\\?[\\s\\S]*?\\?>/g, '');\n  new Function(templatedScript);
 });
 
 test('share URL sanitizer accepts HTTPS only and escapes attributes', () => {
