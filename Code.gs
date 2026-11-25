@@ -874,6 +874,105 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
  * A null dataset means the caller lacks module view permission; an empty
  * array means the caller is authorized but no active records exist.
  */
+
+/**
+ * Returns aggregate-only project-controls indicators for the authenticated
+ * portfolio. Module metrics are independently permission-gated; no source
+ * records are returned by this endpoint.
+ */
+function apiGetPortfolioControlsSummary(filters) {
+  const portfolio = apiGetPortfolioData(filters || {});
+  const ctx = portfolio.context;
+  const projects = portfolio.projects || [];
+  const ids = new Set(projects.map(function (project) { return String(project.Project_ID || '').trim(); }));
+  const canView = function (moduleName) {
+    return Boolean(ctx && (ctx.isAdmin || (ctx.permissions && ctx.permissions[moduleName] && ctx.permissions[moduleName].view === true)));
+  };
+  const readScoped = function (tabName, moduleName, projectField, excludeArchived) {
+    if (!canView(moduleName)) return null;
+    return (getTableRecords_(tabName) || []).filter(function (row) {
+      const id = String(row[projectField || 'Project_ID'] || '').trim();
+      return ids.has(id) && (!excludeArchived || !isTruthySheetFlag_(row.Is_Archived));
+    });
+  };
+  const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+  const risks = readScoped(DB_CONFIG.TABS.RISKS, 'Risks', 'Project_ID', true);
+  const issues = readScoped(DB_CONFIG.TABS.ISSUES, 'Issues', 'Project_ID', true);
+  const milestones = readScoped(DB_CONFIG.TABS.MILESTONES, 'Milestones', 'Project_ID', true);
+  const activities = readScoped(DB_CONFIG.TABS.ACTIVITIES, 'WBS_Schedule', 'Project_ID', true);
+  const financial = readScoped(DB_CONFIG.TABS.FINANCIAL, 'Financial_Monitoring', 'Project_ID', false);
+  const byProject = function (rows, pid) {
+    return rows ? rows.filter(function (row) { return String(row.Project_ID || '').trim() === pid; }) : null;
+  };
+  const rows = projects.map(function (project) {
+    const pid = String(project.Project_ID || '').trim();
+    const pRisks = byProject(risks, pid);
+    const pIssues = byProject(issues, pid);
+    const pMilestones = byProject(milestones, pid);
+    const pActivities = byProject(activities, pid);
+    const pFinancial = byProject(financial, pid);
+    const criticalRisks = pRisks ? pRisks.filter(function (row) {
+      const status = String(row.Current_Status || row.Status || '').trim().toLowerCase();
+      const rating = String(row.Risk_Rating || '').trim().toUpperCase();
+      return !['closed', 'resolved', 'accepted'].includes(status) &&
+        (rating.indexOf('CRITICAL') !== -1 || rating.indexOf('HIGH') !== -1 || Number(rating) >= 15);
+    }).length : null;
+    const openIssues = pIssues ? pIssues.filter(function (row) {
+      return !['closed', 'resolved'].includes(String(row.Issue_Status || row.Status || '').trim().toLowerCase());
+    }).length : null;
+    const overdueMilestones = pMilestones ? pMilestones.filter(function (row) {
+      const status = String(row.Milestone_Status || '').trim().toLowerCase();
+      const forecast = String(row.Forecast_Date || '').trim();
+      return !['completed', 'achieved'].includes(status) && /^\d{4}-\d{2}-\d{2}$/.test(forecast) && forecast < today;
+    }).length : null;
+    const delayedActivities = pActivities ? pActivities.filter(function (row) {
+      const status = String(row.Status || '').trim().toLowerCase();
+      const forecast = String(row.Forecast_Finish_Date || '').trim();
+      return !['completed', 'complete', 'closed'].includes(status) && /^\d{4}-\d{2}-\d{2}$/.test(forecast) && forecast < today;
+    }).length : null;
+    const budget = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Budget_Amount) || 0); }, 0) : null;
+    const committed = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Committed_Amount) || 0); }, 0) : null;
+    const actual = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Actual_Spend) || 0); }, 0) : null;
+    return {
+      projectId: pid,
+      projectName: String(project.Project_Name || ''),
+      criticalRisks: criticalRisks,
+      openIssues: openIssues,
+      overdueMilestones: overdueMilestones,
+      delayedActivities: delayedActivities,
+      overBudget: budget === null ? null : actual > budget,
+      overCommitment: budget === null ? null : committed > budget,
+      availability: {
+        risks: pRisks !== null,
+        issues: pIssues !== null,
+        milestones: pMilestones !== null,
+        schedule: pActivities !== null,
+        financialMonitoring: pFinancial !== null
+      }
+    };
+  });
+  const total = function (key) {
+    const known = rows.filter(function (row) { return row[key] !== null; });
+    return known.length ? known.reduce(function (sum, row) { return sum + row[key]; }, 0) : null;
+  };
+  return {
+    success: true,
+    statusDate: today,
+    projectCount: rows.length,
+    criticalRisks: total('criticalRisks'),
+    openIssues: total('openIssues'),
+    overdueMilestones: total('overdueMilestones'),
+    delayedActivities: total('delayedActivities'),
+    projectsOverBudget: rows.some(function (row) { return row.overBudget === true; })
+      ? rows.filter(function (row) { return row.overBudget === true; }).length
+      : (rows.some(function (row) { return row.overBudget === false; }) ? 0 : null),
+    projectsOverCommitted: rows.some(function (row) { return row.overCommitment === true; })
+      ? rows.filter(function (row) { return row.overCommitment === true; }).length
+      : (rows.some(function (row) { return row.overCommitment === false; }) ? 0 : null),
+    projects: rows
+  };
+}
+
 function apiGetProjectControlsInputs(projectId) {
   const pid = String(projectId || '').trim();
   if (!pid) throw new Error('Project_ID is required.');
