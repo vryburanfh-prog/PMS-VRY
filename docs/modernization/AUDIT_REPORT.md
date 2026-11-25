@@ -135,3 +135,13 @@ A regex scan of the current `main` versions of `index.html` and `Presentation.ht
 **Impact:** Source values that are formula-like strings may be interpreted by Sheets when written to destination, depending on cell value and import content. Imports can also carry invalid relationships or unexpected values despite matching headers.
 **Recommendation:** Validate row data against schemas; ensure text beginning with formula operators is stored as literal text (or rejected); test formula injection in a disposable copy; validate key uniqueness and foreign-key/project relationships; retain backup and recovery verification.
 **Status:** Potential risk, not reproduced; import formula behavior requires runtime testing in Google Sheets.
+
+
+## Remediation tracking (source review update)
+
+| Finding | Remediation branch / PR | Source-level status | Runtime status |
+|---|---|---|---|
+| S6 public client deck may expose raw source metrics | `pms-modernization/phase1-public-deck-data-minimization`, draft PR #4 | New payload omits `rawMetrics`; public endpoint strips it from legacy snapshots; renderer has no reference to it | Not tested in Apps Script; live published links not checked |
+| S7 formula-like imported strings may be interpreted as formulas | `pms-modernization/phase1-import-formula-safety`, draft PR #5 | Import rows sanitize strings beginning with `=`, `+`, `-`, or `@` (including leading whitespace) before destination writes | Not tested against live Google Sheets formula behavior |
+
+The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08/09 and DECK-07/08/09. These code changes remain review-only: neither PR has been merged or deployed. They are source-level mitigations, not evidence of runtime validation. Formula sanitization intentionally changes formula-like imported text to literal text and should be checked against expected import semantics in a disposable test spreadsheet.
