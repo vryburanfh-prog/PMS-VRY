@@ -1,0 +1,25 @@
+name: API Authorization Coverage Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'Security.gs'
+      - 'tests/api-authorization-coverage.test.js'
+      - '.github/workflows/api-authorization-coverage-tests.yml'
+  push:
+    paths:
+      - 'Code.gs'
+      - 'Security.gs'
+      - 'tests/api-authorization-coverage.test.js'
+      - '.github/workflows/api-authorization-coverage-tests.yml'
+
+jobs:
+  api-authorization-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node --test tests/api-authorization-coverage.test.js
