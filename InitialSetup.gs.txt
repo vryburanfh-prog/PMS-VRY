@@ -1,0 +1,10 @@
+function initializeFirstAdministrator() {
+  const trustedAdminEmails = [
+    "vryburan@gmail.com","vryburan.fh@gmail.com"
+  ];
+
+  const result = setPMSuperAdminEmails_(trustedAdminEmails);
+
+  Logger.log("Administrator setup result:");
+  Logger.log(JSON.stringify(result));
+}
