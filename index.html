@@ -2278,6 +2278,10 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         const riskRows = rowsFor('risks');
         const issueRows = rowsFor('issues');
         const financeRows = rowsFor('financialItems');
+        const cpm = res.access.schedule ? res.cpm : null;
+        const cpmSummary = !res.access.schedule ? 'Restricted' :
+          (cpm && cpm.available ? fmt(cpm.durationWorkingDays) + ' working days · ' + cpm.criticalActivityCount + ' critical activities' : 'Unavailable');
+        const cpmReason = cpm && !cpm.available ? String(cpm.reason || 'Insufficient or invalid schedule data') : '';
         const highCritical = riskRows.filter(row => {
           const status = String(row.Current_Status || row.Status || '').toLowerCase();
           const rating = String(row.Risk_Rating || '').toUpperCase();
@@ -2293,6 +2297,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             detail: 'Activities · Planned: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Planned_Progress') : 'Restricted') +
               ' · Actual: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Actual_Progress') : 'Restricted'),
             extra: 'Late: ' + (res.access.schedule ? overdue(scheduleRows, 'Forecast_Finish_Date', 'Status') : 'Restricted') +
+              ' · CPM: ' + cpmSummary + (cpmReason ? ' (' + cpmReason + ')' : '') +
               ' · Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
           { title: 'Milestones', allowed: res.access.milestones, value: res.access.milestones ? metric(count(res.milestones)) : 'Restricted',
             detail: 'Milestones', extra: 'Overdue: ' + (res.access.milestones ? overdue(milestoneRows, 'Forecast_Date', 'Milestone_Status') : 'Restricted') },
