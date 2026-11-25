@@ -1,0 +1,32 @@
+name: Client Deck ID Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/client-deck-id.test.js'
+      - '.github/workflows/client-deck-id-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/client-deck-id.test.js'
+      - '.github/workflows/client-deck-id-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-deck-id-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  client-deck-id:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/client-deck-id.test.js
