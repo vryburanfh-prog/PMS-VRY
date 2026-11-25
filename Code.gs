@@ -4899,8 +4899,7 @@ function apiGenerateClientPresentation(config) {
     audienceTone: audienceTone,
     generatedAt: nowIso,
     executiveSummary: aiDeck.executiveSummary || '',
-    slides: aiDeck.slides || [],
-    rawMetrics: factPacket
+    slides: aiDeck.slides || []
   };
 
   sh.appendRow([
@@ -4999,9 +4998,14 @@ function apiGetPublishedClientDeckByToken(token) {
   const found = decks.find(d => String(d.Share_Token) === cleanToken && String(d.Status || 'PUBLISHED') === 'PUBLISHED');
   if (!found) return { success: false, error: 'Presentation not found or link has been archived.' };
 
+  const deck = JSON.parse(found.Deck_JSON || '{}');
+  // Defense in depth: older published snapshots may contain source metrics.
+  // Public token access returns only curated presentation content.
+  if (deck && typeof deck === 'object' && !Array.isArray(deck)) delete deck.rawMetrics;
+
   return {
     success: true,
-    deck: JSON.parse(found.Deck_JSON || '{}')
+    deck: deck
   };
 }
 
