@@ -29,7 +29,7 @@ function makeSheet(rows, failFirstSet = false) {
   };
   return sheet;
 }
-function runHarness({failOnB = false} = {}) {
+function runHarness({failOnB = false, omitBackupB = false} = {}) {
   const originalA = [['A-old-1'], ['A-old-2']];
   const originalB = [['B-old']];
   const destA = makeSheet(originalA);
@@ -38,7 +38,7 @@ function runHarness({failOnB = false} = {}) {
   const backupB = makeSheet(originalB);
   const invalidated = [];
   const context = {
-    SpreadsheetApp: {openById: () => ({getSheetByName: name => name === 'A' ? backupA : name === 'B' ? backupB : null})},
+    SpreadsheetApp: {openById: () => ({getSheetByName: name => name === 'A' ? backupA : name === 'B' && !omitBackupB ? backupB : null})},
     invalidateTableCache_: name => invalidated.push(name)
   };
   vm.createContext(context);
@@ -64,4 +64,10 @@ test('failed later-tab write restores all touched tabs from backup and invalidat
   assert.deepEqual(state.destB.rows, [['B-old']]);
   assert.ok(state.invalidated.includes('A'));
   assert.ok(state.invalidated.includes('B'));
+});
+
+test('rollback failure reports manual reconciliation warning and backup URL', () => {
+  const state = runHarness({failOnB:true, omitBackupB:true});
+  assert.throws(() => state.context.applyDatabaseImportPlanWithRollback_(state.plan, 'backup-id', 'backup-url'), /Rollback was incomplete.*manual reconciliation.*Backup URL: backup-url/);
+  assert.deepEqual(state.destA.rows, [['A-old-1'],['A-old-2']]);
 });
