@@ -5,8 +5,10 @@ on:
     paths:
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
+      - 'src/pms-project-controls.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
+      - 'tests/pms-project-controls.test.js'
       - '.github/workflows/project-controls-tests.yml'
   push:
     branches:
@@ -15,8 +17,10 @@ on:
     paths:
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
+      - 'src/pms-project-controls.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
+      - 'tests/pms-project-controls.test.js'
       - '.github/workflows/project-controls-tests.yml'
 
 permissions:
@@ -37,4 +41,4 @@ jobs:
         with:
           node-version: 20
       - name: Run project-controls and adapter tests
-        run: node --test tests/project-controls.test.js tests/project-controls-adapter.test.js
+        run: node --test tests/project-controls.test.js tests/project-controls-adapter.test.js tests/pms-project-controls.test.js
