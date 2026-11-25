@@ -88,7 +88,7 @@ test('runtime: project endpoint scopes every returned dataset and strips interna
       { Project_ID: 'P-2', Record_ID: tab + '-2', Is_Archived: false, _rowIndex: 10 }
     ];
   }
-  const { result } = runProjectControlsEndpoint({ datasets: rows });
+  const { result } = runProjectControlsEndpoint({ datasets: rows, context: { isAdmin: true, permissions: {} } });
   assert.equal(result.success, true);
   for (const key of ['activities','dependencies','baselines','milestones','risks','issues','financialItems']) {
     assert.equal(result[key].length, 1, key + ' must be project scoped');
