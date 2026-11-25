@@ -118,3 +118,19 @@ test('password-login failure counter is read-modify-write under Script Lock', { 
   assert.ok(helper.includes('updateRecordById_'));
   assert.ok(helper.includes('attempts >= 5'));
 });
+
+test('project-scoped deletions revalidate ownership inside the locked delete helper', { skip: !(db.includes('function deleteRecordById_(tabName, idColumn, recordId, expectedScope)') && db.includes('Record does not belong to the expected scope.') && code.includes("deleteRecordById_(cfg.tab, cfg.idCol, recordId, { field: 'Project_ID', value: pid })")) && 'Pending atomic-delete-scope remediation PR' }, () => {
+  const helper = section(db, 'function deleteRecordById_', 'function deleteRecordsByIds_');
+  assert.match(helper, /LockService\.getScriptLock\(\)/);
+  assert.match(helper, /expectedScope/);
+  assert.match(helper, /actualValue !== expectedValue/);
+  const scopedCalls = [
+    "deleteRecordById_(cfg.tab, cfg.idCol, recordId, { field: 'Project_ID', value: pid })",
+    "deleteRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId, { field: 'Project_ID', value: pid })",
+    "deleteRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId, { field: 'Assigned_Project_ID', value: pid })",
+    "deleteRecordById_(procTab, 'Procurement_ID', procurementId, { field: 'Project_ID', value: pid })",
+    "deleteRecordById_(finTab, 'Financial_ID', financialId, { field: 'Project_ID', value: pid })",
+    "deleteRecordById_(cfg[0], cfg[1], recordId, { field: 'Project_ID', value: pid })"
+  ];
+  for (const call of scopedCalls) assert.ok(code.includes(call), `Missing atomic scope check: ${call}`);
+});
