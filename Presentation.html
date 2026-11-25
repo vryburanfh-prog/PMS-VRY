@@ -2249,6 +2249,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       permissions: { create: false, edit: false, delete: false, approve: false }
     };
 
+    const REGISTRY_APPROVAL_FIELDS_ = { Deliverables: ['Approval_Status'], Approvals: ['Approval_Status'] };
     const REGISTRY_SCHEMAS = {
       'Milestones': {
         singular: 'Milestone',
@@ -2485,7 +2486,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       const subOpts = '<option value="">-- Optional Sub WBS --</option>' +
         st.subWbs.map(s => `<option value="${escapeHtmlSafe_(s.id)}">${escapeHtmlSafe_(s.id)}: ${escapeHtmlSafe_(s.name)}</option>`).join('');
 
-      const formFieldsHtml = schema.fields.map(f => {
+      const formFieldsHtml = schema.fields.filter(f => st.permissions.approve || !(REGISTRY_APPROVAL_FIELDS_[st.key] || []).includes(f.name)).map(f => {
         const spanClass = f.span === 2 ? 'md:col-span-2' : '';
         const reqAttr = f.required ? 'required' : '';
         let control = '';
@@ -2747,7 +2748,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       document.getElementById('reg-editing-id').value = recordId;
       document.getElementById('reg-form-title').textContent = `Edit ${schema.singular} — ${recordId}`;
 
-      schema.fields.forEach(f => {
+      schema.fields.filter(f => st.permissions.approve || !(REGISTRY_APPROVAL_FIELDS_[st.key] || []).includes(f.name)).forEach(f => {
         const el = document.getElementById('reg-f-' + f.name);
         if (el) el.value = rec[f.name] !== undefined ? rec[f.name] : '';
       });
