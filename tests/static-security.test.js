@@ -110,7 +110,7 @@ test('client deck generation inserts through locked helper with Deck_ID key', { 
 });
 
 
-test('password-login failure counter is read-modify-write under Script Lock', { skip: !(security.includes('function recordPasswordLoginFailure_(') && code.includes('recordPasswordLoginFailure_(cred.Credential_ID)')) && 'Pending login-failure atomicity remediation PR' }, () => {
+test('password-login failure counter is read-modify-write under Script Lock', { skip: !(security.includes('function recordPasswordLoginFailure_(') && security.includes('recordPasswordLoginFailure_(cred.Credential_ID)')) && 'Pending login-failure atomicity remediation PR' }, () => {
   const helper = section(security, 'function recordPasswordLoginFailure_', 'function apiLoginWithPassword');
   assert.ok(helper.includes('LockService.getScriptLock()'));
   assert.ok(helper.includes('waitLock(10000)'));
