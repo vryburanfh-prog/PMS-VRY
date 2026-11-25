@@ -120,7 +120,7 @@ test('password-login failure counter is read-modify-write under Script Lock', { 
 });
 
 test('project-scoped deletions revalidate ownership inside the locked delete helper', { skip: !(db.includes('function deleteRecordById_(tabName, idColumn, recordId, expectedScope)') && db.includes('Record does not belong to the expected scope.') && code.includes("deleteRecordById_(cfg.tab, cfg.idCol, recordId, { field: 'Project_ID', value: pid })")) && 'Pending atomic-delete-scope remediation PR' }, () => {
-  const helper = section(db, 'function deleteRecordById_', 'function updateRecordById_');
+  const helper = section(db, 'function deleteRecordById_', 'function generateNextId_');
   assert.match(helper, /LockService\.getScriptLock\(\)/);
   assert.match(helper, /expectedScope/);
   assert.match(helper, /actualValue !== expectedValue/);
