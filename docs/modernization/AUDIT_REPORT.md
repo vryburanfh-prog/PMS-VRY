@@ -145,3 +145,11 @@ A regex scan of the current `main` versions of `index.html` and `Presentation.ht
 | S7 formula-like imported strings may be interpreted as formulas | `pms-modernization/phase1-import-formula-safety`, draft PR #5 | Import rows sanitize strings beginning with `=`, `+`, `-`, or `@` (including leading whitespace) before destination writes | Not tested against live Google Sheets formula behavior |
 
 The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08/09 and DECK-07/08/09. These code changes remain review-only: neither PR has been merged or deployed. They are source-level mitigations, not evidence of runtime validation. Formula sanitization intentionally changes formula-like imported text to literal text and should be checked against expected import semantics in a disposable test spreadsheet.
+
+
+### S8 — P1 investigation/remediation: duplicate generated IDs under concurrency
+**Evidence:** `generateNextId_` scans records for max numeric suffix and returns the next value; generated IDs are often created before the insertion helper acquires its append lock. The insertion helpers previously serialized writes but did not check whether the supplied primary key already existed.
+**Remediation branch / PR:** `pms-modernization/phase1-id-uniqueness-enforcement`, draft PR #6.
+**Source-level change:** Primary-key duplicate checks were added to single and bulk insert helpers for mapped operational tables. Checks run while the Script Lock is held, before append; duplicate IDs in a bulk batch are also rejected. Missing mapped primary-key headers fail closed.
+**Limitations:** This prevents duplicate keys from being silently inserted but does not make max+1 generation and insertion one atomic allocation operation, nor retry a collision. A concurrent create that loses the race may return an error and require a retry. Runtime concurrency testing and consideration of a lock-protected allocator/counter remain necessary.
+**Status:** Source-only mitigation; runtime test not run.
