@@ -50,6 +50,7 @@ test('single and bulk insert helpers validate mapped primary keys', { skip: !pkF
   assert.match(bulk, /assertUniquePrimaryKeyForInsert_\(/);
   assert.match(db, /Duplicate .+ in insert batch:/);
   assert.match(db, /Record ID already exists in/);
+  assert.match(db, /Primary-key value is required for insert into/);
 });
 
 test('primary-key mapping includes core generated-ID tables', { skip: !pkFixPresent && 'Pending primary-key enforcement remediation PR' }, () => {
