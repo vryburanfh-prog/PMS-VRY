@@ -46,3 +46,21 @@ const dashboard = buildPmsPortfolioDashboardModel(portfolioData, projectReports)
 ```
 
 This Node adapter is not loaded directly by Google Apps Script. A future Apps Script integration must port or bundle compatible pure functions and must preserve the same authorization checks. Do not deploy a new API endpoint until that implementation is separately tested in the Apps Script runtime.
+
+
+## Apps Script endpoint added on the modernization branch
+
+The branch now contains `apiGetProjectControlsInputs(projectId)` in `Code.gs`. It is a read-only API endpoint that:
+
+- Requires `Projects:view` for the requested project, which also enforces project assignment for non-administrators.
+- Checks view permission independently for `WBS_Schedule`, `Milestones`, `Risks`, `Issues`, and `Financial_Monitoring`.
+- Returns only rows whose `Project_ID` matches the requested project and excludes archived rows where applicable.
+- Returns `null` for a dataset when its module permission is absent, and an empty array when access is granted but there are no records.
+- Removes internal `_rowIndex` metadata from returned records.
+- Does not write records, create audit entries, or change approvals.
+
+The Node adapter now includes `buildPmsProjectControlsReportFromApi(apiData)`, which preserves module availability. A denied module is represented as unavailable rather than a healthy zero. Risk and issue summaries can still be computed when the schedule module is empty or inaccessible.
+
+## Validation boundary
+
+Static CI checks compile the Apps Script endpoint function and assert its permission gates, project scoping, metadata redaction, and read-only behavior. These checks do not replace deployment-time testing in the Google Apps Script runtime. The endpoint remains on this GitHub branch only; it has not been deployed to the live Apps Script project.
