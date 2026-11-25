@@ -1,0 +1,169 @@
+{
+  "fixtureName": "PMS Phase 2 staging controls synthetic dataset",
+  "warning": "Synthetic-only data. Do not import into production.",
+  "project": {
+    "Project_ID": "TEST-PROJ-001",
+    "Project_Name": "Staging Controls Validation",
+    "Status": "Active"
+  },
+  "schedule": [
+    {
+      "Activity_ID": "ACT-01",
+      "Project_ID": "TEST-PROJ-001",
+      "Activity_Name": "Start / Design",
+      "Duration": 3,
+      "Actual_Progress": 100,
+      "Baseline_Start": "2026-11-02",
+      "Baseline_Finish": "2026-11-04",
+      "Current_Start": "2026-11-02",
+      "Current_Finish": "2026-11-04"
+    },
+    {
+      "Activity_ID": "ACT-02",
+      "Project_ID": "TEST-PROJ-001",
+      "Activity_Name": "Track B",
+      "Duration": 2,
+      "Actual_Progress": 0,
+      "Baseline_Start": "2026-11-05",
+      "Baseline_Finish": "2026-11-06",
+      "Current_Start": "2026-11-05",
+      "Current_Finish": "2026-11-06"
+    },
+    {
+      "Activity_ID": "ACT-03",
+      "Project_ID": "TEST-PROJ-001",
+      "Activity_Name": "Track C",
+      "Duration": 4,
+      "Actual_Progress": 0,
+      "Baseline_Start": "2026-11-05",
+      "Baseline_Finish": "2026-11-10",
+      "Current_Start": "2026-11-06",
+      "Current_Finish": "2026-11-11"
+    },
+    {
+      "Activity_ID": "ACT-04",
+      "Project_ID": "TEST-PROJ-001",
+      "Activity_Name": "Final integration",
+      "Duration": 1,
+      "Actual_Progress": 0,
+      "Baseline_Start": "2026-11-11",
+      "Baseline_Finish": "2026-11-11",
+      "Current_Start": "2026-11-12",
+      "Current_Finish": "2026-11-12"
+    }
+  ],
+  "dependencies": [
+    {
+      "Dependency_ID": "DEP-01",
+      "Project_ID": "TEST-PROJ-001",
+      "Predecessor_ID": "ACT-01",
+      "Successor_ID": "ACT-02",
+      "Relationship_Type": "FS",
+      "Lag": 0
+    },
+    {
+      "Dependency_ID": "DEP-02",
+      "Project_ID": "TEST-PROJ-001",
+      "Predecessor_ID": "ACT-01",
+      "Successor_ID": "ACT-03",
+      "Relationship_Type": "FS",
+      "Lag": 0
+    },
+    {
+      "Dependency_ID": "DEP-03",
+      "Project_ID": "TEST-PROJ-001",
+      "Predecessor_ID": "ACT-02",
+      "Successor_ID": "ACT-04",
+      "Relationship_Type": "FS",
+      "Lag": 0
+    },
+    {
+      "Dependency_ID": "DEP-04",
+      "Project_ID": "TEST-PROJ-001",
+      "Predecessor_ID": "ACT-03",
+      "Successor_ID": "ACT-04",
+      "Relationship_Type": "FS",
+      "Lag": 0
+    }
+  ],
+  "expectedCPM": {
+    "projectDurationWorkingDays": 8,
+    "criticalPathActivityIds": [
+      "ACT-01",
+      "ACT-03",
+      "ACT-04"
+    ],
+    "criticalActivityCount": 3,
+    "expectedTotalFloatWorkingDays": {
+      "ACT-01": 0,
+      "ACT-02": 2,
+      "ACT-03": 0,
+      "ACT-04": 0
+    }
+  },
+  "baselineSnapshot": {
+    "revision": 1,
+    "activities": [
+      {
+        "Activity_ID": "ACT-01",
+        "Baseline_Start": "2026-11-02",
+        "Baseline_Finish": "2026-11-04"
+      },
+      {
+        "Activity_ID": "ACT-02",
+        "Baseline_Start": "2026-11-05",
+        "Baseline_Finish": "2026-11-06"
+      },
+      {
+        "Activity_ID": "ACT-03",
+        "Baseline_Start": "2026-11-05",
+        "Baseline_Finish": "2026-11-10"
+      },
+      {
+        "Activity_ID": "ACT-04",
+        "Baseline_Start": "2026-11-11",
+        "Baseline_Finish": "2026-11-11"
+      },
+      {
+        "Activity_ID": "ACT-OLD",
+        "Baseline_Start": "2026-10-20",
+        "Baseline_Finish": "2026-10-21"
+      }
+    ]
+  },
+  "expectedBaselineDrift": {
+    "activeActivitiesMatched": 4,
+    "activeActivitiesMissingFromSnapshot": 0,
+    "snapshotOnlyActivities": 1,
+    "activitiesWithBaselineStartChanges": 0,
+    "activitiesWithBaselineFinishChanges": 0,
+    "note": "Current dates differ from baseline but baseline drift metrics compare the active baseline date fields to the approved snapshot; alter the current baseline fields separately to test changed-date counters."
+  },
+  "mutationScenarios": [
+    {
+      "case": "baseline-date-drift",
+      "change": "Change ACT-03 Baseline_Finish in live active row to 2026-11-12; leave approved snapshot unchanged.",
+      "expected": "One baseline-finish date change reported."
+    },
+    {
+      "case": "missing-from-snapshot",
+      "change": "Add ACT-05 to active schedule without adding it to snapshot.",
+      "expected": "Active activity missing-from-snapshot count increments by one."
+    },
+    {
+      "case": "snapshot-only",
+      "change": "Keep ACT-OLD in approved snapshot but absent from active schedule.",
+      "expected": "Snapshot-only count is one."
+    },
+    {
+      "case": "cycle",
+      "change": "Add ACT-04 -> ACT-01 dependency.",
+      "expected": "CPM is unavailable/invalid; cycle is detected."
+    },
+    {
+      "case": "unsupported-relationship",
+      "change": "Set DEP-01 relationship to SS or lag to nonzero.",
+      "expected": "CPM rejects unsupported dependency model rather than producing misleading values."
+    }
+  ]
+}
