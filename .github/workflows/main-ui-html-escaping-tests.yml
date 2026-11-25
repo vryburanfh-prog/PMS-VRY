@@ -1,0 +1,28 @@
+name: Main UI HTML Escaping Tests
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'tests/main-ui-html-escaping.test.js'
+      - '.github/workflows/main-ui-html-escaping-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'index.html'
+      - 'tests/main-ui-html-escaping.test.js'
+      - '.github/workflows/main-ui-html-escaping-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: main-ui-html-escaping-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  main-ui-html-escaping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/main-ui-html-escaping.test.js
