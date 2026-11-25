@@ -19,7 +19,7 @@ function extractObjectLiteral(source, declaration) {
       if (c === quote) quote = null;
       continue;
     }
-    if (c === '\"' || c === '\\'') { quote = c; continue; }
+    if (c === '\"' || c === "'") { quote = c; continue; }
     if (c === '{') depth++;
     else if (c === '}') { depth--; if (depth === 0) return source.slice(braceStart, i + 1); }
   }
