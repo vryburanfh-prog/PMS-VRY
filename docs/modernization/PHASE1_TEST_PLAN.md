@@ -136,6 +136,20 @@ Focused escaping for the registry loading and empty-state labels is in draft PR 
 
 Draft PR #7 adds a Node 20 GitHub Actions workflow to run source-level checks. Its initial run completed successfully: **1 baseline test passed, 0 failed, 6 skipped**. The skipped tests are feature-specific checks waiting for the corresponding remediation code to merge into `main`; they are not counted as validated fixes. Once those remediation PRs merge, the tests activate on subsequent runs.
 
+## 3.9 Backup/restore and destructive-operation verification
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| BAK-01 | Create a full backup copy using the authorized admin endpoint | Copy ID/URL returned; copy is distinct, accessible, and contains all expected tabs | Not run |
+| BAK-02 | Import with a header mismatch on one tab | Validation fails before any destination write; verify no tabs changed | Not run |
+| BAK-03 | Import from a source missing configured tabs | Missing tabs are skipped; operator preflight must detect omissions and prevent unsafe import | Not run |
+| BAK-04 | Inject a write failure during multi-tab import in a disposable copy | Partial-write behavior documented; recovery tested from verified backup | Not run |
+| BAK-05 | Restore backup to a new spreadsheet and validate relationships/formulas | Recovery copy reconciles counts, IDs, relationships, formulas, auth/access, and calculations | Not run |
+| BAK-06 | Start Fresh with incorrect confirmation string | Operation fails without data changes | Not run |
+| BAK-07 | Start Fresh with correct confirmation in disposable database | Pre-reset backup exists; only allowlisted operational tabs are cleared; security/config/audit tabs are preserved | Not run |
+
+Draft backup/recovery runbook PR #10 describes these procedures. Do not run destructive or recovery tests against live production; the Apps Script import is not transactional across tabs and no atomic restore endpoint exists.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
