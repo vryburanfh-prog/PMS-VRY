@@ -153,3 +153,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Source-level change:** Primary-key duplicate checks were added to single and bulk insert helpers for mapped operational tables. Checks run while the Script Lock is held, before append; duplicate IDs in a bulk batch are also rejected. Missing mapped primary-key headers fail closed.
 **Limitations:** This prevents duplicate keys from being silently inserted but does not make max+1 generation and insertion one atomic allocation operation, nor retry a collision. A concurrent create that loses the race may return an error and require a retry. Runtime concurrency testing and consideration of a lock-protected allocator/counter remain necessary.
 **Status:** Source-only mitigation; runtime test not run.
+
+
+### S9 — API authorization inventory: static scan reconciliation
+**Evidence:** A fresh static scan of `Code.gs` identified 66 API functions. Fifty-six directly contain a recognized permission/admin assertion string. The remaining ten were manually reviewed for helper-based guard paths or intentional public behavior: session context, bootstrap, project register, WBS archive/delete/save/depth, project reference names, and published client deck token retrieval.
+**Review notes:** The ten endpoints were not found to be unguarded merely because the static scanner did not find direct guard strings. The inspected source shows authentication/page-access/project-assignment/privileged-WBS helper checks for nine endpoints; the client deck share-token endpoint is intentionally public and checks token shape plus published status. The public payload data-minimization remediation is tracked in draft PR #4.
+**Status:** Source-level call-path review only. Endpoint direct-call tests and deployed-code reconciliation remain outstanding. Test plan PR #2 now records the inventory and test cases.
