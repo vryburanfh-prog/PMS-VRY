@@ -47,3 +47,20 @@ test('registry key and dynamic KPI class are escaped in HTML text and attributes
   assert.ok(presentation.includes('${escapeHtmlSafe_(st.key)}'));
   assert.ok(presentation.includes('${escapeHtmlSafe_(c.color)}'));
 });
+
+test('workload position/department and weekly progress are escaped', () => {
+  assert.ok(presentation.includes("${escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')}"));
+  assert.ok(presentation.includes('Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% | Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%'));
+});
+
+test('procurement quantity and financial burn percentage are escaped', () => {
+  assert.ok(presentation.includes('${escapeHtmlSafe_(p.Quantity ?? 0)}'));
+  assert.ok(presentation.includes('${escapeHtmlSafe_(f.Burn_Pct ?? 0)}%'));
+});
+
+test('user ID event arguments use safe JSON/HTML encoding', () => {
+  assert.ok(presentation.includes('const safeUid = safeJsArg_(uid);'));
+  assert.ok(presentation.includes('onclick="handleToggleUserStatus(${safeUid}, false)"'));
+  assert.ok(presentation.includes('onclick="handleToggleUserStatus(${safeUid}, true)"'));
+  assert.ok(presentation.includes('onclick="openEditUserModal_(${safeUid})"'));
+});
