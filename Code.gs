@@ -4950,6 +4950,34 @@ function apiGetPresentationScopeOptions(projectId) {
 /**
  * Gathers scoped project data, calls Gemini to structure slides, and stores a token snapshot.
  */
+function apiArchiveClientPresentation(deckId, activeProjectId) {
+  const deckKey = String(deckId || '').trim();
+  const pid = String(activeProjectId || '').trim();
+  if (!deckKey || !pid) throw new Error('Presentation and project IDs are required.');
+  assertPrivilegedManagementRole_(pid);
+  const ctx = assertPermission_('Projects', 'edit', pid);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const sh = ensureClientPresentationsSheet_();
+    const records = readSheetObjectsSafe_(CLIENT_DECKS_SHEET_);
+    const deck = records.find(d => String(d.Deck_ID) === deckKey && String(d.Project_ID) === pid);
+    if (!deck) throw new Error('Presentation not found in this project.');
+    if (String(deck.Status || 'PUBLISHED') === 'ARCHIVED') return { success: true, archived: true, alreadyArchived: true };
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const statusCol = headers.indexOf('Status') + 1;
+    const updatedCol = headers.indexOf('Updated_At') + 1;
+    if (!statusCol || !updatedCol) throw new Error('Client presentation sheet schema is incomplete.');
+    sh.getRange(deck._rowIndex, statusCol).setValue('ARCHIVED');
+    sh.getRange(deck._rowIndex, updatedCol).setValue(new Date().toISOString());
+    if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'ARCHIVE_CLIENT_PRESENTATION', 'Client_Presentations', deckKey, null, { projectId: pid }, 'Archived client presentation and revoked its public token');
+    return { success: true, archived: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
 function apiGenerateClientPresentation(config) {
   const cfg = config || {};
   const pid = String(cfg.projectId || '').trim();
