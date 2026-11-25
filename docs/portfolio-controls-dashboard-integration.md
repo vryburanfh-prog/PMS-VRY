@@ -105,3 +105,7 @@ For each project with an authorized detailed report, the portfolio model now inc
 
 Priority classification also treats missing metric coverage or missing financial data as `Incomplete`, rather than `Monitor`. A higher-priority exception that is positively observed still retains its priority while the reason text notes any unavailable coverage.
 
+## Executive management summary
+
+`buildPmsPortfolioDashboardModel()` now includes `managementSummary` with the number of visible projects, projects with/without detailed controls, project counts by exception-priority level, and per-module available/unavailable project counts for schedule, milestones, risks, issues, and financial monitoring. These are coverage and exception-priority counts, not a replacement for the existing portfolio KPIs or a fabricated overall health score. The summary is calculated only from the authorized project list and supplied project reports.
+
