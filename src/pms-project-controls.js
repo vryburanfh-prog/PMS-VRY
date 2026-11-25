@@ -211,6 +211,45 @@ function buildPmsProjectControlsReport(input) {
 }
 
 
+
+/**
+ * Adapts the permission-aware Apps Script endpoint response.
+ * Null datasets mean access was not granted; they must remain unavailable,
+ * not be represented as a measured zero.
+ */
+function buildPmsProjectControlsReportFromApi(apiData) {
+  if (!apiData || apiData.success !== true || !apiData.project || !apiData.access) {
+    throw new TypeError('A successful apiGetProjectControlsInputs response is required');
+  }
+  const report = buildPmsProjectControlsReport({
+    project: apiData.project,
+    statusDate: apiData.statusDate,
+    activities: apiData.access.schedule ? (apiData.activities || []) : [],
+    dependencies: apiData.access.schedule ? (apiData.dependencies || []) : [],
+    baselines: apiData.access.schedule ? (apiData.baselines || []) : [],
+    milestones: apiData.access.milestones ? (apiData.milestones || []) : [],
+    risks: apiData.access.risks ? (apiData.risks || []) : [],
+    issues: apiData.access.issues ? (apiData.issues || []) : [],
+    financialItems: apiData.access.financialMonitoring ? (apiData.financialItems || []) : []
+  });
+  report.availability = {
+    schedule: Boolean(apiData.access.schedule),
+    milestones: Boolean(apiData.access.milestones),
+    risks: Boolean(apiData.access.risks),
+    issues: Boolean(apiData.access.issues),
+    financialMonitoring: Boolean(apiData.access.financialMonitoring)
+  };
+  if (!report.availability.milestones) {
+    report.milestones = null;
+    report.scheduleAlerts.overdueMilestoneCount = null;
+    report.scheduleAlerts.overdueMilestones = null;
+  }
+  if (!report.availability.risks) report.riskSummary = null;
+  if (!report.availability.issues) report.issueSummary = null;
+  if (!report.availability.financialMonitoring) report.finance = null;
+  return report;
+}
+
 /**
  * Aggregates already-authorized, project-scoped reports for a portfolio view.
  * This function does not load records or make access-control decisions.
@@ -257,4 +296,4 @@ function buildPmsPortfolioControlsSummary(reports) {
   };
 }
 
-module.exports = { buildPmsProjectControlsReport, buildPmsPortfolioControlsSummary };
+module.exports = { buildPmsProjectControlsReport, buildPmsProjectControlsReportFromApi, buildPmsPortfolioControlsSummary };
