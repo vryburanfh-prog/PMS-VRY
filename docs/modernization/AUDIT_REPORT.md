@@ -178,3 +178,18 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Impact:** If a later write or audit-log write fails, an earlier business mutation may already be committed, while the caller receives an error or the operation may be incompletely represented in the audit trail. This is a data-integrity and accountability risk; failure scenarios have not been reproduced.
 **Recommendation:** Add fault-injection tests for each step; define required mutation/audit guarantees; use a lock around logical multi-record operations where safe; design explicit compensating rollback or status/reconciliation records instead of assuming Sheets supports transactions. Add Audit_Logs to primary-key uniqueness checks (implemented in draft PR #6).
 **Status:** Investigation; runtime fault-injection and recovery design pending.
+
+
+## Current modernization PR tracker (review-only)
+
+| PR | Workstream | Status | Validation summary |
+|---|---|---|---|
+| #2 | Phase 1 test plan | Open draft | Updated with import/deck/ID/UI/API authorization/CI regression test cases; runtime cases not run |
+| #3 | Audit findings and remediation tracker | Open draft | Source-level evidence and remediation links |
+| #4 | Public client deck data minimization | Open draft | Static source checks; no runtime share-link test |
+| #5 | Spreadsheet import formula safety | Open draft | Static sanitizer-order check; runtime Sheets behavior unverified |
+| #6 | Primary-key duplicate rejection | Open draft | Static insert-helper guard checks; concurrency runtime tests not run; mapped Auth_Credentials/Auth_Sessions/Audit_Logs included |
+| #7 | Static security CI | Open draft | GitHub Actions run succeeded; 1 baseline test passed, 6 fix-specific tests skipped until implementation PRs merge |
+| #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
+| #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
+
