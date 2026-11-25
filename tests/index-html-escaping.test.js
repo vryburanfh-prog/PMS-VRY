@@ -24,7 +24,8 @@ test('index HTML project, WBS, registry, workload and report fields are escaped'
     'escapeHtmlSafe_(l.Notes || \'\')',
     'escapeHtmlSafe_(st.key)',
     'escapeHtmlSafe_(it.id)',
-    'escapeHtmlSafe_(d.focusScope)'
+    'escapeHtmlSafe_(d.focusScope)',
+    'escapeHtmlSafe_(s.headlineTakeaway)'
   ];
   for (const expression of required) assert.ok(indexHtml.includes('${' + expression + '}'), expression + ' must be escaped');
   assert.ok(indexHtml.includes('sanitizeShareUrlForHtml_(d.shareUrl)'));
@@ -38,9 +39,14 @@ test('inline index JavaScript parses after HTML escaping changes', () => {
 });
 test('share URL sanitizer accepts HTTPS only and escapes attributes', () => {
   const escapeHelper = extractFunction(indexHtml, 'escapeHtmlSafe_');
+  const safeUrlHelper = extractFunction(indexHtml, 'safeHttpsUrl_');
   const sanitizerHelper = extractFunction(indexHtml, 'sanitizeShareUrlForHtml_');
-  const sanitizer = new Function(escapeHelper + sanitizerHelper + '; return sanitizeShareUrlForHtml_;')();
+  const helpers = new Function(escapeHelper + safeUrlHelper + sanitizerHelper + '; return {safeHttpsUrl_, sanitizeShareUrlForHtml_};')();
+  const sanitizer = helpers.sanitizeShareUrlForHtml_;
   assert.equal(sanitizer('javascript:alert(1)'), '');
   assert.equal(sanitizer('http://example.com'), '');
   assert.ok(sanitizer('https://example.com/?a=1&b=2').includes('&amp;'));
+  assert.equal(helpers.safeHttpsUrl_('javascript:alert(1)'), '');
+  assert.equal(helpers.safeHttpsUrl_('https://example.com'), 'https://example.com');
+  assert.ok(indexHtml.includes('safeHttpsUrl_(res.shareUrl)'));
 });
