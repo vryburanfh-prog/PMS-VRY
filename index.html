@@ -2261,18 +2261,54 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         }
         const count = rows => Array.isArray(rows) ? rows.length : null;
         const metric = value => value === null ? 'Not available' : String(value);
+        const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const fmt = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        const rowsFor = key => Array.isArray(res[key]) ? res[key] : [];
+        const isOpen = value => !['closed', 'resolved', 'completed', 'complete', 'achieved'].includes(String(value || '').trim().toLowerCase());
+        const overdue = (rows, dateField, statusField) => rows.filter(row =>
+          isOpen(row[statusField]) && /^\\d{4}-\\d{2}-\\d{2}$/.test(String(row[dateField] || '')) &&
+          String(row[dateField]) < String(res.statusDate || '')).length;
+        const weightedProgress = (rows, field) => {
+          const eligible = rows.filter(row => number(row.Activity_Weight) > 0 && row[field] !== '' && row[field] != null);
+          const weight = eligible.reduce((sum, row) => sum + number(row.Activity_Weight), 0);
+          return weight > 0 ? fmt(eligible.reduce((sum, row) => sum + number(row.Activity_Weight) * number(row[field]), 0) / weight) + '%' : 'Not available';
+        };
+        const scheduleRows = rowsFor('activities');
+        const milestoneRows = rowsFor('milestones');
+        const riskRows = rowsFor('risks');
+        const issueRows = rowsFor('issues');
+        const financeRows = rowsFor('financialItems');
+        const highCritical = riskRows.filter(row => {
+          const status = String(row.Current_Status || row.Status || '').toLowerCase();
+          const rating = String(row.Risk_Rating || '').toUpperCase();
+          const score = Number((rating.match(/^\\s*(\\d+(?:\\.\\d+)?)/) || [])[1]);
+          return isOpen(status) && (rating.includes('HIGH') || rating.includes('CRITICAL') || score >= 10);
+        }).length;
+        const openIssues = issueRows.filter(row => isOpen(row.Issue_Status || row.Status)).length;
+        const budget = financeRows.reduce((sum, row) => sum + number(row.Budget_Amount), 0);
+        const committed = financeRows.reduce((sum, row) => sum + number(row.Committed_Amount), 0);
+        const actual = financeRows.reduce((sum, row) => sum + number(row.Actual_Spend), 0);
         const sections = [
-          { title: 'Schedule & baselines', allowed: res.access.schedule, rows: res.activities, detail: 'Activities', extra: 'Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
-          { title: 'Milestones', allowed: res.access.milestones, rows: res.milestones, detail: 'Milestones', extra: '' },
-          { title: 'Risks', allowed: res.access.risks, rows: res.risks, detail: 'Risk records', extra: '' },
-          { title: 'Issues', allowed: res.access.issues, rows: res.issues, detail: 'Issue records', extra: '' },
-          { title: 'Financial monitoring', allowed: res.access.financialMonitoring, rows: res.financialItems, detail: 'Financial records', extra: '' }
+          { title: 'Schedule & baselines', allowed: res.access.schedule, value: res.access.schedule ? metric(count(res.activities)) : 'Restricted',
+            detail: 'Activities · Planned: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Planned_Progress') : 'Restricted') +
+              ' · Actual: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Actual_Progress') : 'Restricted'),
+            extra: 'Late: ' + (res.access.schedule ? overdue(scheduleRows, 'Forecast_Finish_Date', 'Status') : 'Restricted') +
+              ' · Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
+          { title: 'Milestones', allowed: res.access.milestones, value: res.access.milestones ? metric(count(res.milestones)) : 'Restricted',
+            detail: 'Milestones', extra: 'Overdue: ' + (res.access.milestones ? overdue(milestoneRows, 'Forecast_Date', 'Milestone_Status') : 'Restricted') },
+          { title: 'Risks', allowed: res.access.risks, value: res.access.risks ? metric(count(res.risks)) : 'Restricted',
+            detail: 'Risk records', extra: 'Open high / critical: ' + (res.access.risks ? highCritical : 'Restricted') },
+          { title: 'Issues', allowed: res.access.issues, value: res.access.issues ? metric(count(res.issues)) : 'Restricted',
+            detail: 'Issue records', extra: 'Open: ' + (res.access.issues ? openIssues : 'Restricted') },
+          { title: 'Financial monitoring', allowed: res.access.financialMonitoring, value: res.access.financialMonitoring ? metric(count(res.financialItems)) : 'Restricted',
+            detail: 'Financial records · Currency not inferred',
+            extra: res.access.financialMonitoring && financeRows.length ? 'Budget: ' + fmt(budget) + ' · Committed: ' + fmt(committed) + ' · Spent: ' + fmt(actual) : (res.access.financialMonitoring ? 'No financial records' : 'Restricted') }
         ];
         const cards = sections.map(function (section) {
-          const value = section.allowed ? metric(count(section.rows)) : 'Restricted';
           return '<div class="rounded-lg border border-slate-200 p-3"><div class="font-semibold text-slate-800">' + section.title + '</div>' +
-            '<div class="mt-1 text-lg font-bold text-indigo-700">' + escapeHtmlSafe_(value) + '</div>' +
-            '<div class="text-[11px] text-slate-500">' + section.detail + (section.extra ? ' · ' + escapeHtmlSafe_(section.extra) : '') + '</div></div>';
+            '<div class="mt-1 text-lg font-bold text-indigo-700">' + escapeHtmlSafe_(section.value) + '</div>' +
+            '<div class="text-[11px] text-slate-500">' + escapeHtmlSafe_(section.detail) +
+            (section.extra ? ' · ' + escapeHtmlSafe_(section.extra) : '') + '</div></div>';
         }).join('');
         const project = res.project || {};
         const meta = '<div class="rounded-lg bg-slate-50 border border-slate-200 p-3"><div class="font-semibold">' +
