@@ -2138,9 +2138,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         { label: 'On Hold / Delayed', val: `${k.onHoldProjects} / ${k.delayedProjects}`, color: 'text-amber-700' },
         { label: 'Avg Progress', val: `${k.avgPortfolioProgress}%`, color: 'text-blue-700' },
         { label: 'Ahead / Behind', val: `${k.projectsAhead} / ${k.projectsBehind}`, color: 'text-slate-800' },
-        { label: 'Delayed Milestones', val: k.delayedMilestones, color: 'text-rose-700' },
-        { label: 'Critical Risks', val: k.criticalRisks, color: 'text-rose-700' },
-        { label: 'Open Issues', val: k.openIssues, color: 'text-amber-700' },
+        { label: 'Delayed Milestones', val: k.delayedMilestones == null ? '—' : k.delayedMilestones, color: 'text-rose-700' },
+        { label: 'Critical Risks', val: k.criticalRisks == null ? '—' : k.criticalRisks, color: 'text-rose-700' },
+        { label: 'Open Issues', val: k.openIssues == null ? '—' : k.openIssues, color: 'text-amber-700' },
         { label: 'Pending Deliverables', val: k.pendingDeliverables, color: 'text-slate-800' }
       ];
 
