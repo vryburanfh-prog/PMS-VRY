@@ -941,8 +941,8 @@ function apiGetPortfolioControlsSummary(filters) {
     return {
       projectId: pid,
       projectName: String(project.Project_Name || ''),
-      criticalRisks: canViewRisks ? criticalRisks : null,
-      openIssues: canViewIssues ? openIssues : null,
+      criticalRisks: criticalRisks,
+      openIssues: openIssues,
       overdueMilestones: overdueMilestones,
       delayedActivities: delayedActivities,
       overBudget: budget === null ? null : actual > budget,
