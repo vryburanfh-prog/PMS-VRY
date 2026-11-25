@@ -97,6 +97,7 @@ These cases cover the focused changes in the public-deck minimization and import
 | ID-09 | Two concurrent create requests produce the same max+1 candidate | One insert succeeds; the competing insert is rejected with duplicate-ID error rather than corrupting the table | Not run |
 | ID-10 | Insert helper used on a mapped table with a missing primary-key header | Helper fails closed with a clear schema error | Not run |
 | ID-11 | Create record on a table not listed in primary-key map | Existing insert behavior is preserved; coverage of nonmapped IDs must be separately reviewed | Not run |
+| ID-12 | Concurrent audit log inserts reuse the same generated Audit_ID | Duplicate audit IDs are rejected; one write may fail and require retry | Not run |
 
 The primary-key guard draft PR #6 uses the Script Lock around duplicate detection and append. It prevents duplicate keys from being silently inserted, but it does not automatically retry ID generation after a collision; the competing create may return an error and require a retry. Runtime concurrency tests are still needed.
 
