@@ -1785,7 +1785,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
               ${r.actualPct}%
             </div>
             <div class="relative flex-1 h-9" style="min-width:${timelineWidth}px;">
-              ${baseSpan ? `<div title="Baseline: ${r.bStart} → ${r.bEnd}" class="absolute top-1.5 h-1.5 bg-slate-400 rounded-sm opacity-80" style="left:${baseSpan.left}px; width:${baseSpan.width}px;"></div>` : ''}
+              ${baseSpan ? `<div title="Baseline: ${escapeHtmlSafe_(r.bStart)} → ${escapeHtmlSafe_(r.bEnd)}" class="absolute top-1.5 h-1.5 bg-slate-400 rounded-sm opacity-80" style="left:${baseSpan.left}px; width:${baseSpan.width}px;"></div>` : ''}
               ${foreSpan ? `
                 <div ${clickAttr} title="${escapeHtmlSafe_(r.label)} | ${escapeHtmlSafe_(r.fStart || r.bStart)} → ${escapeHtmlSafe_(r.fEnd || r.bEnd)} (${Number(r.actualPct) || 0}%)"
                   class="absolute top-4 h-3.5 ${barColor} rounded-sm shadow-sm flex items-center overflow-hidden"
@@ -6940,7 +6940,7 @@ function renderUsersTable(users) {
           <td class="py-2.5 px-3 text-right">
             <button
               type="button"
-              onclick="handleToggleUserActive(${JSON.stringify(String(userId))}, ${nextActive})"
+              onclick="handleToggleUserActive(${safeJsArg_(String(userId))}, ${nextActive})"
               class="text-xs font-medium px-2.5 py-1 rounded border border-slate-300 hover:bg-slate-50 text-slate-700"
             >
               ${isActive ? 'Deactivate' : 'Activate'}
