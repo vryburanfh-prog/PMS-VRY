@@ -328,23 +328,24 @@ function apiAdminDeleteUser(userId, confirmationText) {
   if (!id) throw new Error('User_ID is required.');
   if (String(confirmationText || '').trim() !== id) throw new Error('Deletion was not confirmed. Enter the exact User ID.');
 
-  const target = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
-  if (!target) throw new Error('User not found. Refresh the user list and try again.');
-  const actorId = String(ctx.user && ctx.user.userId || '').trim();
-  if (actorId && actorId === id) throw new Error('You cannot delete your own Administrator account.');
-
-  const targetRole = normalizeRoleName_(target.Role_Name || target.Role_ID);
-  if (targetRole === 'Administrator') {
-    const activeAdmins = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).filter(function (u) {
-      return normalizeRoleName_(u.Role_Name || u.Role_ID) === 'Administrator' && isTruthySheetFlag_(u.Is_Active) && isTrustedAdministratorEmail_(u.Email);
-    });
-    if (activeAdmins.length <= 1) throw new Error('The last active Administrator cannot be deleted. Add and verify another trusted Administrator first.');
-  }
-
-  const oldProfile = Object.assign({}, target);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
+    // Re-read target and administrator count while locked to avoid concurrent last-admin deletions.
+    const target = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
+    if (!target) throw new Error('User not found. Refresh the user list and try again.');
+    const actorId = String(ctx.user && ctx.user.userId || '').trim();
+    if (actorId && actorId === id) throw new Error('You cannot delete your own Administrator account.');
+
+    const targetRole = normalizeRoleName_(target.Role_Name || target.Role_ID);
+    if (targetRole === 'Administrator') {
+      const activeAdmins = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).filter(function (u) {
+        return normalizeRoleName_(u.Role_Name || u.Role_ID) === 'Administrator' && isTruthySheetFlag_(u.Is_Active) && isTrustedAdministratorEmail_(u.Email);
+      });
+      if (activeAdmins.length <= 1) throw new Error('The last active Administrator cannot be deleted. Add and verify another trusted Administrator first.');
+    }
+
+    const oldProfile = Object.assign({}, target);
     // Audit before removing the profile; the audit history is retained.
     writeAuditLog_(ctx, 'DELETE_USER', 'Users_Admin', id, oldProfile, null,
       'Administrator permanently deleted user account and related access records');
@@ -364,13 +365,11 @@ function apiAdminDeleteUser(userId, confirmationText) {
 
     deleteRecordsByIds_(DB_CONFIG.TABS.USERS, 'User_ID', [id]);
     if (targetRole === 'Administrator') removeTrustedAdminEmail_(target.Email);
+    return { success: true, deletedUserId: id, retainedAuditHistory: true };
   } finally {
     lock.releaseLock();
   }
-
-  return { success: true, deletedUserId: id, retainedAuditHistory: true };
 }
-
 function apiToggleUserStatus(userId, setActive, reason) {
   const ctx = assertPermission_('Users_Admin', 'edit', null);
 
