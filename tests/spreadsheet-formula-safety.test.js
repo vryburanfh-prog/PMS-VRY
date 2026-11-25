@@ -10,7 +10,7 @@ function extractFunction(source, name) {
   const marker = 'function ' + name + '(';
   const start = source.indexOf(marker);
   assert.ok(start >= 0, name + ' must exist');
-  const next = source.slice(start + marker.length).search(/^function\\s+\\w+\\s*\\(/m);
+  const next = source.slice(start + marker.length).search(/^function\s+\w+\s*\(/m);
   return source.slice(start, next < 0 ? undefined : start + marker.length + next);
 }
 
@@ -27,15 +27,15 @@ test('formula-like strings are neutralized while numeric strings are preserved',
 });
 
 test('all generic database writes sanitize user-provided cell values', () => {
-  assert.match(database, /sanitizeSpreadsheetCellValue_\\(recordObj/);
-  assert.match(database, /sanitizeSpreadsheetCellValue_\\(record\\[header\\]/);
-  assert.match(database, /sanitizeSpreadsheetCellValue_\\(next\\)/);
-  assert.match(database, /sanitizeSpreadsheetCellValue_\\(patch\\[header\\]/);
+  assert.match(database, /sanitizeSpreadsheetCellValue_\(recordObj/);
+  assert.match(database, /sanitizeSpreadsheetCellValue_\(record\[header\]/);
+  assert.match(database, /sanitizeSpreadsheetCellValue_\(next\)/);
+  assert.match(database, /sanitizeSpreadsheetCellValue_\(patch\[header\]/);
 });
 
 test('direct append and cell-write APIs sanitize before writing', () => {
-  assert.match(code, /setValue\\(sanitizeSpreadsheetCellValue_\\(record\\[k\\]\\)\\)/);
-  assert.match(code, /appendRow\\(newRowValues\\.map\\(sanitizeSpreadsheetCellValue_\\)\\)/);
-  assert.match(code, /appendRow\\(rowValues\\.map\\(sanitizeSpreadsheetCellValue_\\)\\)/);
-  assert.match(code, /appendRow\\(\\[([\\s\\S]*?)\\]\\.map\\(sanitizeSpreadsheetCellValue_\\)\\)/);
+  assert.match(code, /setValue\(sanitizeSpreadsheetCellValue_\(record\[k\]\)\)/);
+  assert.match(code, /appendRow\(newRowValues\.map\(sanitizeSpreadsheetCellValue_\)\)/);
+  assert.match(code, /appendRow\(rowValues\.map\(sanitizeSpreadsheetCellValue_\)\)/);
+  assert.match(code, /appendRow\(\[([\s\S]*?)\]\.map\(sanitizeSpreadsheetCellValue_\)\)/);
 });
