@@ -535,9 +535,12 @@ function apiGetPortfolioData(filters) {
 
   const allProjects = getTableRecords_(DB_CONFIG.TABS.PROJECTS);
   const assignments = ctx.isAdmin ? getTableRecords_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS) : [];
-  const milestones = getTableRecords_(DB_CONFIG.TABS.MILESTONES);
-  const risks = getTableRecords_(DB_CONFIG.TABS.RISKS);
-  const issues = getTableRecords_(DB_CONFIG.TABS.ISSUES);
+  const canViewMilestones = Boolean(ctx.isAdmin || (ctx.permissions['Milestones'] && ctx.permissions['Milestones'].view));
+  const canViewRisks = Boolean(ctx.isAdmin || (ctx.permissions['Risks'] && ctx.permissions['Risks'].view));
+  const canViewIssues = Boolean(ctx.isAdmin || (ctx.permissions['Issues'] && ctx.permissions['Issues'].view));
+  const milestones = canViewMilestones ? getTableRecords_(DB_CONFIG.TABS.MILESTONES) : [];
+  const risks = canViewRisks ? getTableRecords_(DB_CONFIG.TABS.RISKS) : [];
+  const issues = canViewIssues ? getTableRecords_(DB_CONFIG.TABS.ISSUES) : [];
   const deliverables = getTableRecords_(DB_CONFIG.TABS.DELIVERABLES);
   const permits = getTableRecords_(DB_CONFIG.TABS.PERMITS);
   const approvals = getTableRecords_(DB_CONFIG.TABS.APPROVALS);
@@ -685,9 +688,9 @@ function apiGetPortfolioData(filters) {
       projectsAhead: aheadCount,
       projectsBehind: behindCount,
       avgPortfolioProgress: avgPortfolioProgress,
-      delayedMilestones: delayedMilestones,
-      criticalRisks: criticalRisks,
-      openIssues: openIssues,
+      delayedMilestones: canViewMilestones ? delayedMilestones : null,
+      criticalRisks: canViewRisks ? criticalRisks : null,
+      openIssues: canViewIssues ? openIssues : null,
       pendingDeliverables: pendingDeliverables,
       pendingPermitsAndApprovals: pendingPermitsAndApprovals,
       avgResourceUtilization: avgResourceUtilization,
@@ -867,6 +870,365 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
 /**
  * Fetches Main WBS, Sub WBS, Activities, and Schedule Dependencies for a project.
  */
+
+/**
+ * Read-only project-controls data endpoint.
+ * Every dataset is independently permission-gated and project-scoped.
+ * A null dataset means the caller lacks module view permission; an empty
+ * array means the caller is authorized but no active records exist.
+ */
+
+/**
+ * Returns aggregate-only project-controls indicators for the authenticated
+ * portfolio. Module metrics are independently permission-gated; no source
+ * records are returned by this endpoint.
+ */
+function apiGetPortfolioControlsSummary(filters) {
+  const portfolio = apiGetPortfolioData(filters || {});
+  const ctx = portfolio.context;
+  const projects = portfolio.projects || [];
+  const ids = new Set(projects.map(function (project) { return String(project.Project_ID || '').trim(); }));
+  const canView = function (moduleName) {
+    return Boolean(ctx && (ctx.isAdmin || (ctx.permissions && ctx.permissions[moduleName] && ctx.permissions[moduleName].view === true)));
+  };
+  const readScoped = function (tabName, moduleName, projectField, excludeArchived) {
+    if (!canView(moduleName)) return null;
+    return (getTableRecords_(tabName) || []).filter(function (row) {
+      const id = String(row[projectField || 'Project_ID'] || '').trim();
+      return ids.has(id) && (!excludeArchived || !isTruthySheetFlag_(row.Is_Archived));
+    });
+  };
+  const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+  if (!ids.size) return {
+    success: true, statusDate: today, projectCount: 0,
+    criticalRisks: 0, openIssues: 0, overdueMilestones: 0, delayedActivities: 0,
+    baselineDriftActivities: 0, unbaselinedActivities: 0, snapshotOnlyActivities: 0, projectsWithBaselineDrift: 0,
+    projectsOverBudget: 0, projectsOverCommitted: 0, projects: []
+  };
+  const risks = readScoped(DB_CONFIG.TABS.RISKS, 'Risks', 'Project_ID', true);
+  const issues = readScoped(DB_CONFIG.TABS.ISSUES, 'Issues', 'Project_ID', true);
+  const milestones = readScoped(DB_CONFIG.TABS.MILESTONES, 'Milestones', 'Project_ID', true);
+  const activities = readScoped(DB_CONFIG.TABS.ACTIVITIES, 'WBS_Schedule', 'Project_ID', true);
+  const baselines = readScoped(DB_CONFIG.TABS.BASELINES, 'WBS_Schedule', 'Project_ID', false);
+  const financial = readScoped(DB_CONFIG.TABS.FINANCIAL, 'Financial_Monitoring', 'Project_ID', false);
+  const byProject = function (rows, pid) {
+    return rows ? rows.filter(function (row) { return String(row.Project_ID || '').trim() === pid; }) : null;
+  };
+  const rows = projects.map(function (project) {
+    const pid = String(project.Project_ID || '').trim();
+    const pRisks = byProject(risks, pid);
+    const pIssues = byProject(issues, pid);
+    const pMilestones = byProject(milestones, pid);
+    const pActivities = byProject(activities, pid);
+    const pBaselines = byProject(baselines, pid);
+    const pFinancial = byProject(financial, pid);
+    const baselineQuality = pActivities !== null && pBaselines !== null
+      ? buildAppsScriptBaselineSummary_(pActivities, pBaselines, pid) : null;
+    const criticalRisks = pRisks ? pRisks.filter(function (row) {
+      const status = String(row.Current_Status || row.Status || '').trim().toLowerCase();
+      const rating = String(row.Risk_Rating || '').trim().toUpperCase();
+      const scoreMatch = rating.match(/^\s*(\d+(?:\.\d+)?)/);
+      const score = scoreMatch ? Number(scoreMatch[1]) : null;
+      return !['closed', 'resolved', 'accepted'].includes(status) &&
+        (rating.indexOf('CRITICAL') !== -1 || rating.indexOf('HIGH') !== -1 || (score !== null && score >= 10));
+    }).length : null;
+    const openIssues = pIssues ? pIssues.filter(function (row) {
+      return !['closed', 'resolved'].includes(String(row.Issue_Status || row.Status || '').trim().toLowerCase());
+    }).length : null;
+    const overdueMilestones = pMilestones ? pMilestones.filter(function (row) {
+      const status = String(row.Milestone_Status || '').trim().toLowerCase();
+      const forecast = String(row.Forecast_Date || '').trim();
+      return !['completed', 'achieved'].includes(status) && /^\d{4}-\d{2}-\d{2}$/.test(forecast) && forecast < today;
+    }).length : null;
+    const delayedActivities = pActivities ? pActivities.filter(function (row) {
+      const status = String(row.Status || '').trim().toLowerCase();
+      const forecast = String(row.Forecast_Finish_Date || '').trim();
+      return !['completed', 'complete', 'closed'].includes(status) && /^\d{4}-\d{2}-\d{2}$/.test(forecast) && forecast < today;
+    }).length : null;
+    const budget = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Budget_Amount) || 0); }, 0) : null;
+    const committed = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Committed_Amount) || 0); }, 0) : null;
+    const actual = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Actual_Spend) || 0); }, 0) : null;
+    return {
+      projectId: pid,
+      projectName: String(project.Project_Name || ''),
+      criticalRisks: criticalRisks,
+      openIssues: openIssues,
+      overdueMilestones: overdueMilestones,
+      delayedActivities: delayedActivities,
+      baselineDriftActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.changedActivityCount : null,
+      unbaselinedActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.missingActivityCount : null,
+      snapshotOnlyActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.snapshotOnlyActivityCount : null,
+      baselineQualityAvailable: baselineQuality ? baselineQuality.available : null,
+      baselineQualityReason: baselineQuality && !baselineQuality.available ? baselineQuality.reason : null,
+      overBudget: budget === null ? null : actual > budget,
+      overCommitment: budget === null ? null : committed > budget,
+      availability: {
+        risks: pRisks !== null,
+        issues: pIssues !== null,
+        milestones: pMilestones !== null,
+        schedule: pActivities !== null,
+        financialMonitoring: pFinancial !== null
+      }
+    };
+  });
+  const total = function (key) {
+    // A portfolio total is only reliable when every included project has this module's data.
+    // Never present a partial sum as if it covered the full authorized portfolio.
+    if (rows.some(function (row) { return row[key] === null; })) return null;
+    return rows.reduce(function (sum, row) { return sum + row[key]; }, 0);
+  };
+  return {
+    success: true,
+    statusDate: today,
+    projectCount: rows.length,
+    criticalRisks: total('criticalRisks'),
+    openIssues: total('openIssues'),
+    overdueMilestones: total('overdueMilestones'),
+    delayedActivities: total('delayedActivities'),
+    baselineDriftActivities: rows.some(function (row) { return row.baselineDriftActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.baselineDriftActivities; }, 0),
+    unbaselinedActivities: rows.some(function (row) { return row.unbaselinedActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.unbaselinedActivities; }, 0),
+    snapshotOnlyActivities: rows.some(function (row) { return row.snapshotOnlyActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.snapshotOnlyActivities; }, 0),
+    projectsWithBaselineDrift: rows.some(function (row) { return row.baselineQualityAvailable === null; })
+      ? null : rows.filter(function (row) { return row.baselineDriftActivities > 0 || row.unbaselinedActivities > 0 || row.snapshotOnlyActivities > 0; }).length,
+    projectsOverBudget: rows.some(function (row) { return row.overBudget === null; }) ? null
+      : rows.filter(function (row) { return row.overBudget === true; }).length,
+    projectsOverCommitted: rows.some(function (row) { return row.overCommitment === null; }) ? null
+      : rows.filter(function (row) { return row.overCommitment === true; }).length,
+    projects: rows
+  };
+}
+
+
+/**
+ * Read-only CPM summary for the project controls view.
+ * Supports Finish-to-Start links with zero lag and baseline durations in working-day units.
+ * Invalid/incomplete networks are reported as unavailable; no guessed calendar is applied.
+ */
+function buildAppsScriptCpmSummary_(activities, dependencies, projectId) {
+  const rows = (activities || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      !isTruthySheetFlag_(row.Is_Archived);
+  });
+  if (!rows.length) return { available: false, reason: 'No active schedule activities are available' };
+  const byId = {};
+  const indegree = {};
+  const successors = {};
+  const predecessors = {};
+  rows.forEach(function (row) {
+    const id = String(row.Activity_ID || '').trim();
+    const duration = Number(row.Baseline_Duration);
+    if (!id || byId[id]) throw new Error('CPM unavailable: missing or duplicate Activity_ID');
+    if (String(row.Baseline_Duration == null ? '' : row.Baseline_Duration).trim() === '' || !Number.isFinite(duration) || duration < 0) throw new Error('CPM unavailable: invalid Baseline_Duration for ' + id);
+    byId[id] = { id: id, duration: duration, row: row };
+    indegree[id] = 0;
+    successors[id] = [];
+    predecessors[id] = [];
+  });
+  const addLink = function (from, to, type, lag) {
+    if (!byId[from] || !byId[to]) throw new Error('CPM unavailable: dependency references an activity outside this project schedule');
+    if (String(type || 'FS').trim().toUpperCase() !== 'FS' || Number(lag || 0) !== 0) {
+      throw new Error('CPM unavailable: only Finish-to-Start dependencies with zero lag are supported');
+    }
+    if (from === to || predecessors[to].indexOf(from) !== -1) throw new Error('CPM unavailable: self or duplicate dependency');
+    predecessors[to].push(from);
+    successors[from].push(to);
+    indegree[to] += 1;
+  };
+  const activeLinks = (dependencies || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      !['false', '0', 'no', 'inactive'].includes(String(row.Is_Active == null ? 'true' : row.Is_Active).trim().toLowerCase());
+  });
+  const represented = {};
+  activeLinks.forEach(function (row) {
+    addLink(String(row.Predecessor_ID || '').trim(), String(row.Successor_ID || '').trim(),
+      row.Dependency_Type, row.Lag_Or_Lead_Days);
+    represented[String(row.Successor_ID || '').trim()] = true;
+  });
+  rows.forEach(function (row) {
+    const id = String(row.Activity_ID).trim();
+    const legacy = String(row.Predecessor_ID || '').trim();
+    if (legacy && !represented[id]) addLink(legacy, id, row.Dependency_Type, row.Lag_Or_Lead_Days);
+  });
+  const queue = Object.keys(byId).filter(function (id) { return indegree[id] === 0; }).sort();
+  const order = [];
+  while (queue.length) {
+    const id = queue.shift();
+    order.push(id);
+    successors[id].forEach(function (next) {
+      indegree[next] -= 1;
+      if (indegree[next] === 0) { queue.push(next); queue.sort(); }
+    });
+  }
+  if (order.length !== rows.length) throw new Error('CPM unavailable: dependency cycle detected');
+  const es = {}, ef = {}, ls = {}, lf = {};
+  order.forEach(function (id) {
+    es[id] = predecessors[id].reduce(function (max, pred) { return Math.max(max, ef[pred]); }, 0);
+    ef[id] = es[id] + byId[id].duration;
+  });
+  const projectDuration = order.reduce(function (max, id) { return Math.max(max, ef[id]); }, 0);
+  order.slice().reverse().forEach(function (id) {
+    lf[id] = successors[id].length ? successors[id].reduce(function (min, next) { return Math.min(min, ls[next]); }, Infinity) : projectDuration;
+    ls[id] = lf[id] - byId[id].duration;
+  });
+  const critical = order.filter(function (id) { return Math.abs(ls[id] - es[id]) < 1e-9; });
+  return {
+    available: true,
+    durationWorkingDays: projectDuration,
+    activityCount: rows.length,
+    criticalActivityCount: critical.length,
+    criticalActivityIds: critical,
+    activities: order.map(function (id) {
+      return { activityId: id, earlyStart: es[id], earlyFinish: ef[id], lateStart: ls[id], lateFinish: lf[id], totalFloat: ls[id] - es[id], isCritical: critical.indexOf(id) !== -1 };
+    }),
+    calendarNote: 'Durations are baseline working-day units; weekends, holidays, and resource calendars are not applied.'
+  };
+}
+
+
+/**
+ * Compare the active schedule against the latest stored baseline snapshot.
+ * This is diagnostic only; it does not approve, revise, or write a baseline.
+ */
+function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
+  const candidates = (baselines || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId);
+  }).sort(function (a, b) {
+    const revision = Number(b.Revision_Number || 0) - Number(a.Revision_Number || 0);
+    if (revision) return revision;
+    return String(b.Approved_Date || '').localeCompare(String(a.Approved_Date || ''));
+  });
+  if (!candidates.length) return { available: false, reason: 'No baseline snapshot is recorded' };
+  const latest = candidates[0];
+  if (!latest.Snapshot_JSON) return { available: false, reason: 'Latest baseline has no Snapshot_JSON' };
+  let snapshot;
+  try { snapshot = JSON.parse(latest.Snapshot_JSON); }
+  catch (error) { return { available: false, reason: 'Latest baseline Snapshot_JSON is invalid' }; }
+  if (!snapshot || !Array.isArray(snapshot.activities)) {
+    return { available: false, reason: 'Latest baseline snapshot has no activities array' };
+  }
+  const saved = {};
+  for (let i = 0; i < snapshot.activities.length; i += 1) {
+    const row = snapshot.activities[i] || {};
+    const id = String(row.Activity_ID || '').trim();
+    if (!id) return { available: false, reason: 'Latest baseline snapshot contains an activity without Activity_ID' };
+    if (saved[id]) return { available: false, reason: 'Latest baseline snapshot contains duplicate Activity_ID values' };
+    saved[id] = row;
+  }
+  const active = (activities || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      !isTruthySheetFlag_(row.Is_Archived);
+  });
+  let matched = 0, missing = 0, changedStart = 0, changedFinish = 0, changedActivities = 0;
+  active.forEach(function (row) {
+    const baseline = saved[String(row.Activity_ID || '').trim()];
+    if (!baseline) { missing += 1; return; }
+    matched += 1;
+    const startChanged = String(row.Baseline_Start_Date || '') !== String(baseline.Baseline_Start_Date || '');
+    const finishChanged = String(row.Baseline_Finish_Date || '') !== String(baseline.Baseline_Finish_Date || '');
+    if (startChanged) changedStart += 1;
+    if (finishChanged) changedFinish += 1;
+    if (startChanged || finishChanged) changedActivities += 1;
+  });
+  return {
+    available: true,
+    baselineId: String(latest.Baseline_ID || ''),
+    revision: Number(latest.Revision_Number) || null,
+    name: String(latest.Baseline_Name || ''),
+    approvedDate: String(latest.Approved_Date || ''),
+    snapshotActivityCount: snapshot.activities.length,
+    activeActivityCount: active.length,
+    matchedActivityCount: matched,
+    missingActivityCount: missing,
+    snapshotOnlyActivityCount: Object.keys(saved).filter(function (id) {
+      return !active.some(function (row) { return String(row.Activity_ID || '').trim() === id; });
+    }).length,
+    changedBaselineStartCount: changedStart,
+    changedBaselineFinishCount: changedFinish,
+    changedActivityCount: changedActivities
+  };
+}
+
+function apiGetProjectControlsInputs(projectId) {
+  const pid = String(projectId || '').trim();
+  if (!pid) throw new Error('Project_ID is required.');
+  const ctx = assertPermission_('Projects', 'view', pid);
+  const project = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', pid);
+  if (!project || isTruthySheetFlag_(project.Is_Archived)) throw new Error('Project not found or archived.');
+
+  const canView = function (moduleName) {
+    if (ctx.isAdmin) return true;
+    const permissions = ctx.permissions || {};
+    return Boolean(permissions[moduleName] && permissions[moduleName].view === true);
+  };
+  const readRows = function (tabName, permitted, excludeArchived) {
+    if (!permitted) return null;
+    return (getTableRecords_(tabName) || []).filter(function (row) {
+      return String(row.Project_ID || '').trim() === pid &&
+        (!excludeArchived || !isTruthySheetFlag_(row.Is_Archived));
+    }).map(function (row) {
+      const clean = {};
+      Object.keys(row).forEach(function (key) {
+        if (key !== '_rowIndex') clean[key] = row[key];
+      });
+      return clean;
+    });
+  };
+
+  const scheduleAllowed = canView('WBS_Schedule');
+  const milestonesAllowed = canView('Milestones');
+  const risksAllowed = canView('Risks');
+  const issuesAllowed = canView('Issues');
+  const financeAllowed = canView('Financial_Monitoring');
+
+  const activities = readRows(DB_CONFIG.TABS.ACTIVITIES, scheduleAllowed, true);
+  const dependencies = readRows(DB_CONFIG.TABS.DEPENDENCIES, scheduleAllowed, false);
+  const baselines = readRows(DB_CONFIG.TABS.BASELINES, scheduleAllowed, false);
+  const milestones = readRows(DB_CONFIG.TABS.MILESTONES, milestonesAllowed, true);
+  const risks = readRows(DB_CONFIG.TABS.RISKS, risksAllowed, true);
+  const issues = readRows(DB_CONFIG.TABS.ISSUES, issuesAllowed, true);
+  const financialItems = readRows(DB_CONFIG.TABS.FINANCIAL, financeAllowed, false);
+  let cpm = null;
+  let baselineSummary = null;
+  if (scheduleAllowed) {
+    try { cpm = buildAppsScriptCpmSummary_(activities, dependencies, pid); }
+    catch (error) { cpm = { available: false, reason: String(error && error.message || error) }; }
+    baselineSummary = buildAppsScriptBaselineSummary_(activities, baselines, pid);
+  }
+
+  return {
+    success: true,
+    project: {
+      Project_ID: project.Project_ID,
+      Project_Name: project.Project_Name || '',
+      Project_Status: project.Project_Status || '',
+      Project_Health: project.Project_Health || ''
+    },
+    statusDate: Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd'),
+    access: {
+      schedule: scheduleAllowed,
+      milestones: milestonesAllowed,
+      risks: risksAllowed,
+      issues: issuesAllowed,
+      financialMonitoring: financeAllowed
+    },
+    activities: activities,
+    dependencies: dependencies,
+    baselines: baselines,
+    milestones: milestones,
+    risks: risks,
+    issues: issues,
+    financialItems: financialItems,
+    cpm: cpm,
+    baselineSummary: baselineSummary
+  };
+}
+
 function apiGetProjectWbsAndSchedule(projectId) {
   const ctx = assertPermission_('WBS_Schedule', 'view', projectId);
   if (!projectId) throw new Error('Project_ID is required.');

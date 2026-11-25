@@ -192,6 +192,36 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
         <div id="kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
 
+        <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">Project Controls Watchlist</h2>
+              <p id="project-controls-status" class="text-[11px] text-slate-500">Permission-aware risk, issue, schedule and financial indicators</p>
+            </div>
+            <span class="text-[10px] uppercase tracking-wide text-slate-400">Read-only summary</span>
+          </div>
+          <div id="project-controls-kpi-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-2.5"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                  <th class="py-2 px-3">Project</th>
+                  <th class="py-2 px-3">High / Critical Risks</th>
+                  <th class="py-2 px-3">Open Issues</th>
+                  <th class="py-2 px-3">Overdue Milestones</th>
+                  <th class="py-2 px-3">Delayed Activities</th>
+                  <th class="py-2 px-3">Baseline Drift</th>
+                  <th class="py-2 px-3">Unbaselined</th>
+                  <th class="py-2 px-3">Budget Status</th>
+                  <th class="py-2 px-3">Commitment Status</th>
+                  <th class="py-2 px-3">Drill-down</th>
+                </tr>
+              </thead>
+              <tbody id="project-controls-project-rows" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
             <h3 class="text-sm font-bold text-slate-800 mb-3">Projects by Status</h3>
@@ -2127,9 +2157,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         { label: 'On Hold / Delayed', val: `${k.onHoldProjects} / ${k.delayedProjects}`, color: 'text-amber-700' },
         { label: 'Avg Progress', val: `${k.avgPortfolioProgress}%`, color: 'text-blue-700' },
         { label: 'Ahead / Behind', val: `${k.projectsAhead} / ${k.projectsBehind}`, color: 'text-slate-800' },
-        { label: 'Delayed Milestones', val: k.delayedMilestones, color: 'text-rose-700' },
-        { label: 'Critical Risks', val: k.criticalRisks, color: 'text-rose-700' },
-        { label: 'Open Issues', val: k.openIssues, color: 'text-amber-700' },
+        { label: 'Delayed Milestones', val: k.delayedMilestones == null ? '—' : k.delayedMilestones, color: 'text-rose-700' },
+        { label: 'Critical Risks', val: k.criticalRisks == null ? '—' : k.criticalRisks, color: 'text-rose-700' },
+        { label: 'Open Issues', val: k.openIssues == null ? '—' : k.openIssues, color: 'text-amber-700' },
         { label: 'Pending Deliverables', val: k.pendingDeliverables, color: 'text-slate-800' }
       ];
 
@@ -2139,6 +2169,181 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <div class="text-xl font-bold ${c.color} mt-1">${c.val}</div>
         </div>
       `).join('');
+    }
+
+
+    function renderProjectControlsKPIs(data) {
+      const grid = document.getElementById('project-controls-kpi-grid');
+      const status = document.getElementById('project-controls-status');
+      if (!grid || !status) return;
+      const projectRows = document.getElementById('project-controls-project-rows');
+      if (!data || data.success !== true) {
+        status.textContent = 'Project controls indicators are currently unavailable.';
+        grid.innerHTML = '';
+        if (projectRows) projectRows.innerHTML = '<tr><td colspan="10" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
+        return;
+      }
+      status.textContent = 'Read-only summary as of ' + (data.statusDate || 'the current reporting date') +
+        ' · ' + Number(data.projectCount || 0) + ' accessible projects';
+      const cards = [
+        { label: 'High / Critical Risks', value: data.criticalRisks, color: 'text-rose-700' },
+        { label: 'Open Issues', value: data.openIssues, color: 'text-amber-700' },
+        { label: 'Overdue Milestones', value: data.overdueMilestones, color: 'text-rose-700' },
+        { label: 'Delayed Activities', value: data.delayedActivities, color: 'text-orange-700' },
+        { label: 'Baseline-drifted Projects', value: data.projectsWithBaselineDrift, color: 'text-amber-700' },
+        { label: 'Activities with Baseline Date Changes', value: data.baselineDriftActivities, color: 'text-amber-700' },
+        { label: 'Active Activities Missing from Baseline', value: data.unbaselinedActivities, color: 'text-orange-700' },
+        { label: 'Projects Over Budget', value: data.projectsOverBudget, color: 'text-rose-700' },
+        { label: 'Projects Over-committed', value: data.projectsOverCommitted, color: 'text-amber-700' }
+      ];
+      grid.innerHTML = cards.map(function (card) {
+        const value = card.value === null || card.value === undefined ? '—' : String(card.value);
+        return '<div class="rounded-md border border-slate-200 bg-slate-50 p-3">' +
+          '<div class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">' + card.label + '</div>' +
+          '<div class="mt-1 text-xl font-bold ' + card.color + '">' + value + '</div>' +
+          '</div>';
+      }).join('');
+      if (projectRows) {
+        const projects = Array.isArray(data.projects) ? data.projects : [];
+        const metric = value => value === null || value === undefined ? '—' : String(value);
+        const flag = value => value === null || value === undefined ? '—' : (value ? 'Over limit' : 'Within limit');
+        projectRows.innerHTML = projects.length ? projects.map(function (project) {
+          return '<tr class="hover:bg-slate-50">' +
+            '<td class="py-2 px-3"><div class="font-mono text-slate-500">' + escapeHtmlSafe_(project.projectId) + '</div><div class="font-semibold text-slate-800">' + escapeHtmlSafe_(project.projectName || '') + '</div></td>' +
+            '<td class="py-2 px-3">' + metric(project.criticalRisks) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.openIssues) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.overdueMilestones) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.delayedActivities) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.baselineDriftActivities) + '</td>' +
+            '<td class="py-2 px-3">' + metric(project.unbaselinedActivities) + '</td>' +
+            '<td class="py-2 px-3">' + flag(project.overBudget) + '</td>' +
+            '<td class="py-2 px-3">' + flag(project.overCommitment) + '</td>' +
+            '<td class="py-2 px-3"><button type="button" onclick="openProjectControlsDrilldown_(' + safeJsArg_(project.projectId) + ')" class="text-indigo-600 hover:underline font-semibold">Details</button></td>' +
+            '</tr>';
+        }).join('') : '<tr><td colspan="10" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
+      }
+    }
+
+    let activeProjectControlsDrilldownId_ = null;
+
+    function ensureProjectControlsDrilldown_() {
+      let modal = document.getElementById('project-controls-drilldown');
+      if (modal) return modal;
+      modal = document.createElement('div');
+      modal.id = 'project-controls-drilldown';
+      modal.className = 'fixed inset-0 z-50 hidden bg-slate-900/60 flex items-center justify-center p-4';
+      modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden text-xs">' +
+        '<div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between"><div><h2 id="project-controls-drilldown-title" class="text-sm font-bold">Project controls detail</h2><p class="text-[11px] text-slate-300">Permission-aware, read-only project summary</p></div>' +
+        '<button type="button" onclick="closeProjectControlsDrilldown_()" class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600">Close</button></div>' +
+        '<div id="project-controls-drilldown-body" class="p-5 overflow-y-auto space-y-4"><p class="text-slate-500">Loading project controls...</p></div></div>';
+      document.body.appendChild(modal);
+      return modal;
+    }
+
+    function closeProjectControlsDrilldown_() {
+      const modal = document.getElementById('project-controls-drilldown');
+      if (modal) modal.classList.add('hidden');
+      activeProjectControlsDrilldownId_ = null;
+    }
+
+    function openProjectControlsDrilldown_(projectId) {
+      const pid = String(projectId || '');
+      const authorizedProject = (APP_STATE.allProjects || []).find(p => String(p.Project_ID) === pid);
+      if (!authorizedProject) { alert('Project access denied. Refresh the portfolio and try again.'); return; }
+      activeProjectControlsDrilldownId_ = pid;
+      const modal = ensureProjectControlsDrilldown_();
+      modal.classList.remove('hidden');
+      document.getElementById('project-controls-drilldown-title').textContent =
+        (authorizedProject.Project_ID || pid) + ' — ' + (authorizedProject.Project_Name || 'Project controls');
+      const body = document.getElementById('project-controls-drilldown-body');
+      body.textContent = 'Loading permission-aware project controls...';
+      PMS_SERVER_RUN.withSuccessHandler(function (res) {
+        if (!res || res.success !== true || !res.access) {
+          body.textContent = 'Project controls are unavailable for this project.';
+          return;
+        }
+        if (activeProjectControlsDrilldownId_ !== pid || !(APP_STATE.allProjects || []).some(p => String(p.Project_ID) === pid)) {
+          body.textContent = 'Project access changed. Close this view and refresh the portfolio.';
+          return;
+        }
+        const count = rows => Array.isArray(rows) ? rows.length : null;
+        const metric = value => value === null ? 'Not available' : String(value);
+        const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+        const fmt = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        const rowsFor = key => Array.isArray(res[key]) ? res[key] : [];
+        const isOpen = value => !['closed', 'resolved', 'completed', 'complete', 'achieved'].includes(String(value || '').trim().toLowerCase());
+        const overdue = (rows, dateField, statusField) => rows.filter(row =>
+          isOpen(row[statusField]) && /^\d{4}-\d{2}-\d{2}$/.test(String(row[dateField] || '')) &&
+          String(row[dateField]) < String(res.statusDate || '')).length;
+        const weightedProgress = (rows, field) => {
+          const eligible = rows.filter(row => number(row.Activity_Weight) > 0 && row[field] !== '' && row[field] != null);
+          const weight = eligible.reduce((sum, row) => sum + number(row.Activity_Weight), 0);
+          return weight > 0 ? fmt(eligible.reduce((sum, row) => sum + number(row.Activity_Weight) * number(row[field]), 0) / weight) + '%' : 'Not available';
+        };
+        const scheduleRows = rowsFor('activities');
+        const milestoneRows = rowsFor('milestones');
+        const riskRows = rowsFor('risks');
+        const issueRows = rowsFor('issues');
+        const financeRows = rowsFor('financialItems');
+        const cpm = res.access.schedule ? res.cpm : null;
+        const cpmSummary = !res.access.schedule ? 'Restricted' :
+          (cpm && cpm.available ? fmt(cpm.durationWorkingDays) + ' working days · ' + cpm.criticalActivityCount + ' critical activities' : 'Unavailable');
+        const cpmReason = cpm && !cpm.available ? String(cpm.reason || 'Insufficient or invalid schedule data') : '';
+        const criticalPath = cpm && cpm.available && Array.isArray(cpm.criticalActivityIds) ? cpm.criticalActivityIds.slice(0, 8).join(' → ') : '';
+        const baselineSummary = res.access.schedule ? res.baselineSummary : null;
+        const baselineQuality = !res.access.schedule ? 'Restricted' :
+          (baselineSummary && baselineSummary.available
+            ? 'Baseline r' + (baselineSummary.revision == null ? '—' : baselineSummary.revision) +
+              ' · matched ' + baselineSummary.matchedActivityCount + '/' + baselineSummary.activeActivityCount +
+              ' · missing ' + baselineSummary.missingActivityCount +
+              ' · snapshot-only ' + baselineSummary.snapshotOnlyActivityCount +
+              ' · changed start/finish ' + baselineSummary.changedBaselineStartCount + '/' + baselineSummary.changedBaselineFinishCount
+            : (baselineSummary && baselineSummary.reason || 'Unavailable'));
+        const highCritical = riskRows.filter(row => {
+          const status = String(row.Current_Status || row.Status || '').toLowerCase();
+          const rating = String(row.Risk_Rating || '').toUpperCase();
+          const score = Number((rating.match(/^\s*(\d+(?:\.\d+)?)/) || [])[1]);
+          return isOpen(status) && (rating.includes('HIGH') || rating.includes('CRITICAL') || score >= 10);
+        }).length;
+        const openIssues = issueRows.filter(row => isOpen(row.Issue_Status || row.Status)).length;
+        const budget = financeRows.reduce((sum, row) => sum + number(row.Budget_Amount), 0);
+        const committed = financeRows.reduce((sum, row) => sum + number(row.Committed_Amount), 0);
+        const actual = financeRows.reduce((sum, row) => sum + number(row.Actual_Spend), 0);
+        const sections = [
+          { title: 'Schedule & baselines', allowed: res.access.schedule, value: res.access.schedule ? metric(count(res.activities)) : 'Restricted',
+            detail: 'Activities · Planned: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Planned_Progress') : 'Restricted') +
+              ' · Actual: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Actual_Progress') : 'Restricted'),
+            extra: 'Late: ' + (res.access.schedule ? overdue(scheduleRows, 'Forecast_Finish_Date', 'Status') : 'Restricted') +
+              ' · CPM: ' + cpmSummary + (criticalPath ? ' · Critical path: ' + criticalPath + (cpm.criticalActivityIds.length > 8 ? ' …' : '') : '') + (cpmReason ? ' (' + cpmReason + ')' : '') +
+              ' · Baseline quality: ' + baselineQuality +
+              ' · Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
+          { title: 'Milestones', allowed: res.access.milestones, value: res.access.milestones ? metric(count(res.milestones)) : 'Restricted',
+            detail: 'Milestones', extra: 'Overdue: ' + (res.access.milestones ? overdue(milestoneRows, 'Forecast_Date', 'Milestone_Status') : 'Restricted') },
+          { title: 'Risks', allowed: res.access.risks, value: res.access.risks ? metric(count(res.risks)) : 'Restricted',
+            detail: 'Risk records', extra: 'Open high / critical: ' + (res.access.risks ? highCritical : 'Restricted') },
+          { title: 'Issues', allowed: res.access.issues, value: res.access.issues ? metric(count(res.issues)) : 'Restricted',
+            detail: 'Issue records', extra: 'Open: ' + (res.access.issues ? openIssues : 'Restricted') },
+          { title: 'Financial monitoring', allowed: res.access.financialMonitoring, value: res.access.financialMonitoring ? metric(count(res.financialItems)) : 'Restricted',
+            detail: 'Financial records · Currency not inferred · EVM unavailable without approved time-phased PV/EV',
+            extra: res.access.financialMonitoring && financeRows.length ? 'Budget: ' + fmt(budget) + ' · Committed: ' + fmt(committed) + ' · Spent: ' + fmt(actual) : (res.access.financialMonitoring ? 'No financial records' : 'Restricted') }
+        ];
+        const cards = sections.map(function (section) {
+          return '<div class="rounded-lg border border-slate-200 p-3"><div class="font-semibold text-slate-800">' + section.title + '</div>' +
+            '<div class="mt-1 text-lg font-bold text-indigo-700">' + escapeHtmlSafe_(section.value) + '</div>' +
+            '<div class="text-[11px] text-slate-500">' + escapeHtmlSafe_(section.detail) +
+            (section.extra ? ' · ' + escapeHtmlSafe_(section.extra) : '') + '</div></div>';
+        }).join('');
+        const project = res.project || {};
+        const meta = '<div class="rounded-lg bg-slate-50 border border-slate-200 p-3"><div class="font-semibold">' +
+          escapeHtmlSafe_(project.Project_Name || pid) + '</div><div class="text-[11px] text-slate-500 mt-1">Status: ' +
+          escapeHtmlSafe_(project.Project_Status || 'Not recorded') + ' · Health: ' +
+          escapeHtmlSafe_(project.Project_Health || 'Not recorded') + ' · As of ' + escapeHtmlSafe_(res.statusDate || 'unknown') + '</div></div>';
+        body.innerHTML = meta + '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">' + cards + '</div>' +
+          '<p class="text-[11px] text-slate-500">Counts reflect records visible to your account. “Restricted” means the module is not available to your role; it is not a zero-record result. This view does not modify project data.</p>';
+      }).withFailureHandler(function (err) {
+        if (activeProjectControlsDrilldownId_ !== pid) return;
+        body.textContent = 'Unable to load project controls: ' + (err && err.message ? err.message : 'Request failed.');
+      }).apiGetProjectControlsInputs(pid);
     }
 
     function renderCharts(projects) {
@@ -2399,6 +2604,10 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           cliSel.value = curCli || 'ALL';
 
           renderKPIs(pRes.kpis);
+          PMS_SERVER_RUN
+            .withSuccessHandler(renderProjectControlsKPIs)
+            .withFailureHandler(() => renderProjectControlsKPIs(null))
+            .apiGetPortfolioControlsSummary({ includeArchived: includeArchived });
           renderPortfolioTable(APP_STATE.filteredProjects);
           // Project Register rows are fetched separately through its stricter backend page authorization.
           renderCharts(APP_STATE.filteredProjects);

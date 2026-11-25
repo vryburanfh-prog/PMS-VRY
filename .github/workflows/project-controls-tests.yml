@@ -1,0 +1,54 @@
+name: Project Controls Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'index.html'
+      - 'src/project-controls.js'
+      - 'src/project-controls-adapter.js'
+      - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
+      - 'tests/project-controls.test.js'
+      - 'tests/project-controls-adapter.test.js'
+      - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
+      - 'tests/apps-script-controls-endpoint.test.js'
+      - '.github/workflows/project-controls-tests.yml'
+  push:
+    branches:
+      - main
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'index.html'
+      - 'src/project-controls.js'
+      - 'src/project-controls-adapter.js'
+      - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
+      - 'tests/project-controls.test.js'
+      - 'tests/project-controls-adapter.test.js'
+      - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
+      - 'tests/apps-script-controls-endpoint.test.js'
+      - '.github/workflows/project-controls-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-controls-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-calculations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run project-controls and adapter tests
+        run: node --test tests/project-controls.test.js tests/project-controls-adapter.test.js tests/pms-project-controls.test.js tests/pms-portfolio-dashboard.test.js tests/apps-script-controls-endpoint.test.js
