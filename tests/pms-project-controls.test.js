@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildPmsProjectControlsReport } = require('../src/pms-project-controls');
+const { buildPmsProjectControlsReport, buildPmsPortfolioControlsSummary } = require('../src/pms-project-controls');
 
 const project = { Project_ID: 'P-1', Project_Name: 'Sample' };
 const activities = [
@@ -127,6 +127,34 @@ test('excludes archived risks and issues from management summaries', () => {
   });
   assert.equal(report.riskSummary.total, 0);
   assert.equal(report.issueSummary.total, 0);
+});
+
+
+test('builds a portfolio dashboard summary from project-scoped reports', () => {
+  const summary = buildPmsPortfolioControlsSummary([
+    { projectId: 'P-1', projectName: 'One',
+      riskSummary: { highOrCriticalOpen: 2 }, issueSummary: { open: 1 },
+      scheduleAlerts: { overdueMilestoneCount: 1, delayedActivityCount: 3 },
+      finance: { overBudget: true, overCommitment: false } },
+    { projectId: 'P-2', projectName: 'Two',
+      riskSummary: { highOrCriticalOpen: 0 }, issueSummary: { open: 0 },
+      scheduleAlerts: { overdueMilestoneCount: 0, delayedActivityCount: 0 },
+      finance: null }
+  ]);
+  assert.equal(summary.projectCount, 2);
+  assert.equal(summary.projectsWithAlerts, 1);
+  assert.equal(summary.highOrCriticalOpenRisks, 2);
+  assert.equal(summary.openIssues, 1);
+  assert.equal(summary.overdueMilestones, 1);
+  assert.equal(summary.delayedActivities, 3);
+  assert.equal(summary.projectsOverBudget, 1);
+  assert.equal(summary.projects[1].hasFinancialData, false);
+});
+
+test('rejects duplicate project reports in portfolio aggregation', () => {
+  assert.throws(() => buildPmsPortfolioControlsSummary([
+    { projectId: 'P-1' }, { projectId: 'P-1' }
+  ]), /Duplicate project report/);
 });
 
 test('validates status date and malformed baseline JSON', () => {
