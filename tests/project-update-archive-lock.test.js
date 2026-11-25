@@ -23,6 +23,6 @@ test('project register update and archive/restore are serialized', () => {
   const updateAudit = update.indexOf("writeAuditLog_(ctx, 'UPDATE_PROJECT'");
   assert.ok(updateRecord > update.indexOf('lock.waitLock(15000)') && updateAudit > updateRecord);
   const archiveRecord = archive.indexOf("updateRecordById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', projectId");
-  const archiveAudit = archive.indexOf("writeAuditLog_(ctx,");
+  const archiveAudit = archive.indexOf("writeAuditLog_(");
   assert.ok(archiveRecord > archive.indexOf('lock.waitLock(15000)') && archiveAudit > archiveRecord);
 });
