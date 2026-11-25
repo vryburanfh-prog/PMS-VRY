@@ -77,6 +77,6 @@ test('deletion APIs use the locked delete helper', { skip: !['apiDeleteProjectCo
     const start = code.indexOf('function ' + name);
     const next = code.indexOf('\nfunction ', start + 10);
     const body = code.slice(start, next === -1 ? code.length : next);
-    assert.match(body, /deleteRecordById_\\(/);
+    assert.ok(body.includes('deleteRecordById_('));
   }
 });
