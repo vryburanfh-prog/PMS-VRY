@@ -47,3 +47,21 @@ test('registry key and dynamic KPI class are escaped in HTML text and attributes
   assert.ok(presentation.includes('${escapeHtmlSafe_(st.key)}'));
   assert.ok(presentation.includes('${escapeHtmlSafe_(c.color)}'));
 });
+
+test('index.html project, WBS, registry, workload and report fields are escaped', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const required = [
+    'escapeHtmlSafe_(proj.Project_ID)',
+    'escapeHtmlSafe_(proj.Project_Name)',
+    'escapeHtmlSafe_(p.Client || \'-\')',
+    'escapeHtmlSafe_(p.Project_Manager || \'-\')',
+    'escapeHtmlSafe_(p.Project_Location || \'-\')',
+    'escapeHtmlSafe_(w.Employee_Name)',
+    'escapeHtmlSafe_(l.Notes || \'\')',
+    'escapeHtmlSafe_(st.key)',
+    'escapeHtmlSafe_(it.id)',
+    'escapeHtmlSafe_(d.focusScope)'
+  ];
+  for (const expression of required) assert.ok(indexHtml.includes('${' + expression + '}'), expression + ' must be escaped');
+  assert.ok(indexHtml.includes('sanitizeShareUrlForHtml_(d.shareUrl)'));
+});
