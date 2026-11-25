@@ -946,7 +946,7 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
     const deps = getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES).filter(d => String(d.Project_ID) === pid && isActiveDependencyRecord_(d));
     if (deps.some(d => String(d.Predecessor_ID) === String(recordId) || String(d.Successor_ID) === String(recordId))) throw new Error('Cannot delete this Activity because it is referenced by a schedule dependency. Remove or update the dependency first.');
   }
-  const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
+  const previous = deleteRecordById_(cfg[0], cfg[1], recordId, { field: 'Project_ID', value: pid });
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
 }
@@ -1632,7 +1632,7 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
     throw new Error('Record does not belong to the active project.');
   }
 
-  const deleted = deleteRecordById_(cfg.tab, cfg.idCol, recordId);
+  const deleted = deleteRecordById_(cfg.tab, cfg.idCol, recordId, { field: 'Project_ID', value: pid });
   delete deleted._rowIndex;
   writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, deleted, null, 'Deleted ' + registryKey + ' record');
   return { success: true };
@@ -2031,7 +2031,7 @@ function apiDeleteWeeklyReport(projectId, reportId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  deleteRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId);
+  deleteRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
@@ -2289,7 +2289,7 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  deleteRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId);
+  deleteRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId, { field: 'Assigned_Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
@@ -2518,7 +2518,7 @@ function apiDeleteProcurementItem(projectId, procurementId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  deleteRecordById_(procTab, 'Procurement_ID', procurementId);
+  deleteRecordById_(procTab, 'Procurement_ID', procurementId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
@@ -2592,7 +2592,7 @@ function apiDeleteFinancialItem(projectId, financialId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  deleteRecordById_(finTab, 'Financial_ID', financialId);
+  deleteRecordById_(finTab, 'Financial_ID', financialId, { field: 'Project_ID', value: pid });
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
