@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildPmsProjectControlsReport, buildPmsPortfolioControlsSummary } = require('../src/pms-project-controls');
+const { buildPmsProjectControlsReport, buildPmsProjectControlsReportFromApi, buildPmsPortfolioControlsSummary } = require('../src/pms-project-controls');
 
 const project = { Project_ID: 'P-1', Project_Name: 'Sample' };
 const activities = [
@@ -144,6 +144,38 @@ test('excludes archived risks and issues from management summaries', () => {
   assert.equal(report.issueSummary.total, 0);
 });
 
+
+
+test('adapts permission-aware Apps Script API data without treating denied modules as zero', () => {
+  const apiData = {
+    success: true, project, statusDate: '2026-02-01',
+    access: { schedule: false, milestones: false, risks: false, issues: true, financialMonitoring: false },
+    activities: null, dependencies: null, baselines: null, milestones: null, risks: null,
+    issues: [{ Project_ID: 'P-1', Issue_ID: 'I-1', Issue_Status: 'Open' }],
+    financialItems: null
+  };
+  const report = buildPmsProjectControlsReportFromApi(apiData);
+  assert.equal(report.schedule, null);
+  assert.equal(report.riskSummary, null);
+  assert.equal(report.milestones, null);
+  assert.equal(report.scheduleAlerts.overdueMilestoneCount, null);
+  assert.equal(report.issueSummary.open, 1);
+  assert.equal(report.finance, null);
+  assert.equal(report.availability.schedule, false);
+  assert.equal(report.availability.issues, true);
+});
+
+test('continues risk and issue reporting when an authorized schedule has no activities', () => {
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-02-01', activities: [],
+    risks: [{ Project_ID: 'P-1', Risk_ID: 'R-1', Risk_Rating: '15 - Critical', Current_Status: 'Open' }],
+    issues: [{ Project_ID: 'P-1', Issue_ID: 'I-1', Issue_Status: 'Open' }]
+  });
+  assert.equal(report.schedule, null);
+  assert.equal(report.riskSummary.highOrCriticalOpen, 1);
+  assert.equal(report.issueSummary.open, 1);
+  assert.ok(report.warnings.some(message => message.includes('No active schedule activities')));
+});
 
 test('builds a portfolio dashboard summary from project-scoped reports', () => {
   const summary = buildPmsPortfolioControlsSummary([
