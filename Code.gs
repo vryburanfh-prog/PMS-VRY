@@ -3804,78 +3804,76 @@ function apiGetDigestTriggerStatus(activeProjectId) {
       projectId: cfg.projectId
     },
     activeTriggerCount: matching.length,
-    history: getPhase17History_(ctx,function apiSaveDigestTriggerConfig(payload, activeProjectId) {
+    history: getPhase17History_(ctx, visibleIds)
+  };
+}
+
+function apiSaveDigestTriggerConfig(payload, activeProjectId) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-  var pid = activeProjectId ? String(activeProjectId).trim() : '';
-  var ctx = assertPermission_('Projects', 'view', pid || null);
-  if (!isPhase17Admin_(ctx)) {
-    throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
-  }
-
-  var p = payload || {};
-  var enabled = Boolean(p.enabled);
-  var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
-  var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
-  var recipients = String(p.recipients || '').trim();
-  var targetPid = String(p.projectId || '').trim();
-
-  if (enabled && !recipients) {
-    throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
-  }
-
-  var nextCfg = {
-    enabled: enabled,
-    frequency: frequency,
-    hourOfDay: hourOfDay,
-    recipients: recipients,
-    projectId: targetPid
-  };
-
-  PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
-
-  // Clear existing triggers for this handler before recreating
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
-      ScriptApp.deleteTrigger(t);
+    var pid = activeProjectId ? String(activeProjectId).trim() : '';
+    var ctx = assertPermission_('Projects', 'view', pid || null);
+    if (!isPhase17Admin_(ctx)) {
+      throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
     }
-  });
 
-  if (enabled) {
-    var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
-    if (frequency === 'DAILY') {
-      builder.everyDays(1).atHour(hourOfDay);
-    } else {
-      builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+    var p = payload || {};
+    var enabled = Boolean(p.enabled);
+    var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
+    var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
+    var recipients = String(p.recipients || '').trim();
+    var targetPid = String(p.projectId || '').trim();
+
+    if (enabled && !recipients) {
+      throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
     }
-    builder.create();
-  }
 
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
-      'PMO_Digest_Trigger',
-      targetPid || 'PORTFOLIO',
-      null,
-      { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
-      enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
-    );
-  }
+    var nextCfg = {
+      enabled: enabled,
+      frequency: frequency,
+      hourOfDay: hourOfDay,
+      recipients: recipients,
+      projectId: targetPid
+    };
 
-  return apiGetDigestTriggerStatus(pid);
+    PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
 
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+
+    if (enabled) {
+      var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
+      if (frequency === 'DAILY') {
+        builder.everyDays(1).atHour(hourOfDay);
+      } else {
+        builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+      }
+      builder.create();
+    }
+
+    if (typeof writeAuditLog_ === 'function') {
+      writeAuditLog_(
+        ctx,
+        enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
+        'PMO_Digest_Trigger',
+        targetPid || 'PORTFOLIO',
+        null,
+        { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
+        enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
+      );
+    }
+
+    return apiGetDigestTriggerStatus(pid);
   } finally {
     lock.releaseLock();
   }
-}  return apiGetDigestTriggerStatus(pid);
 }
 
-/**
- * Executed automatically by Apps Script time-driven trigger.
- */
 function runScheduledPmoDigestTrigger(e) {
   // This public trigger handler is callable by Apps Script time-driven
   // triggers, but must not become an unauthenticated browser/API endpoint.
