@@ -144,6 +144,32 @@ function buildPmsProjectControlsReport(input) {
     (row.finishVarianceDays != null && row.finishVarianceDays > 0));
   const delayedMilestones = milestones.filter(row => row.overdueAtStatusDate);
 
+  const riskRows = (input.risks || []).filter(row =>
+    String(row.Project_ID || '').trim() === projectId &&
+    !['true', '1', 'yes'].includes(String(row.Is_Archived || '').trim().toLowerCase()));
+  const risks = riskRows.map(row => {
+    const status = String(row.Current_Status || row.Status || 'Open').trim();
+    const rating = String(row.Risk_Rating || '').trim();
+    const scoreMatch = rating.match(/^\\s*(\\d+(?:\\.\\d+)?)/);
+    const score = scoreMatch ? Number(scoreMatch[1]) : null;
+    const band = /critical/i.test(rating) || (score != null && score >= 15) ? 'critical'
+      : /high/i.test(rating) || (score != null && score >= 10) ? 'high'
+      : /medium/i.test(rating) || (score != null && score >= 5) ? 'medium' : 'unclassified';
+    return { id: String(row.Risk_ID || ''), status, rating, score, band,
+      isOpen: !['closed', 'resolved', 'accepted'].includes(status.toLowerCase()) };
+  });
+  const issueRows = (input.issues || []).filter(row =>
+    String(row.Project_ID || '').trim() === projectId &&
+    !['true', '1', 'yes'].includes(String(row.Is_Archived || '').trim().toLowerCase()));
+  const issues = issueRows.map(row => {
+    const status = String(row.Issue_Status || row.Status || 'Open').trim();
+    return { id: String(row.Issue_ID || ''), status,
+      isOpen: !['closed', 'resolved'].includes(status.toLowerCase()) };
+  });
+  const openRisks = risks.filter(row => row.isOpen);
+  const criticalOpenRisks = openRisks.filter(row => row.band === 'critical' || row.band === 'high');
+  const openIssues = issues.filter(row => row.isOpen);
+
   const financialRows = (input.financialItems || []).filter(row => String(row.Project_ID || '').trim() === projectId);
   const finance = financialRows.length ? financialRows.reduce((sum, row) => ({
     budget: sum.budget + number(row.Budget_Amount, 'Budget_Amount', 0),
@@ -165,6 +191,8 @@ function buildPmsProjectControlsReport(input) {
   if (!baseline) warnings.push('No approved Project_Baselines snapshot was found');
   else if (baselineComparison.some(row => !row.hasSnapshotMatch)) warnings.push('Some active activities are absent from the latest approved baseline snapshot');
   if (!finance) warnings.push('No Financial_Monitoring rows are available');
+  if (criticalOpenRisks.length) warnings.push(criticalOpenRisks.length + ' open high/critical risks require management attention');
+  if (openIssues.length) warnings.push(openIssues.length + ' open issues remain unresolved');
   if (delayedActivities.length) warnings.push(delayedActivities.length + ' activities are forecast late or have slipped beyond baseline finish');
   if (delayedMilestones.length) warnings.push(delayedMilestones.length + ' milestones are overdue at the report status date');
   if (finance && finance.overBudget) warnings.push('Actual spending exceeds the recorded project budget');
@@ -179,6 +207,8 @@ function buildPmsProjectControlsReport(input) {
     baselineComparison,
     scheduleAlerts: { delayedActivityCount: delayedActivities.length, overdueMilestoneCount: delayedMilestones.length, delayedActivities, overdueMilestones: delayedMilestones },
     milestones,
+    riskSummary: { total: risks.length, open: openRisks.length, highOrCriticalOpen: criticalOpenRisks.length, records: risks },
+    issueSummary: { total: issues.length, open: openIssues.length, records: issues },
     finance, warnings
   };
 }
