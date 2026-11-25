@@ -1663,6 +1663,9 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
   if (!projectId || !recordId) throw new Error('Project_ID and Record ID are required.');
 
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_(cfg.module, 'delete', pid);
 
   const existing = findRecordRowById_(cfg.tab, cfg.idCol, recordId);
@@ -1677,6 +1680,9 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
 
   writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
   return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
