@@ -193,3 +193,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
 | #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
 
+
+
+### S13 — P1 operational readiness: backup/recovery procedure not runtime-verified
+**Evidence:** Source includes full spreadsheet backup-copy endpoint, import header checks and pre-import backup, and Start Fresh allowlist/backup. Import replaces matching tabs and skips missing source tabs; the multi-tab write loop has no rollback boundary. No dedicated atomic restore endpoint is present in the inspected source.
+**Remediation:** Draft PR #10 documents pre-change backup verification, isolated recovery, import/reset safeguards, post-change reconciliation, and evidence retention. Draft PR #2 now includes BAK-01 through BAK-07.
+**Status:** Runbook documentation exists on a draft branch; backup/restore and failure-injection tests have not been executed.
