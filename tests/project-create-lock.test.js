@@ -28,3 +28,14 @@ test('project ID generation and duplicate validation happen under the lock', () 
   const duplicateCheck = fn.indexOf("findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId)");
   assert.ok(lock >= 0 && generatedId > lock && duplicateCheck > generatedId);
 });
+
+test('project creation compensates partial writes and treats audit failure as warning', () => {
+  const creationCatch = fn.indexOf('catch (creationError)');
+  const assignmentCleanup = fn.indexOf("deleteRecordsByIds_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS", creationCatch);
+  const projectCleanup = fn.indexOf("deleteRecordsByIds_(DB_CONFIG.TABS.PROJECTS", creationCatch);
+  const audit = fn.indexOf("writeAuditLog_(ctx, 'CREATE_PROJECT'");
+  assert.ok(creationCatch > 0 && assignmentCleanup > creationCatch && projectCleanup > assignmentCleanup);
+  assert.ok(audit > projectCleanup);
+  assert.match(fn, /Project was created successfully, but audit logging failed/);
+  assert.match(fn, /return \{ success: true, project: record, warning: auditWarning \}/);
+});
