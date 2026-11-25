@@ -363,3 +363,50 @@ test('project drill-down displays a bounded CPM critical-path sequence', () => {
   assert.match(indexSource, /Critical path:/);
   assert.match(indexSource, /criticalActivityIds\.length > 8/);
 });
+
+
+function runAppsScriptBaseline(activities, baselines, projectId) {
+  const fn = extractFunction('buildAppsScriptBaselineSummary_');
+  const context = {
+    isTruthySheetFlag_: value => value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase())
+  };
+  return vm.runInNewContext('(' + fn + ')', context)(activities, baselines, projectId || 'P-1');
+}
+
+test('baseline summary reports matching, missing and changed activity baselines', () => {
+  const activities = [
+    { Project_ID: 'P-1', Activity_ID: 'A', Baseline_Start_Date: '2026-01-01', Baseline_Finish_Date: '2026-01-03' },
+    { Project_ID: 'P-1', Activity_ID: 'B', Baseline_Start_Date: '2026-01-04', Baseline_Finish_Date: '2026-01-08' },
+    { Project_ID: 'P-1', Activity_ID: 'C', Is_Archived: true }
+  ];
+  const baselines = [
+    { Project_ID: 'P-1', Baseline_ID: 'BL-2', Revision_Number: 2, Approved_Date: '2026-01-10',
+      Snapshot_JSON: JSON.stringify({ activities: [
+        { Activity_ID: 'A', Baseline_Start_Date: '2026-01-01', Baseline_Finish_Date: '2026-01-02' },
+        { Activity_ID: 'B', Baseline_Start_Date: '2026-01-04', Baseline_Finish_Date: '2026-01-08' }
+      ] }) },
+    { Project_ID: 'P-1', Baseline_ID: 'BL-1', Revision_Number: 1,
+      Snapshot_JSON: JSON.stringify({ activities: [] }) }
+  ];
+  const result = runAppsScriptBaseline(activities, baselines);
+  assert.equal(result.available, true);
+  assert.equal(result.baselineId, 'BL-2');
+  assert.equal(result.matchedActivityCount, 2);
+  assert.equal(result.missingActivityCount, 0);
+  assert.equal(result.changedBaselineStartCount, 0);
+  assert.equal(result.changedBaselineFinishCount, 1);
+});
+
+test('baseline summary distinguishes missing, malformed and incomplete snapshots', () => {
+  assert.equal(runAppsScriptBaseline([], []).available, false);
+  assert.match(runAppsScriptBaseline([], [{ Project_ID: 'P-1', Snapshot_JSON: '{bad' }]).reason, /invalid/);
+  assert.match(runAppsScriptBaseline([], [{ Project_ID: 'P-1', Snapshot_JSON: '{}' }]).reason, /activities array/);
+});
+
+test('project controls API includes baseline quality only behind schedule permission', () => {
+  const fn = extractFunction('apiGetProjectControlsInputs');
+  assert.match(fn, /buildAppsScriptBaselineSummary_\(activities, baselines, pid\)/);
+  assert.match(fn, /baselineSummary: baselineSummary/);
+  assert.match(fn, /if \(scheduleAllowed\)/);
+  assert.match(indexSource, /Baseline quality:/);
+});
