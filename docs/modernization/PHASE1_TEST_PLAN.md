@@ -100,6 +100,25 @@ These cases cover the focused changes in the public-deck minimization and import
 
 The primary-key guard draft PR #6 uses the Script Lock around duplicate detection and append. It prevents duplicate keys from being silently inserted, but it does not automatically retry ID generation after a collision; the competing create may return an error and require a retry. Runtime concurrency tests are still needed.
 
+## 3.6 API authorization inventory — static scan and manual guard-path review
+
+A source scan identified 66 `api*` functions in `Code.gs`. Fifty-six directly contained one of the recognized guard strings (`assertPermission_`, `assertPrivilegedManagementRole_`, or database-transfer/admin assertions). Ten did not contain those strings and were manually reviewed for guard paths or intentionally public behavior:
+
+| Endpoint | Guard path / purpose | Test status |
+|---|---|---|
+| `apiGetSessionContext` | Authenticated session context only; returns unauthenticated response when absent | Not run |
+| `apiGetBootstrapData` | Checks authenticated context; redacts user/settings data and exposes users only when permission allows | Not run |
+| `apiGetProjectRegisterData` | `assertPageAccess_('Project_Register')`; filters by assignment/admin scope | Not run |
+| `apiSetWbsRecordArchived` | `assertPrivilegedWbsRole_(projectId, 'edit')` plus record-project ownership assertion | Not run |
+| `apiDeleteWbsRecord` | `assertPrivilegedWbsRole_(projectId, 'delete')` plus record-project ownership assertion and relationship checks | Not run |
+| `apiSaveMainWbs` | `assertPrivilegedWbsRole_` for create/edit and ownership assertion on update | Not run |
+| `apiSaveSubWbs` | `assertPrivilegedWbsRole_` for create/edit plus parent WBS ownership check | Not run |
+| `apiSaveProjectWbsDepth` | `assertPrivilegedWbsRole_(projectId, 'edit')`; retained compatibility endpoint | Not run |
+| `apiGetProjectReferenceNames` | Authenticated context and `assertProjectAssignment_`; project-filtered reference records | Not run |
+| `apiGetPublishedClientDeckByToken` | Intentional public share-token endpoint; token format and published status are checked. Public payload minimization is tracked in draft PR #4 | Not run |
+
+This is a static scan and manual call-path review, not proof that the server guards work. The API list must be rechecked against the deployed code and direct-call tests must verify unauthorized roles, project-scope mismatches, and public-token behavior. Some guard methods are helpers and therefore the static direct-string count undercounts guarded endpoints.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
