@@ -13,9 +13,8 @@ on:
       - 'tests/google-token-validation.test.js'
       - 'tests/import-formula-preservation.test.js'
       - 'tests/index-html-escaping.test.js'
-      - 'tests/presentation-html-escaping.test.js'
-      - 'tests/spreadsheet-formula-safety.test.js'
       - 'tests/api-authorization-coverage.test.js'
+      - 'index.html'
       - 'tests/index-html-escaping.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
   push:
@@ -26,6 +25,8 @@ on:
       - 'tests/presentation-html-escaping.test.js'
       - 'tests/project-control-field-authorization.test.js'
       - 'tests/api-authorization-coverage.test.js'
+      - 'index.html'
+      - 'tests/index-html-escaping.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
 
 jobs:
