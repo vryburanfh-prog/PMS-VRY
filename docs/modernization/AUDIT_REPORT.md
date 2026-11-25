@@ -169,7 +169,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 
 ### S11 — P1 improvement: automated static security regression checks
 **Remediation:** Draft PR #7 adds a Node 20 GitHub Actions workflow and source-level tests for the focused Phase 1 fixes. Tests for code fixes not yet merged into `main` skip with explicit pending-remediation messages; they will activate when the corresponding code is merged.
-**CI evidence:** Run `Static Security Checks` on PR #7 completed successfully. The job reported 1 passing baseline test, 0 failures, and 6 skipped tests (skips correspond to remediation branches not yet in main). This is not runtime validation of Apps Script.
+**CI evidence:** PR #7’s test-only CI run succeeded (1 baseline test passed, 0 failed, 6 feature tests skipped until remediation merges). A separate temporary integrated-validation PR #11 combined the pending source fixes and ran the same test suite: **7 passed, 0 failed, 0 skipped**. PR #11 was closed unmerged after collecting the CI result. This validates static source assertions only, not runtime Apps Script or Sheets behavior.
 **Status:** CI workflow and runner are functional; fix-specific checks remain pending until their implementation PRs merge.
 
 
@@ -193,6 +193,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
 | #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
 | #10 | Backup/recovery runbook | Open draft | Source-based guidance; runtime recovery and failure-injection tests not run |
+| #11 | Temporary integrated validation | Closed unmerged | CI passed 7/7 static regression tests with all Phase 1 source fixes combined; closed after validation |
 
 
 
