@@ -4899,8 +4899,7 @@ function apiGenerateClientPresentation(config) {
     audienceTone: audienceTone,
     generatedAt: nowIso,
     executiveSummary: aiDeck.executiveSummary || '',
-    slides: aiDeck.slides || [],
-    rawMetrics: factPacket
+    slides: aiDeck.slides || []
   };
 
   sh.appendRow([
@@ -4999,9 +4998,14 @@ function apiGetPublishedClientDeckByToken(token) {
   const found = decks.find(d => String(d.Share_Token) === cleanToken && String(d.Status || 'PUBLISHED') === 'PUBLISHED');
   if (!found) return { success: false, error: 'Presentation not found or link has been archived.' };
 
+  const deck = JSON.parse(found.Deck_JSON || '{}');
+  // Defense in depth: older published snapshots may contain source metrics.
+  // Public token access returns only curated presentation content.
+  if (deck && typeof deck === 'object' && !Array.isArray(deck)) delete deck.rawMetrics;
+
   return {
     success: true,
-    deck: JSON.parse(found.Deck_JSON || '{}')
+    deck: deck
   };
 }
 
@@ -5227,7 +5231,16 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
         throw new Error('Header mismatch in tab "' + tabName + '". No import was applied.');
       }
       var srcLast = src.getLastRow();
-      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [] });
+      var importedRows = srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [];
+      // Treat formula-like imported strings as literal text in the destination.
+      // Numeric/date values are preserved; source formulas are imported as values.
+      importedRows = importedRows.map(function(row) {
+        return row.map(function(value) {
+          if (typeof value === 'string' && /^[\s]*[=+\-@]/.test(value)) return "'" + value;
+          return value;
+        });
+      });
+      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: importedRows });
     });
     if (!plan.length) throw new Error('No matching database tabs were found in the source spreadsheet.');
     // Always create a full backup only after all source headers have passed validation.
