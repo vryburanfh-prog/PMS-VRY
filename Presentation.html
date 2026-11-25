@@ -6799,7 +6799,7 @@ function renderDeckHistoryList_() {
       </div>
       <div class="flex gap-2 shrink-0">
         <a href="${escapeHtmlSafe_(d.shareUrl)}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open ↗</a>
-        <button type="button" onclick="archiveClientDeck('${safeJsArg_(d.deckId)}')" class="text-rose-600 hover:underline font-semibold">Revoke</button>
+        <button type="button" onclick="archiveClientDeck(${safeJsArg_(d.deckId)})" class="text-rose-600 hover:underline font-semibold">Revoke</button>
       </div>
     </div>
   `).join('');
