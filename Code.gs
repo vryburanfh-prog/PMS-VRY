@@ -995,8 +995,10 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
+  } finally {
+    lock.releaseLock();
+  }
 }
-
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
   if (!ctx || !ctx.authenticated) throw new Error((ctx && ctx.error) || 'Authentication required.');
