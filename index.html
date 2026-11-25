@@ -2135,8 +2135,8 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
       document.getElementById('kpi-grid').innerHTML = cards.map(c => `
         <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200">
-          <div class="text-[11px] font-semibold text-slate-400 uppercase">${c.label}</div>
-          <div class="text-xl font-bold ${c.color} mt-1">${c.val}</div>
+          <div class="text-[11px] font-semibold text-slate-400 uppercase">${escapeHtmlSafe_(c.label)}</div>
+          <div class="text-xl font-bold ${escapeHtmlSafe_(c.color)} mt-1">${escapeHtmlSafe_(c.val)}</div>
         </div>
       `).join('');
     }
@@ -3402,7 +3402,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(l.Log_ID)}</td>
             <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(l.Log_Date || '-')}</td>
-            <td class="py-2 px-3 font-mono text-[11px]">${scopeLabel}</td>
+            <td class="py-2 px-3 font-mono text-[11px]">${escapeHtmlSafe_(scopeLabel)}</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
             <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(l.Submitted_By || '-')}</td>
