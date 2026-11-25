@@ -13,7 +13,9 @@ on:
       - 'tests/project-controls-adapter.test.js'
       - 'tests/pms-project-controls.test.js'
       - 'tests/pms-portfolio-dashboard.test.js'
-      - 'tests/apps-script-controls-endpoint.test.js'\n      - 'tests/phase2-staging-fixture.test.js'\n      - 'tests/fixtures/phase2-staging-controls-fixture.json'
+      - 'tests/apps-script-controls-endpoint.test.js'
+      - 'tests/phase2-staging-fixture.test.js'
+      - 'tests/fixtures/phase2-staging-controls-fixture.json'
       - '.github/workflows/project-controls-tests.yml'
   push:
     branches:
@@ -31,14 +33,12 @@ on:
       - 'tests/pms-project-controls.test.js'
       - 'tests/pms-portfolio-dashboard.test.js'
       - 'tests/apps-script-controls-endpoint.test.js'
+      - 'tests/phase2-staging-fixture.test.js'
+      - 'tests/fixtures/phase2-staging-controls-fixture.json'
       - '.github/workflows/project-controls-tests.yml'
 
 permissions:
   contents: read
-
-concurrency:
-  group: project-controls-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   deterministic-calculations:
