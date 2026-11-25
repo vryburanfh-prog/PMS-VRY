@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 function extractFunction(name) {
   const marker = 'function ' + name + '(';
@@ -71,4 +72,14 @@ test('project-controls endpoint denies inaccessible projects before reading data
   const firstRead = fn.indexOf('readRows(DB_CONFIG.TABS.');
   assert.ok(projectGate >= 0 && firstRead > projectGate);
   assert.match(fn, /Project not found or archived/);
+});
+
+
+test('portfolio dashboard renders and refreshes the project-controls watchlist', () => {
+  assert.match(indexSource, /id="project-controls-kpi-grid"/);
+  assert.match(indexSource, /function renderProjectControlsKPIs\(data\)/);
+  assert.match(indexSource, /\.apiGetPortfolioControlsSummary\(\{ includeArchived: includeArchived \}\)/);
+  for (const label of ['High / Critical Risks', 'Open Issues', 'Overdue Milestones', 'Delayed Activities', 'Projects Over Budget', 'Projects Over-committed']) {
+    assert.ok(indexSource.includes(label), 'missing watchlist KPI: ' + label);
+  }
 });
