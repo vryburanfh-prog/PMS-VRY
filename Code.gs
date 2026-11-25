@@ -2327,6 +2327,9 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
 function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
   if (!projectId || !assignmentId) throw new Error('Project_ID and Assignment_ID are required.');
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Team_Workload', 'delete', pid);
 
   const existing = findRecordRowById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId);
@@ -2344,6 +2347,9 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
