@@ -2041,6 +2041,9 @@ function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
  * Creates or updates a Weekly Project Report in Weekly_Reports.
  */
 function apiSaveWeeklyReport(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2114,12 +2117,19 @@ function apiSaveWeeklyReport(projectId, payload) {
   }
 
   return { success: true, report: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Weekly Project Report (requires Weekly_Reports delete permission) and logs to Audit_Logs.
  */
 function apiDeleteWeeklyReport(projectId, reportId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !reportId) throw new Error('Project_ID and Report_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Weekly_Reports', 'delete', pid);
@@ -2139,6 +2149,10 @@ function apiDeleteWeeklyReport(projectId, reportId) {
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2319,6 +2333,9 @@ function apiGetTeamWorkloadData(projectId) {
  * Creates or updates a Team_Workload assignment row and writes an Audit_Logs entry.
  */
 function apiSaveTeamWorkloadAssignment(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2373,6 +2390,10 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
   }
 
   return { success: true, assignment: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2380,6 +2401,9 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
  * and writes an Audit_Logs entry.
  */
 function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !assignmentId) throw new Error('Project_ID and Assignment_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Team_Workload', 'delete', pid);
@@ -2399,6 +2423,10 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2555,6 +2583,9 @@ function apiGetProcurementFinancialData(projectId) {
  * Creates or updates a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiSaveProcurementItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2604,12 +2635,19 @@ function apiSaveProcurementItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiDeleteProcurementItem(projectId, procurementId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !procurementId) throw new Error('Project_ID and Procurement_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Procurement', 'delete', pid);
@@ -2629,6 +2667,10 @@ function apiDeleteProcurementItem(projectId, procurementId) {
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
