@@ -1436,6 +1436,9 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
  * Triggers the weighted progress roll-up engine for a project and logs it.
  */
 function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('WBS_Schedule', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -1451,6 +1454,10 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
   writeAuditLog_(ctx, 'RECALCULATE_PROGRESS', 'WBS_Schedule', pid, null, summary, 'Weighted progress roll-up executed');
 
   return { success: true, summary: summary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1458,6 +1465,9 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
  * then automatically rolls up weighted progress.
  */
 function apiQuickUpdateGanttActivity(activityId, updates) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', activityId);
   if (!existing) throw new Error('Activity not found: ' + activityId);
 
@@ -1495,6 +1505,10 @@ function apiQuickUpdateGanttActivity(activityId, updates) {
 
   writeAuditLog_(ctx, 'GANTT_UPDATE_ACTIVITY', 'WBS_Schedule', activityId, res.previous, res.updated, 'Updated via Interactive Gantt Chart');
   return { success: true, activity: res.updated, rollSummary: rollSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2677,6 +2691,9 @@ function apiDeleteProcurementItem(projectId, procurementId) {
  * Creates or updates a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiSaveFinancialItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2721,12 +2738,19 @@ function apiSaveFinancialItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiDeleteFinancialItem(projectId, financialId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !financialId) throw new Error('Project_ID and Financial_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Financials', 'delete', pid);
@@ -2746,6 +2770,10 @@ function apiDeleteFinancialItem(projectId, financialId) {
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -4015,6 +4043,9 @@ function apiGetEscalationsData(activeProjectId) {
  * Creates or updates an exception escalation row.
  */
 function apiUpsertEscalationItem(payload, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   var p = payload || {};
   var targetPid = String(p.Project_ID || activeProjectId || '').trim();
   assertPrivilegedManagementRole_(targetPid || null);
@@ -4093,6 +4124,10 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   }
 
   return apiGetEscalationsData(activeProjectId);
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
