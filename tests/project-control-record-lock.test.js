@@ -15,9 +15,10 @@ test('control record uniqueness checks, ID generation, mutations, and audit are 
   const idGeneration = fn.indexOf('generateNextId_(cfg.tab, cfg.idCol');
   const update = fn.indexOf('updateRecordById_(cfg.tab, cfg.idCol');
   const insert = fn.indexOf('insertRecord_(cfg.tab, cleanRecord)');
-  const audit = fn.indexOf('writeAuditLog_(ctx,');
+  const updateAudit = fn.indexOf("writeAuditLog_(ctx, 'UPDATE_");
+  const insertAudit = fn.indexOf("writeAuditLog_(ctx, 'CREATE_");
   const release = fn.indexOf('lock.releaseLock()');
   assert.ok(lock >= 0 && existingLookup > lock && permissionCheck > existingLookup && idGeneration > permissionCheck);
-  assert.ok(update > lock && insert > lock && audit > update && audit > insert && release > audit);
+  assert.ok(update > lock && insert > lock && updateAudit > update && insertAudit > insert && release > updateAudit && release > insertAudit);
   assert.match(fn, /finally\s*\{\s*lock\.releaseLock\(\)/);
 });
