@@ -15,7 +15,7 @@ function extractObjectLiteral(source, declaration) {
     const c = source[i];
     if (quote) {
       if (escaped) { escaped = false; continue; }
-      if (c === '\\\\') { escaped = true; continue; }
+      if (c === '\\') { escaped = true; continue; }
       if (c === quote) quote = null;
       continue;
     }
