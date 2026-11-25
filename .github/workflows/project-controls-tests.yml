@@ -1,0 +1,36 @@
+name: Project Controls Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/project-controls.js'
+      - 'tests/project-controls.test.js'
+      - '.github/workflows/project-controls-tests.yml'
+  push:
+    branches:
+      - main
+      - 'pms-modernization/**'
+    paths:
+      - 'src/project-controls.js'
+      - 'tests/project-controls.test.js'
+      - '.github/workflows/project-controls-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-controls-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-calculations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run project-controls tests
+        run: node --test tests/project-controls.test.js
