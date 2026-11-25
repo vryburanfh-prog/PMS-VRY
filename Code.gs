@@ -908,6 +908,7 @@ function apiGetPortfolioControlsSummary(filters) {
   const issues = readScoped(DB_CONFIG.TABS.ISSUES, 'Issues', 'Project_ID', true);
   const milestones = readScoped(DB_CONFIG.TABS.MILESTONES, 'Milestones', 'Project_ID', true);
   const activities = readScoped(DB_CONFIG.TABS.ACTIVITIES, 'WBS_Schedule', 'Project_ID', true);
+  const baselines = readScoped(DB_CONFIG.TABS.BASELINES, 'WBS_Schedule', 'Project_ID', false);
   const financial = readScoped(DB_CONFIG.TABS.FINANCIAL, 'Financial_Monitoring', 'Project_ID', false);
   const byProject = function (rows, pid) {
     return rows ? rows.filter(function (row) { return String(row.Project_ID || '').trim() === pid; }) : null;
@@ -918,7 +919,10 @@ function apiGetPortfolioControlsSummary(filters) {
     const pIssues = byProject(issues, pid);
     const pMilestones = byProject(milestones, pid);
     const pActivities = byProject(activities, pid);
+    const pBaselines = byProject(baselines, pid);
     const pFinancial = byProject(financial, pid);
+    const baselineQuality = pActivities !== null && pBaselines !== null
+      ? buildAppsScriptBaselineSummary_(pActivities, pBaselines, pid) : null;
     const criticalRisks = pRisks ? pRisks.filter(function (row) {
       const status = String(row.Current_Status || row.Status || '').trim().toLowerCase();
       const rating = String(row.Risk_Rating || '').trim().toUpperCase();
@@ -950,6 +954,14 @@ function apiGetPortfolioControlsSummary(filters) {
       openIssues: openIssues,
       overdueMilestones: overdueMilestones,
       delayedActivities: delayedActivities,
+      baselineDriftActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.changedActivityCount : null,
+      unbaselinedActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.missingActivityCount : null,
+      snapshotOnlyActivities: baselineQuality && baselineQuality.available
+        ? baselineQuality.snapshotOnlyActivityCount : null,
+      baselineQualityAvailable: baselineQuality ? baselineQuality.available : null,
+      baselineQualityReason: baselineQuality && !baselineQuality.available ? baselineQuality.reason : null,
       overBudget: budget === null ? null : actual > budget,
       overCommitment: budget === null ? null : committed > budget,
       availability: {
@@ -975,6 +987,14 @@ function apiGetPortfolioControlsSummary(filters) {
     openIssues: total('openIssues'),
     overdueMilestones: total('overdueMilestones'),
     delayedActivities: total('delayedActivities'),
+    baselineDriftActivities: rows.some(function (row) { return row.baselineDriftActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.baselineDriftActivities; }, 0),
+    unbaselinedActivities: rows.some(function (row) { return row.unbaselinedActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.unbaselinedActivities; }, 0),
+    snapshotOnlyActivities: rows.some(function (row) { return row.snapshotOnlyActivities === null; })
+      ? null : rows.reduce(function (sum, row) { return sum + row.snapshotOnlyActivities; }, 0),
+    projectsWithBaselineDrift: rows.some(function (row) { return row.baselineQualityAvailable === null; })
+      ? null : rows.filter(function (row) { return row.baselineDriftActivities > 0 || row.unbaselinedActivities > 0 || row.snapshotOnlyActivities > 0; }).length,
     projectsOverBudget: rows.some(function (row) { return row.overBudget === null; }) ? null
       : rows.filter(function (row) { return row.overBudget === true; }).length,
     projectsOverCommitted: rows.some(function (row) { return row.overCommitment === null; }) ? null
