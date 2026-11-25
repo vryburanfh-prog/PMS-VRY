@@ -4124,7 +4124,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
     }
     Object.keys(record).forEach(function(k) {
       if (colIdx[k]) {
-        sheet.getRange(existingRowIndex, colIdx[k]).setValue(record[k]);
+        sheet.getRange(existingRowIndex, colIdx[k]).setValue(sanitizeSpreadsheetCellValue_(record[k]));
       }
     });
   } else {
@@ -4132,7 +4132,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
       var key = String(h).trim();
       return record[key] !== undefined ? record[key] : '';
     });
-    sheet.appendRow(newRowValues);
+    sheet.appendRow(newRowValues.map(sanitizeSpreadsheetCellValue_));
   }
 
   if (typeof writeAuditLog_ === 'function') {
@@ -4359,7 +4359,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    sheet.appendRow(rowValues);
+    sheet.appendRow(rowValues.map(sanitizeSpreadsheetCellValue_));
     if (typeof invalidateTableCache_ === 'function') invalidateTableCache_(resolvePhase19TabName_());
   } finally {
     lock.releaseLock();
@@ -5137,7 +5137,7 @@ function apiGenerateClientPresentation(config) {
     nowIso,
     nowIso,
     'PUBLISHED'
-    ]);
+    ].map(sanitizeSpreadsheetCellValue_));
   } finally {
     writeLock.releaseLock();
   }
