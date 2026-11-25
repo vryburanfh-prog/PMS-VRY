@@ -1438,6 +1438,9 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
  * Triggers the weighted progress roll-up engine for a project and logs it.
  */
 function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('WBS_Schedule', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -1452,8 +1455,11 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
   const summary = recalculateProjectProgressEngine_(pid);
   writeAuditLog_(ctx, 'RECALCULATE_PROGRESS', 'WBS_Schedule', pid, null, summary, 'Weighted progress roll-up executed');
 
-  return { success: true, summary: summary };
+  return { success: true, summary: summary };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /**
  * Quick-updates an activity's dates, progress, or critical flag directly from the Gantt chart,
