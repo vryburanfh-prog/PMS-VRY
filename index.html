@@ -2178,7 +2178,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       if (!data || data.success !== true) {
         status.textContent = 'Project controls indicators are currently unavailable.';
         grid.innerHTML = '';
-        if (projectRows) projectRows.innerHTML = '<tr><td colspan="7" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
+        if (projectRows) projectRows.innerHTML = '<tr><td colspan="8" class="py-3 text-center text-slate-400">Controls data unavailable.</td></tr>';
         return;
       }
       status.textContent = 'Read-only summary as of ' + (data.statusDate || 'the current reporting date') +
@@ -2213,7 +2213,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             '<td class="py-2 px-3">' + flag(project.overCommitment) + '</td>' +
             '<td class="py-2 px-3"><button type="button" onclick="openProjectControlsDrilldown_(' + safeJsArg_(project.projectId) + ')" class="text-indigo-600 hover:underline font-semibold">Details</button></td>' +
             '</tr>';
-        }).join('') : '<tr><td colspan="7" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
+        }).join('') : '<tr><td colspan="8" class="py-3 text-center text-slate-400">No accessible projects in this portfolio.</td></tr>';
       }
     }
 
