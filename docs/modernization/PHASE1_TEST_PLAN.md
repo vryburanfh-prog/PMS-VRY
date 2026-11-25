@@ -55,6 +55,27 @@ Database.gs contains generateNextId_(), which scans current records and returns 
 4. Add a concurrency test that launches simultaneous creates and asserts all IDs are unique and all expected rows exist.
 5. Avoid broad mechanical replacements; review each entity's prefix, padding, and legacy ID format.
 
+## 3A. ID-allocation call-site inventory (static scan)
+
+The following ID-generator call sites were identified in Code.gs on the main branch during the source scan. This list is an initial inventory; follow-up should verify each write path and include IDs allocated outside this helper.
+
+| API | ID prefix / entity |
+|---|---|
+| apiCreateUser | USR / User |
+| apiCreateProject | PRJ / Project; ASG / Project Assignment |
+| apiSaveMainWbs | MWBS / Main WBS |
+| apiSaveSubWbs | SWBS / Sub WBS |
+| apiSaveActivity | ACT / Activity; DEP / Dependency |
+| apiCreateProjectBaseline | BL / Baseline |
+| apiSaveProjectControlRecord | Registry-configured entity ID |
+| apiSaveProgressLog | LOG / Progress Update |
+| apiSaveWeeklyReport | WKR / Weekly Report |
+| apiSaveTeamWorkloadAssignment | WASG / Workload Assignment |
+| apiSaveProcurementItem | PRC / Procurement |
+| apiSaveFinancialItem | FIN / Financial |
+
+This is a static call-site inventory (14 occurrences, including APIs that allocate more than one ID), not a complete test or confirmed race reproduction. Prioritize concurrent creates for project, WBS, activities/dependencies, and module registry records; then verify all remaining API paths. The implementation should preserve each entity's prefix, padding, and existing legacy IDs.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
