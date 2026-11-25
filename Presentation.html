@@ -1884,7 +1884,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       document.getElementById('kpi-grid').innerHTML = cards.map(c => `
         <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200">
           <div class="text-[11px] font-semibold text-slate-400 uppercase">${escapeHtmlSafe_(c.label)}</div>
-          <div class="text-xl font-bold ${c.color} mt-1">${escapeHtmlSafe_(c.val)}</div>
+          <div class="text-xl font-bold ${escapeHtmlSafe_(c.color)} mt-1">${escapeHtmlSafe_(c.val)}</div>
         </div>
       `).join('');
     }
@@ -2544,7 +2544,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             </div>
           ` : `
             <div class="p-3 rounded bg-slate-50 border border-slate-200 text-slate-500">
-              View-only mode: your role does not have create/edit permissions for <strong>${st.key}</strong>.
+              View-only mode: your role does not have create/edit permissions for <strong>${escapeHtmlSafe_(st.key)}</strong>.
             </div>
           `}
 
@@ -2559,7 +2559,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
               </select>
             </div>
             <button onclick="openControlsRegistryModule(${escapeHtmlSafe_(safeJsArg_(st.key))})" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
-              ↻ Reload ${st.key}
+              ↻ Reload ${escapeHtmlSafe_(st.key)}
             </button>
           </div>
 
@@ -2610,7 +2610,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       const kpiEl = document.getElementById('reg-kpi-strip');
       if (kpiEl) {
         kpiEl.innerHTML = `
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${st.key}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(total)}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${escapeHtmlSafe_(st.key)}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(total)}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Active / Open</div><div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(openCount)}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Completed / Closed</div><div class="text-lg font-bold text-emerald-700 mt-0.5">${escapeHtmlSafe_(closedCount)}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">${escapeHtmlSafe_(alertLabel)}</div><div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(alertCount)}</div></div>
@@ -2802,7 +2802,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
 
     function deleteControlsRegistryRecord(recordId) {
       const st = APP_STATE.registryState;
-      if (!confirm(`Delete ${recordId} from ${st.key}? This action will be recorded in Audit_Logs.`)) return;
+      if (!confirm(`Delete ${recordId} from ${escapeHtmlSafe_(st.key)}? This action will be recorded in Audit_Logs.`)) return;
 
       google.script.run
         .withSuccessHandler(() => {
