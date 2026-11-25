@@ -39,3 +39,10 @@ test('direct append and cell-write APIs sanitize before writing', () => {
   assert.match(code, /appendRow\(rowValues\.map\(sanitizeSpreadsheetCellValue_\)\)/);
   assert.match(code, /appendRow\(\[([\s\S]*?)\]\.map\(sanitizeSpreadsheetCellValue_\)\)/);
 });
+
+test('database import sanitizes values and restores only actual formulas', () => {
+  assert.match(code, /function writeImportRowsPreservingFormulas_/);
+  assert.match(code, /sourceRange\.getFormulas\(\)/);
+  assert.match(code, /writeImportRowsPreservingFormulas_\(item\.dst, 2, item\.rows, item\.formulas, item\.cols\)/);
+  assert.match(code, /writeImportRowsPreservingFormulas_\(item\.dst, 2, restoreRows, restoreFormulas, item\.cols\)/);
+});
