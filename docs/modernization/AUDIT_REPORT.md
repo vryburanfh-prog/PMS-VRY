@@ -198,6 +198,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
 | #14 | Phase 18/19 mutation helper integrity | Open draft (stacked on #13) | Static helper callsite check; runtime concurrency/audit tests pending |
 | #15 | Locked client-presentation insert | Open draft | Static helper callsite check; runtime concurrent generation test pending |
+| #16 | Atomic password-login failure counting | Open draft | Static lock/read/write check; concurrent authentication test pending |
 
 
 
@@ -229,3 +230,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** `apiGenerateClientPresentation` appended published deck records directly with `appendRow`, without the shared Script Lock/primary-key duplicate check.
 **Remediation:** Draft PR #15 uses `insertRecord_` for the presentation row. Draft PR #6 adds `Client_Presentations: Deck_ID` to the primary-key map.
 **Status:** Source-level change; runtime concurrent deck-generation test pending.
+
+
+### S18 — P1 security/integrity investigation: password-login failure count can race
+**Evidence:** `apiLoginWithPassword` reads `Failed_Attempts` from cached/table records, increments the count in the request, then calls the locked update helper. The read and increment were outside the lock, so concurrent failures could overwrite one another's count and potentially delay the lockout threshold.
+**Remediation:** Draft PR #16 moves credential read, count increment, lockout decision, and write into `recordPasswordLoginFailure_` under Script Lock. Draft PR #7 includes a static regression check; test plan PR #2 adds AUTH-19/20/21.
+**Status:** Source-level change; concurrent authentication/runtime tests not run.
