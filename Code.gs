@@ -867,6 +867,71 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
 /**
  * Fetches Main WBS, Sub WBS, Activities, and Schedule Dependencies for a project.
  */
+
+/**
+ * Read-only project-controls data endpoint.
+ * Every dataset is independently permission-gated and project-scoped.
+ * A null dataset means the caller lacks module view permission; an empty
+ * array means the caller is authorized but no active records exist.
+ */
+function apiGetProjectControlsInputs(projectId) {
+  const pid = String(projectId || '').trim();
+  if (!pid) throw new Error('Project_ID is required.');
+  const ctx = assertPermission_('Projects', 'view', pid);
+  const project = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', pid);
+  if (!project || isTruthySheetFlag_(project.Is_Archived)) throw new Error('Project not found or archived.');
+
+  const canView = function (moduleName) {
+    if (ctx.isAdmin) return true;
+    const permissions = ctx.permissions || {};
+    return Boolean(permissions[moduleName] && permissions[moduleName].view === true);
+  };
+  const readRows = function (tabName, permitted, excludeArchived) {
+    if (!permitted) return null;
+    return (getTableRecords_(tabName) || []).filter(function (row) {
+      return String(row.Project_ID || '').trim() === pid &&
+        (!excludeArchived || !isTruthySheetFlag_(row.Is_Archived));
+    }).map(function (row) {
+      const clean = {};
+      Object.keys(row).forEach(function (key) {
+        if (key !== '_rowIndex') clean[key] = row[key];
+      });
+      return clean;
+    });
+  };
+
+  const scheduleAllowed = canView('WBS_Schedule');
+  const milestonesAllowed = canView('Milestones');
+  const risksAllowed = canView('Risks');
+  const issuesAllowed = canView('Issues');
+  const financeAllowed = canView('Financial_Monitoring');
+
+  return {
+    success: true,
+    project: {
+      Project_ID: project.Project_ID,
+      Project_Name: project.Project_Name || '',
+      Project_Status: project.Project_Status || '',
+      Project_Health: project.Project_Health || ''
+    },
+    statusDate: Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd'),
+    access: {
+      schedule: scheduleAllowed,
+      milestones: milestonesAllowed,
+      risks: risksAllowed,
+      issues: issuesAllowed,
+      financialMonitoring: financeAllowed
+    },
+    activities: readRows(DB_CONFIG.TABS.ACTIVITIES, scheduleAllowed, true),
+    dependencies: readRows(DB_CONFIG.TABS.DEPENDENCIES, scheduleAllowed, false),
+    baselines: readRows(DB_CONFIG.TABS.BASELINES, scheduleAllowed, false),
+    milestones: readRows(DB_CONFIG.TABS.MILESTONES, milestonesAllowed, true),
+    risks: readRows(DB_CONFIG.TABS.RISKS, risksAllowed, true),
+    issues: readRows(DB_CONFIG.TABS.ISSUES, issuesAllowed, true),
+    financialItems: readRows(DB_CONFIG.TABS.FINANCIAL, financeAllowed, false)
+  };
+}
+
 function apiGetProjectWbsAndSchedule(projectId) {
   const ctx = assertPermission_('WBS_Schedule', 'view', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
