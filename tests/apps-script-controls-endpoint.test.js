@@ -169,10 +169,13 @@ test('project-controls endpoint denies inaccessible projects before reading data
 test('portfolio dashboard renders and refreshes the project-controls watchlist', () => {
   assert.match(indexSource, /id="project-controls-kpi-grid"/);
   assert.match(indexSource, /id="project-controls-project-rows"/);
+  assert.match(indexSource, /<th class="py-2 px-3">Baseline Drift<\/th>/);
+  assert.match(indexSource, /project\.baselineDriftActivities/);
+  assert.match(indexSource, /project\.unbaselinedActivities/);
   assert.match(indexSource, /Array\.isArray\(data\.projects\)/);
   assert.match(indexSource, /function renderProjectControlsKPIs\(data\)/);
   assert.match(indexSource, /\.apiGetPortfolioControlsSummary\(\{ includeArchived: includeArchived \}\)/);
-  for (const label of ['High / Critical Risks', 'Open Issues', 'Overdue Milestones', 'Delayed Activities', 'Projects Over Budget', 'Projects Over-committed']) {
+  for (const label of ['High / Critical Risks', 'Open Issues', 'Overdue Milestones', 'Delayed Activities', 'Baseline-drifted Projects', 'Activities with Baseline Date Changes', 'Active Activities Missing from Baseline', 'Projects Over Budget', 'Projects Over-committed']) {
     assert.ok(indexSource.includes(label), 'missing watchlist KPI: ' + label);
   }
 });
