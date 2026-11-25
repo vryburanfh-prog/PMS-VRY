@@ -83,3 +83,16 @@ test('portfolio dashboard renders and refreshes the project-controls watchlist',
     assert.ok(indexSource.includes(label), 'missing watchlist KPI: ' + label);
   }
 });
+
+
+test('legacy portfolio KPI response hides module metrics without view permission', () => {
+  assert.match(source, /const canViewMilestones = Boolean\(ctx\.isAdmin \|\|/);
+  assert.match(source, /const canViewRisks = Boolean\(ctx\.isAdmin \|\|/);
+  assert.match(source, /const canViewIssues = Boolean\(ctx\.isAdmin \|\|/);
+  assert.match(source, /delayedMilestones: canViewMilestones \? delayedMilestones : null/);
+  assert.match(source, /criticalRisks: canViewRisks \? criticalRisks : null/);
+  assert.match(source, /openIssues: canViewIssues \? openIssues : null/);
+  assert.match(indexSource, /k\.criticalRisks == null \? '—'/);
+  assert.match(indexSource, /k\.openIssues == null \? '—'/);
+});
+
