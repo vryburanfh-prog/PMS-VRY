@@ -190,6 +190,16 @@ Draft PR #14 refactors Phase 18/19 direct mutations to the shared insert/update 
 
 Draft PR #15 routes new presentation records through `insertRecord_`; PR #6 adds `Client_Presentations` primary-key mapping. The share-token endpoint and data-minimization fixes are separately tracked in PR #4.
 
+## 3.14 Password login rate-limit concurrency regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| AUTH-19 | Concurrent failed password attempts against one credential | Failed-attempt counter increments atomically; concurrent failures cannot overwrite each other's count; lockout threshold is enforced | Not run |
+| AUTH-20 | Fifth failed attempt and subsequent attempts within lockout window | Credential is locked for 15 minutes; attempts are not accepted until lockout expires | Not run |
+| AUTH-21 | Valid password login following failures (after lockout policy permits) | Failure counter and lockout reset; login audit/session behavior remains correct | Not run |
+
+Draft PR #16 moves the failed-login counter read/modify/write into a Script-Lock-protected helper. Runtime concurrent authentication tests are pending.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
