@@ -4,7 +4,7 @@
 Modernize the existing Google Apps Script + Google Sheets PMS-VRY in five phases while preserving current functionality. Work is performed on feature branches, validated, and proposed through pull requests. No changes are applied to production/main without review and approval. Do not migrate platform or rewrite the UI until reliability/security and performance evidence justifies it.
 
 ## Phase 1 — Stabilization, audit, security, data integrity
-**Status:** Audit started; remediation pending.
+**Status:** Static audit and targeted remediation substantially progressed; completion remains gated by GitHub Actions runner availability, staging integration tests, backup/restore validation, and deployment review. See Phase 1 audit and runbooks.
 - Complete source audit: Security.gs, Database.gs, Code.gs, index.html, Presentation.html and module/API cross-check.
 - Security: token/session lifecycle, Google ID-token validation, authorization coverage, least privilege, admin allowlist, credential storage, login rate limiting, direct API protection, public deck token access.
 - Data integrity: ID generation concurrency, uniqueness, foreign-key/project ownership, update field allowlists, deletion and audit snapshots, validation/normalization, formula preservation.
