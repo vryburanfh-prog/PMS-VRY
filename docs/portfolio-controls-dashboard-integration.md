@@ -64,3 +64,20 @@ The Node adapter now includes `buildPmsProjectControlsReportFromApi(apiData)`, w
 ## Validation boundary
 
 Static CI checks compile the Apps Script endpoint function and assert its permission gates, project scoping, metadata redaction, and read-only behavior. These checks do not replace deployment-time testing in the Google Apps Script runtime. The endpoint remains on this GitHub branch only; it has not been deployed to the live Apps Script project.
+
+
+## Portfolio dashboard watchlist
+
+The branch also adds `apiGetPortfolioControlsSummary(filters)`, used by the existing portfolio page in `index.html`. It derives its project set by calling the existing `apiGetPortfolioData(filters)`, so the portfolio's current role and project-assignment scope remains the source of truth.
+
+The endpoint returns aggregate-only indicators (not source risk, issue, schedule, or financial records):
+- Open high/critical risks
+- Open issues
+- Overdue milestones
+- Forecast-late activities
+- Projects over budget
+- Projects over committed budget
+
+Each metric is independently gated by its module view permission. A metric is `null` when the user lacks access or there are no source rows from which to assess it; zero is reserved for an available metric with no matching exceptions. The portfolio page displays unavailable metrics as an em dash. The watchlist is read-only and refreshes with the existing portfolio refresh action.
+
+The portfolio endpoint uses the PMS risk score bands: scores 10–14 are High and 15+ are Critical. This is aligned with `computeRiskRatingLabel_` and the risk registry's stored rating labels.
