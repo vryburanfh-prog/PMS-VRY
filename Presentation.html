@@ -758,9 +758,9 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
         <div class="space-y-5 text-xs">
           <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Overall Project Progress</div><div class="text-2xl font-bold text-indigo-700">${Number(p.Overall_Actual_Progress || 0).toFixed(1)}%</div><div class="text-slate-400">Planned ${Number(p.Overall_Planned_Progress || 0).toFixed(1)}%</div></div>
-            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Pending Deliverables</div><div class="text-2xl font-bold">${data.deliverables.pending}</div><div class="text-slate-400">${data.deliverables.total} total · ${escapeHtmlSafe_(Object.entries(data.deliverables.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No pending status')}</div></div>
-            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Open Risks</div><div class="text-2xl font-bold">${data.risks.open}</div><div class="text-slate-400">${escapeHtmlSafe_(Object.entries(data.risks.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open risks')}</div></div>
-            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Open Issues</div><div class="text-2xl font-bold">${data.issues.open}</div><div class="text-slate-400">${escapeHtmlSafe_(Object.entries(data.issues.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open issues')}</div></div>
+            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Pending Deliverables</div><div class="text-2xl font-bold">${escapeHtmlSafe_(data.deliverables.pending)}</div><div class="text-slate-400">${escapeHtmlSafe_(data.deliverables.total)} total · ${escapeHtmlSafe_(Object.entries(data.deliverables.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No pending status')}</div></div>
+            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Open Risks</div><div class="text-2xl font-bold">${escapeHtmlSafe_(data.risks.open)}</div><div class="text-slate-400">${escapeHtmlSafe_(Object.entries(data.risks.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open risks')}</div></div>
+            <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Open Issues</div><div class="text-2xl font-bold">${escapeHtmlSafe_(data.issues.open)}</div><div class="text-slate-400">${escapeHtmlSafe_(Object.entries(data.issues.statuses || {}).map(([k,v]) => k + ': ' + v).join(', ') || 'No open issues')}</div></div>
             <div class="p-3 rounded border bg-slate-50"><div class="text-slate-500">Project Status</div><div class="text-lg font-bold">${escapeHtmlSafe_(p.Project_Status || '—')}</div><div class="text-slate-400">${escapeHtmlSafe_(p.Project_Health || '')}</div></div>
           </div>
           <div class="grid grid-cols-1 xl:grid-cols-10 gap-4 items-start">
@@ -1170,10 +1170,10 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                   <td class="py-1.5 px-3 pl-14 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td>
-                  <td class="py-1.5 px-3">${a.Activity_Weight || 0}</td>
+                  <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Weight || 0)}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td>
-                  <td class="py-1.5 px-3">${a.Baseline_Duration || 0}</td>
-                  <td class="py-1.5 px-3 ${Number(a.Schedule_Variance_Days) > 0 ? 'text-rose-600 font-semibold' : ''}">${a.Schedule_Variance_Days || 0}d</td>
+                  <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Duration || 0)}</td>
+                  <td class="py-1.5 px-3 ${Number(a.Schedule_Variance_Days) > 0 ? 'text-rose-600 font-semibold' : ''}">${escapeHtmlSafe_(a.Schedule_Variance_Days || 0)}d</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td>
                   <td class="py-1.5 px-3 text-right whitespace-nowrap">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Edit</button>` : '<span class="text-slate-400">View only</span>'}</td>
                 </tr>
@@ -1183,7 +1183,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           const directMainActs = activities.filter(a => String(a.Main_WBS_ID) === String(m.Main_WBS_ID) && !a.Sub_WBS_ID);
           directMainActs.forEach(a => {
             const critBadge = String(a.Is_Critical).toUpperCase() === 'TRUE' ? '<span class="ml-1 px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">CP</span>' : '';
-            html += `<tr class="bg-slate-50/50"><td class="py-1.5 px-3 pl-8 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td><td class="py-1.5 px-3">${a.Activity_Weight || 0}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td><td class="py-1.5 px-3">${a.Baseline_Duration || 0}</td><td class="py-1.5 px-3">${a.Schedule_Variance_Days || 0}d</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td><td class="py-1.5 px-3 text-right">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border">Edit</button>` : 'View only'}</td></tr>`;
+            html += `<tr class="bg-slate-50/50"><td class="py-1.5 px-3 pl-8 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Weight || 0)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Duration || 0)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Schedule_Variance_Days || 0)}d</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td><td class="py-1.5 px-3 text-right">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border">Edit</button>` : 'View only'}</td></tr>`;
           });
         }
       });
@@ -1614,7 +1614,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       tbody.innerHTML = baselines.map(b => `
         <tr>
           <td class="py-1.5 px-3 font-mono">${escapeHtmlSafe_(b.Baseline_ID)}</td>
-          <td class="py-1.5 px-3 font-bold">Rev ${b.Revision_Number}</td>
+          <td class="py-1.5 px-3 font-bold">Rev ${escapeHtmlSafe_(b.Revision_Number)}</td>
           <td class="py-1.5 px-3 font-medium">${escapeHtmlSafe_(b.Baseline_Name)}</td>
           <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_By || '-')}</td>
           <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_Date || '-')}</td>
@@ -1745,7 +1745,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
         const offsetDays = Math.round((cursor - minDate) / (1000 * 60 * 60 * 24));
         const leftPx = Math.round(offsetDays * pxPerDay);
         const label = cursor.toISOString().slice(0, 10);
-        ticks.push(`<div class="absolute top-0 bottom-0 border-l border-slate-200 text-[10px] text-slate-500 pl-1 pt-1 select-none" style="left:${leftPx}px;">${label}</div>`);
+        ticks.push(`<div class="absolute top-0 bottom-0 border-l border-slate-200 text-[10px] text-slate-500 pl-1 pt-1 select-none" style="left:${leftPx}px;">${escapeHtmlSafe_(label)}</div>`);
         cursor.setDate(cursor.getDate() + stepDays);
       }
 
@@ -1884,7 +1884,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       document.getElementById('kpi-grid').innerHTML = cards.map(c => `
         <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200">
           <div class="text-[11px] font-semibold text-slate-400 uppercase">${escapeHtmlSafe_(c.label)}</div>
-          <div class="text-xl font-bold ${c.color} mt-1">${c.val}</div>
+          <div class="text-xl font-bold ${c.color} mt-1">${escapeHtmlSafe_(c.val)}</div>
         </div>
       `).join('');
     }
@@ -2213,7 +2213,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             const p = res.context.permissions[mod];
             return `
               <tr>
-                <td class="py-2 px-3 font-medium">${mod}</td>
+                <td class="py-2 px-3 font-medium">${escapeHtmlSafe_(mod)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.view)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.create)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.edit)}</td>
@@ -2454,7 +2454,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
 
     function openControlsRegistryModule(registryKey) {
       const container = document.getElementById('ws-tab-content');
-      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${registryKey} registry from Google Sheets...</div>`;
+      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${escapeHtmlSafe_(registryKey)} registry from Google Sheets...</div>`;
 
       google.script.run
         .withSuccessHandler(res => {
@@ -2471,7 +2471,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           renderControlsRegistryTable();
         })
         .withFailureHandler(err => {
-          container.innerHTML = `<div class="p-4 rounded bg-red-50 border border-red-200 text-red-700 text-xs">Error loading ${registryKey}: ${escapeHtmlSafe_(err.message)}</div>`;
+          container.innerHTML = `<div class="p-4 rounded bg-red-50 border border-red-200 text-red-700 text-xs">Error loading ${escapeHtmlSafe_(registryKey)}: ${escapeHtmlSafe_(err.message)}</div>`;
         })
         .apiGetProjectControlRegistry(APP_STATE.selectedProjectId, registryKey);
     }
@@ -2558,7 +2558,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                 ${statusFilterOpts}
               </select>
             </div>
-            <button onclick="openControlsRegistryModule('${st.key}')" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
+            <button onclick="openControlsRegistryModule(${escapeHtmlSafe_(safeJsArg_(st.key))})" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
               ↻ Reload ${st.key}
             </button>
           </div>
@@ -2610,10 +2610,10 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       const kpiEl = document.getElementById('reg-kpi-strip');
       if (kpiEl) {
         kpiEl.innerHTML = `
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${st.key}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${total}</div></div>
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Active / Open</div><div class="text-lg font-bold text-indigo-700 mt-0.5">${openCount}</div></div>
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Completed / Closed</div><div class="text-lg font-bold text-emerald-700 mt-0.5">${closedCount}</div></div>
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">${escapeHtmlSafe_(alertLabel)}</div><div class="text-lg font-bold text-rose-700 mt-0.5">${alertCount}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${st.key}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(total)}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Active / Open</div><div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(openCount)}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Completed / Closed</div><div class="text-lg font-bold text-emerald-700 mt-0.5">${escapeHtmlSafe_(closedCount)}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">${escapeHtmlSafe_(alertLabel)}</div><div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(alertCount)}</div></div>
         `;
       }
 
@@ -2878,15 +2878,15 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Project Planned / Actual</div>
-              <div class="text-lg font-bold text-slate-900 mt-0.5">${projPlanned}% <span class="text-xs font-normal text-slate-400">/</span> <span class="text-indigo-700">${projActual}%</span></div>
+              <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(projPlanned)}% <span class="text-xs font-normal text-slate-400">/</span> <span class="text-indigo-700">${escapeHtmlSafe_(projActual)}%</span></div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Daily Progress Logs</div>
-              <div class="text-lg font-bold text-slate-900 mt-0.5">${st.logs.length} <span class="text-xs font-normal text-emerald-700">(${approvedLogs} approved)</span></div>
+              <div class="text-lg font-bold text-slate-900 mt-0.5">${st.logs.length} <span class="text-xs font-normal text-emerald-700">(${escapeHtmlSafe_(approvedLogs)} approved)</span></div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Pending Log Approvals</div>
-              <div class="text-lg font-bold text-amber-700 mt-0.5">${pendingLogs}</div>
+              <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(pendingLogs)}</div>
             </div>
           </div>
 
@@ -3141,8 +3141,8 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(l.Log_ID)}</td>
             <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(l.Log_Date || '-')}</td>
             <td class="py-2 px-3 font-mono text-[11px]">${escapeHtmlSafe_(scopeLabel)}</td>
-            <td class="py-2 px-3">${l.Quantity_Accomplished || 0}</td>
-            <td class="py-2 px-3 font-bold text-indigo-700">${l.Reported_Progress_Pct || 0}%</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
+            <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(l.Submitted_By || '-')}</td>
             <td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-semibold ${badgeCls}">${escapeHtmlSafe_(status)}</span></td>
             <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(l.Notes || '')}">${escapeHtmlSafe_(l.Notes || '-')}</td>
@@ -3494,8 +3494,8 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                   <td>${escapeHtmlSafe_(l.Log_Date || '')}</td>
                   <td>${escapeHtmlSafe_(l.Activity_ID || '')}</td>
                   <td>${escapeHtmlSafe_([l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(' / '))}</td>
-                  <td>${l.Quantity_Accomplished || 0}</td>
-                  <td>${l.Reported_Progress_Pct || 0}%</td>
+                  <td>${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
+                  <td>${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
                   <td>${escapeHtmlSafe_(l.Submitted_By || '')}</td>
                   <td>${escapeHtmlSafe_(l.Approval_Status || '')}</td>
                   <td>${escapeHtmlSafe_(l.Notes || '')}</td>
@@ -3618,15 +3618,15 @@ button, input, select, textarea { min-height: 2.25rem; }
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Unique Team Members</div>
-              <div class="text-lg font-bold text-indigo-700 mt-0.5">${uniquePeopleCount}</div>
+              <div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(uniquePeopleCount)}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Avg Active Utilization</div>
-              <div class="text-lg font-bold text-slate-900 mt-0.5">${avgUtil}%</div>
+              <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(avgUtil)}%</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Over-Allocated (&gt;100%)</div>
-              <div class="text-lg font-bold ${overallocatedCount > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${overallocatedCount}</div>
+              <div class="text-lg font-bold ${overallocatedCount > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${escapeHtmlSafe_(overallocatedCount)}</div>
             </div>
           </div>
 
@@ -3713,7 +3713,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <!-- Table 1: Assignments on Current Project -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <h3 class="font-bold text-slate-900">Assignments in Active Project (${st.projectId})</h3>
+              <h3 class="font-bold text-slate-900">Assignments in Active Project (${escapeHtmlSafe_(st.projectId)})</h3>
               <button onclick="openTeamWorkloadModule()" class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-medium">
                 ↻ Refresh Utilization
               </button>
@@ -3838,7 +3838,7 @@ button, input, select, textarea { min-height: 2.25rem; }
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(r.employeeName)} <span class="text-[10px] font-mono text-slate-400">${r.employeeId !== '-' ? '(' + escapeHtmlSafe_(r.employeeId) + ')' : ''}</span></td>
             <td class="py-2 px-3">${escapeHtmlSafe_([r.position, r.department].filter(Boolean).join(' • ') || '-')}</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(r.activeProjectsSummary || 'None active')}</td>
-            <td class="py-2 px-3 font-bold ${pct > 100 ? 'text-rose-700' : 'text-slate-900'}">${pct}%</td>
+            <td class="py-2 px-3 font-bold ${pct > 100 ? 'text-rose-700' : 'text-slate-900'}">${escapeHtmlSafe_(pct)}%</td>
             <td class="py-2 px-3">${statusBadge}</td>
           </tr>
         `;
@@ -3996,7 +3996,7 @@ button, input, select, textarea { min-height: 2.25rem; }
               <div class="text-base font-bold text-indigo-700 mt-0.5">${formatCurrencyNum(sum.totalCommitted)}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
-              <div class="text-[11px] text-slate-400 uppercase font-semibold">Actual Spend (${sum.overallBurnPct || 0}%)</div>
+              <div class="text-[11px] text-slate-400 uppercase font-semibold">Actual Spend (${escapeHtmlSafe_(sum.overallBurnPct || 0)}%)</div>
               <div class="text-base font-bold text-slate-900 mt-0.5">${formatCurrencyNum(sum.totalActual)}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
@@ -4005,13 +4005,13 @@ button, input, select, textarea { min-height: 2.25rem; }
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Procurement / Open</div>
-              <div class="text-base font-bold text-slate-900 mt-0.5">${sum.procurementCount || 0} <span class="text-xs font-medium text-amber-700">(${sum.openShipmentsCount || 0} open)</span></div>
+              <div class="text-base font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(sum.procurementCount || 0)} <span class="text-xs font-medium text-amber-700">(${escapeHtmlSafe_(sum.openShipmentsCount || 0)} open)</span></div>
             </div>
           </div>
 
           <div class="flex items-center justify-between border-b border-slate-200 pb-2">
             <h3 class="text-sm font-bold text-slate-900">${escapeHtmlSafe_(sectionTitle)}</h3>
-            <button onclick="openProcurementAndFinancialsModule('${activeSub}')"
+            <button onclick="openProcurementAndFinancialsModule(${escapeHtmlSafe_(safeJsArg_(activeSub))})"
               class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-medium">
               ↻ Refresh
             </button>
@@ -4527,7 +4527,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         body.innerHTML = `
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h3 class="font-bold text-slate-900">Recent Governance &amp; Change Audit Logs (${logs.length})</h3>
+              <h3 class="font-bold text-slate-900">Recent Governance &amp; Change Audit Logs (${escapeHtmlSafe_(logs.length)})</h3>
               <span class="text-[11px] text-slate-500">Newest events first</span>
             </div>
             <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -4579,7 +4579,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Accessible Projects</div>
-              <div class="text-lg font-bold text-slate-900 mt-0.5">${sum.visibleProjectsCount || 0}</div>
+              <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(sum.visibleProjectsCount || 0)}</div>
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Portfolio Budget</div>
@@ -4594,7 +4594,7 @@ button, input, select, textarea { min-height: 2.25rem; }
             </div>
             <div class="p-3 bg-slate-50 rounded border border-slate-200">
               <div class="text-[11px] text-slate-400 uppercase font-semibold">Over-Allocated Staff</div>
-              <div class="text-lg font-bold ${(sum.overallocatedCount || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${sum.overallocatedCount || 0}</div>
+              <div class="text-lg font-bold ${(sum.overallocatedCount || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${escapeHtmlSafe_(sum.overallocatedCount || 0)}</div>
             </div>
           </div>
 
@@ -4815,7 +4815,7 @@ function safeDeckShareUrl_(value) {
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Role Permissions Matrix (${roleRows.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Role Permissions Matrix (${escapeHtmlSafe_(roleRows.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -4837,7 +4837,7 @@ function safeDeckShareUrl_(value) {
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">User Access &amp; Project Scopes (${userRows.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">User Access &amp; Project Scopes (${escapeHtmlSafe_(userRows.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -5057,11 +5057,11 @@ function safeDeckShareUrl_(value) {
           <div class="flex flex-wrap items-end gap-3">
             <div>
               <label class="block text-[10px] font-semibold text-slate-600 mb-1">Max Allocation Cap (%)</label>
-              <input type="number" id="alert-max-alloc" min="1" max="300" value="${st.maxAllocPct}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
+              <input type="number" id="alert-max-alloc" min="1" max="300" value="${escapeHtmlSafe_(st.maxAllocPct)}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
             </div>
             <div>
               <label class="block text-[10px] font-semibold text-slate-600 mb-1">Budget Burn Warning (%)</label>
-              <input type="number" id="alert-burn-pct" min="1" max="200" value="${st.budgetWarnPct}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
+              <input type="number" id="alert-burn-pct" min="1" max="200" value="${escapeHtmlSafe_(st.budgetWarnPct)}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
             </div>
             <label class="inline-flex items-center gap-1.5 pb-1 text-slate-700 cursor-pointer">
               <input type="checkbox" id="alert-only-active" ${st.onlyActiveProject ? 'checked' : ''} ${!activePid ? 'disabled' : ''}>
@@ -5081,19 +5081,19 @@ function safeDeckShareUrl_(value) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">High Severity</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${counts.high || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(counts.high || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Budget Burn Warnings</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${counts.medium || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(counts.medium || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Procurement</div>
-            <div class="text-lg font-bold text-indigo-700 mt-0.5">${counts.openProcurement || 0}</div>
+            <div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(counts.openProcurement || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Displayed Alerts</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${items.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(items.length)}</div>
           </div>
         </div>
 
@@ -5230,7 +5230,7 @@ function safeDeckShareUrl_(value) {
           <div class="flex flex-wrap items-end gap-3">
             <div>
               <label class="block text-[10px] font-semibold text-slate-600 mb-1">Lookahead Window (Days)</label>
-              <input type="number" id="sched-lookahead-days" min="1" max="90" value="${st.lookaheadDays}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
+              <input type="number" id="sched-lookahead-days" min="1" max="90" value="${escapeHtmlSafe_(st.lookaheadDays)}" class="w-24 border border-slate-300 rounded px-2 py-1 bg-white">
             </div>
             <label class="inline-flex items-center gap-1.5 pb-1 text-slate-700 cursor-pointer">
               <input type="checkbox" id="sched-only-active" ${st.onlyActiveProject ? 'checked' : ''} ${!activePid ? 'disabled' : ''}>
@@ -5250,15 +5250,15 @@ function safeDeckShareUrl_(value) {
         <div class="grid grid-cols-3 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${overdueFiltered}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(overdueFiltered)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
-            <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Within ${st.lookaheadDays}d</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${dueSoonFiltered}</div>
+            <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Within ${escapeHtmlSafe_(st.lookaheadDays)}d</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(dueSoonFiltered)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Flagged</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${filtered.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(filtered.length)}</div>
           </div>
         </div>
 
@@ -5389,19 +5389,19 @@ function safeDeckShareUrl_(value) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Projects</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${c.projects || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(c.projects || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">High Alerts</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.highAlerts || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.highAlerts || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue Items</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.overdue || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.overdue || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Soon</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${c.dueSoon || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(c.dueSoon || 0)}</div>
           </div>
         </div>
 
@@ -5595,7 +5595,7 @@ function safeDeckShareUrl_(value) {
         ${adminFormHtml}
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Recent Digest Dispatch History (${history.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Recent Digest Dispatch History (${escapeHtmlSafe_(history.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -5732,19 +5732,19 @@ function safeDeckShareUrl_(value) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Escalations</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${c.open || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(c.open || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Critical / High Open</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${c.criticalOrHigh || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(c.criticalOrHigh || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Logged</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${c.total || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(c.total || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Live Exceptions</div>
-            <div class="text-lg font-bold text-indigo-700 mt-0.5">${c.suggested || 0}</div>
+            <div class="text-lg font-bold text-indigo-700 mt-0.5">${escapeHtmlSafe_(c.suggested || 0)}</div>
           </div>
         </div>
 
@@ -5833,7 +5833,7 @@ function safeDeckShareUrl_(value) {
         ` : ''}
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Escalation Register (${list.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Escalation Register (${escapeHtmlSafe_(list.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -6093,15 +6093,15 @@ function safeDeckShareUrl_(value) {
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Open Escalations</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${cur.openEscalations || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(cur.openEscalations || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue Items</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${cur.overdueItems || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(cur.overdueItems || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Saved Snapshots</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${snaps.length}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(snaps.length)}</div>
           </div>
         </div>
 
@@ -6138,7 +6138,7 @@ function safeDeckShareUrl_(value) {
         </div>
 
         <div>
-          <h3 class="font-bold text-slate-900 mb-2">Archived Snapshots (${snaps.length})</h3>
+          <h3 class="font-bold text-slate-900 mb-2">Archived Snapshots (${escapeHtmlSafe_(snaps.length)})</h3>
           <div class="overflow-x-auto border border-slate-200 rounded-lg">
             <table class="w-full text-left border-collapse">
               <thead>
@@ -6314,19 +6314,19 @@ function safeDeckShareUrl_(value) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Tracked Items</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${counts.total || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(counts.total || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Overdue</div>
-            <div class="text-lg font-bold text-rose-700 mt-0.5">${counts.overdue || 0}</div>
+            <div class="text-lg font-bold text-rose-700 mt-0.5">${escapeHtmlSafe_(counts.overdue || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Due Soon</div>
-            <div class="text-lg font-bold text-amber-700 mt-0.5">${counts.dueSoon || 0}</div>
+            <div class="text-lg font-bold text-amber-700 mt-0.5">${escapeHtmlSafe_(counts.dueSoon || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Completed / Closed</div>
-            <div class="text-lg font-bold text-emerald-700 mt-0.5">${counts.done || 0}</div>
+            <div class="text-lg font-bold text-emerald-700 mt-0.5">${escapeHtmlSafe_(counts.done || 0)}</div>
           </div>
         </div>
 
@@ -6548,15 +6548,15 @@ function safeDeckShareUrl_(value) {
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Total Workbook Tabs</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${res.totalSheetsInWorkbook || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(res.totalSheetsInWorkbook || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Missing Critical Tabs</div>
-            <div class="text-lg font-bold ${(res.missingCriticalTabs || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${res.missingCriticalTabs || 0}</div>
+            <div class="text-lg font-bold ${(res.missingCriticalTabs || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'} mt-0.5">${escapeHtmlSafe_(res.missingCriticalTabs || 0)}</div>
           </div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200">
             <div class="text-[10px] text-slate-400 uppercase font-semibold">Active Triggers</div>
-            <div class="text-lg font-bold text-slate-900 mt-0.5">${res.activeProjectTriggers || 0}</div>
+            <div class="text-lg font-bold text-slate-900 mt-0.5">${escapeHtmlSafe_(res.activeProjectTriggers || 0)}</div>
           </div>
         </div>
 
