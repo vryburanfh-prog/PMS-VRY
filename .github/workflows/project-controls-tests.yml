@@ -6,9 +6,11 @@ on:
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
-      - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-project-controls.test.js tests/pms-portfolio-dashboard.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-controls-tests.yml'
   push:
     branches:
@@ -18,9 +20,11 @@ on:
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
       - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-controls-tests.yml'
 
 permissions:
