@@ -239,6 +239,18 @@ function buildPmsProjectControlsReportFromApi(apiData) {
     issues: Boolean(apiData.access.issues),
     financialMonitoring: Boolean(apiData.access.financialMonitoring)
   };
+  const unavailableWarnings = [];
+  if (!report.availability.schedule) unavailableWarnings.push(
+    'No active schedule activities are available',
+    'No approved Project_Baselines snapshot was found',
+    'Some active activities are absent from the latest approved baseline snapshot'
+  );
+  if (!report.availability.financialMonitoring) unavailableWarnings.push('No Financial_Monitoring rows are available');
+  if (!report.availability.risks) unavailableWarnings.push(' open high/critical risks require management attention');
+  if (!report.availability.issues) unavailableWarnings.push(' open issues remain unresolved');
+  if (!report.availability.milestones) unavailableWarnings.push(' milestones are overdue at the report status date');
+  report.warnings = report.warnings.filter(message =>
+    !unavailableWarnings.some(unavailable => message === unavailable || message.endsWith(unavailable)));
   if (!report.availability.milestones) {
     report.milestones = null;
     report.scheduleAlerts.overdueMilestoneCount = null;
