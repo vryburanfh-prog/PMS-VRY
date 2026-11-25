@@ -7,7 +7,7 @@ Scope: Security.gs, Database.gs, Code.gs, index.html, Presentation.html, module/
 ## Current evidence
 
 - 65 top-level api endpoints in Code.gs. All private API names are present in the dispatcher allowlist and contain an authorization/authentication guard in the static coverage test. The token-published client deck endpoint is separately classified as public and token-gated.
-- Server and inline Presentation JavaScript parse successfully.
+- Server, Presentation inline script, and index inline script (after Apps Script template directives are substituted) parse successfully.
 - UI and server registry field allowlists match across all seven registry modules.
 - Local mock harness executed the regression suite: 21/21 tests passed. This is not a substitute for GitHub Actions, Apps Script runtime tests, or browser/staging tests.
 - GitHub Actions runner allocation is blocked before job steps. Tests are not yet executed on GitHub runners.
