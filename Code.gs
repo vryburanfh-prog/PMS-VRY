@@ -4665,6 +4665,8 @@ function ensureClientPresentationsSheet_() {
   let sh = ss.getSheetByName(CLIENT_DECKS_SHEET_);
   if (!sh) {
     sh = ss.insertSheet(CLIENT_DECKS_SHEET_);
+  }
+  if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, CLIENT_DECKS_HEADERS_.length).setValues([CLIENT_DECKS_HEADERS_]);
     sh.setFrozenRows(1);
   }
