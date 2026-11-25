@@ -167,7 +167,8 @@ function sanitizeSpreadsheetCellValue_(value) {
   if (typeof value !== 'string') return value;
   const trimmed = value.replace(/^\s+/, '');
   const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(trimmed);
-  const formulaLike = /^[=+@]/.test(trimmed) || (trimmed.charAt(0) === '-' && !numeric);
+  const first = trimmed.charAt(0);
+  const formulaLike = first === '=' || first === '@' || ((first === '+' || first === '-') && !numeric);
   return formulaLike ? "'" + value : value;
 }
 
