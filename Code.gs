@@ -1003,7 +1003,7 @@ function buildAppsScriptCpmSummary_(activities, dependencies, projectId) {
     const id = String(row.Activity_ID || '').trim();
     const duration = Number(row.Baseline_Duration);
     if (!id || byId[id]) throw new Error('CPM unavailable: missing or duplicate Activity_ID');
-    if (!Number.isFinite(duration) || duration < 0) throw new Error('CPM unavailable: invalid Baseline_Duration for ' + id);
+    if (String(row.Baseline_Duration == null ? '' : row.Baseline_Duration).trim() === '' || !Number.isFinite(duration) || duration < 0) throw new Error('CPM unavailable: invalid Baseline_Duration for ' + id);
     byId[id] = { id: id, duration: duration, row: row };
     indegree[id] = 0;
     successors[id] = [];
@@ -1021,8 +1021,7 @@ function buildAppsScriptCpmSummary_(activities, dependencies, projectId) {
   };
   const activeLinks = (dependencies || []).filter(function (row) {
     return String(row.Project_ID || '').trim() === String(projectId) &&
-      String(row.Is_Active == null ? 'true' : row.Is_Active).trim().toLowerCase() !== 'false' &&
-      String(row.Is_Active == null ? 'true' : row.Is_Active).trim() !== '0';
+      !['false', '0', 'no', 'inactive'].includes(String(row.Is_Active == null ? 'true' : row.Is_Active).trim().toLowerCase());
   });
   const represented = {};
   activeLinks.forEach(function (row) {
