@@ -4874,21 +4874,21 @@ function apiGenerateClientPresentation(config) {
     slides: aiDeck.slides || []
   };
 
-  sh.appendRow([
-    deckId,
-    pid,
-    deckTitle,
-    focusScope,
-    JSON.stringify(selectedWbsIds),
-    audienceTone,
-    customPrompt,
-    JSON.stringify(fullDeckPayload),
-    shareToken,
-    actor,
-    nowIso,
-    nowIso,
-    'PUBLISHED'
-  ]);
+  insertRecord_(CLIENT_DECKS_SHEET_, {
+    Deck_ID: deckId,
+    Project_ID: pid,
+    Deck_Title: deckTitle,
+    Focus_Scope: focusScope,
+    Selected_WBS_JSON: JSON.stringify(selectedWbsIds),
+    Audience_Tone: audienceTone,
+    Custom_Prompt: customPrompt,
+    Deck_JSON: JSON.stringify(fullDeckPayload),
+    Share_Token: shareToken,
+    Created_By: actor,
+    Created_At: nowIso,
+    Updated_At: nowIso,
+    Status: 'PUBLISHED'
+  });
 
   return {
     success: true,
