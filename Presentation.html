@@ -3336,7 +3336,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                     ${r.Main_WBS_ID ? `<span class="ml-2 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">${escapeHtmlSafe_(r.Main_WBS_ID)}</span>` : ''}
                   </div>
                   <div class="flex items-center gap-3">
-                    <span class="font-semibold text-indigo-700">Planned: ${r.Overall_Planned_Progress || 0}% | Actual: ${r.Overall_Actual_Progress || 0}%</span>
+                    <span class="font-semibold text-indigo-700">Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% | Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%</span>
                     ${st.permissions.weeklyEdit ? `<button onclick="editWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-indigo-600 hover:underline font-medium">Edit</button>` : ''}
                     ${st.permissions.weeklyDelete ? `<button onclick="deleteWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-rose-600 hover:underline font-medium">Delete</button>` : ''}
                   </div>
@@ -3796,7 +3796,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(w.Assignment_ID) }</td>
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(w.Employee_Name)} <span class="text-[10px] font-mono text-slate-400">${escapeHtmlSafe_(w.Employee_ID ? '(' + w.Employee_ID + ')' : '')}</span></td>
-            <td class="py-2 px-3">${[w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-'}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')}</td>
             <td class="py-2 px-3 font-mono text-[11px]">${wbsStr}</td>
             <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '')}">${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '-')}</td>
             <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(w.Workload_Allocation_Pct || 0)}%</td>
@@ -4136,7 +4136,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                           <td class="py-2 px-3 font-mono">${escapeHtmlSafe_(p.PO_Or_Reference || '-')}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(p.Item_Description)}</td>
                           <td class="py-2 px-3">${escapeHtmlSafe_(p.Vendor_Or_Carrier || '-')}</td>
-                          <td class="py-2 px-3">${p.Quantity ?? 0}</td>
+                          <td class="py-2 px-3">${escapeHtmlSafe_(p.Quantity ?? 0)}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${formatCurrencyNum(p.Total_Cost)}</td>
                           <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(p.Expected_Delivery_Date || '-')}</td>
                           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(p.Delivery_Status || 'Pending')}</span></td>
@@ -4253,7 +4253,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                           <td class="py-2 px-3">${formatCurrencyNum(f.Committed_Amount)}</td>
                           <td class="py-2 px-3 font-semibold">${formatCurrencyNum(f.Actual_Spend)}</td>
                           <td class="py-2 px-3 ${vCls}">${v >= 0 ? '+' : ''}${formatCurrencyNum(v)}</td>
-                          <td class="py-2 px-3 font-medium">${f.Burn_Pct ?? 0}%</td>
+                          <td class="py-2 px-3 font-medium">${escapeHtmlSafe_(f.Burn_Pct ?? 0)}%</td>
                           <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${editBtn}${delBtn}</td>
                         </tr>
                       `;
@@ -7083,11 +7083,11 @@ function canManageProject_() {
           ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Active</span>'
           : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">Inactive</span>';
 
-        const safeUid = uid.replace(/'/g, "\\'");
+        const safeUid = safeJsArg_(uid);
         const statusAction = isActive
-          ? `<button type="button" onclick="handleToggleUserStatus('${safeUid}', false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
-          : `<button type="button" onclick="handleToggleUserStatus('${safeUid}', true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
-        const actionBtn = `<button type="button" onclick="openEditUserModal_('${safeUid}')" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${statusAction}`;
+          ? `<button type="button" onclick="handleToggleUserStatus(${safeUid}, false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
+          : `<button type="button" onclick="handleToggleUserStatus(${safeUid}, true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
+        const actionBtn = `<button type="button" onclick="openEditUserModal_(${safeUid})" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${statusAction}`;
 
         return `
           <tr class="hover:bg-slate-50">
