@@ -21,11 +21,11 @@ test('main HTML templates escape server-controlled dynamic values', () => {
     '${escapeHtmlSafe_(b.Approved_By || '-')}', '${escapeHtmlSafe_(b.Remarks || '-')}',
     '${escapeHtmlSafe_(p.Client || '-')}', '${escapeHtmlSafe_(p.Project_Location || '-')}',
     '${escapeHtmlSafe_(p.Project_Status || '-')}', '${escapeHtmlSafe_(m)}', '${escapeHtmlSafe_(c)}',
-    '${escapeHtmlSafe_(f.label)}', '${escapeHtmlSafe_(s)}', '${escapeHtmlSafe_(rec[col.key] || '-')}',
+    '${escapeHtmlSafe_(f.label)}', '${escapeHtmlSafe_(s)}', 'const safeVal = escapeHtmlSafe_(val);',
     '${escapeHtmlSafe_(l.Notes || '')}', '${escapeHtmlSafe_(r.Accomplishments || '-')}',
     '${escapeHtmlSafe_(w.Employee_Name)}', '${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '')}',
     '${escapeHtmlSafe_(p.Item_Description)}', '${escapeHtmlSafe_(f.Cost_Category)}',
-    '${escapeHtmlSafe_(a.Actor_Email || a.User_Email || a.Changed_By || '-')}'
+    '${escapeHtmlSafe_(actor)}'
   ];
   for (const expression of required) assert.ok(index.includes(expression), expression + ' must be escaped');
 });
