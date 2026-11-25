@@ -15,9 +15,10 @@ test('workload assignment read, ID allocation, mutation, and audit are locked', 
   const id = fn.indexOf("generateNextId_(DB_CONFIG.TABS.TEAM_WORKLOAD");
   const update = fn.indexOf("updateRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD");
   const insert = fn.indexOf("insertRecord_(DB_CONFIG.TABS.TEAM_WORKLOAD");
-  const audit = fn.indexOf("writeAuditLog_(ctx,");
+  const updateAudit = fn.indexOf("writeAuditLog_(ctx, 'UPDATE_TEAM_WORKLOAD");
+  const insertAudit = fn.indexOf("writeAuditLog_(ctx, 'CREATE_TEAM_WORKLOAD");
   const release = fn.indexOf('lock.releaseLock()');
   assert.ok(lock >= 0 && existing > lock && permission > existing && id > permission);
-  assert.ok(update > lock && insert > lock && audit > update && audit > insert && release > audit);
+  assert.ok(update > lock && insert > lock && updateAudit > update && insertAudit > insert && release > updateAudit && release > insertAudit);
   assert.match(fn, /finally\s*\{\s*lock\.releaseLock\(\)/);
 });
