@@ -51,4 +51,66 @@ function buildPmsPortfolioDashboardModel(portfolioData, projectControlReports) {
   };
 }
 
-module.exports = { buildPmsPortfolioDashboardModel };
+
+
+/**
+ * Orders visible projects by explicit exception severity, not an invented
+ * numeric health score. Priority is based only on available, observed controls.
+ * Missing module access/data is surfaced as incomplete coverage.
+ */
+function prioritizeProjectExceptions(project) {
+  if (!project || !project.controls) {
+    return {
+      level: 'unavailable',
+      rank: 5,
+      reasons: ['Project controls report is unavailable']
+    };
+  }
+  const c = project.controls;
+  const reasons = [];
+  let rank = 4;
+  if (c.highOrCriticalOpenRisks > 0) {
+    reasons.push(c.highOrCriticalOpenRisks + ' open high/critical risk(s)');
+    rank = Math.min(rank, 1);
+  }
+  if (c.overBudget === true) {
+    reasons.push('Actual spending exceeds budget');
+    rank = Math.min(rank, 1);
+  }
+  if (c.overdueMilestones > 0) {
+    reasons.push(c.overdueMilestones + ' overdue milestone(s)');
+    rank = Math.min(rank, 1);
+  }
+  if (c.overCommitment === true) {
+    reasons.push('Committed amount exceeds budget');
+    rank = Math.min(rank, 2);
+  }
+  if (c.delayedActivities > 0) {
+    reasons.push(c.delayedActivities + ' delayed activity(ies)');
+    rank = Math.min(rank, 2);
+  }
+  if (c.openIssues > 0) {
+    reasons.push(c.openIssues + ' open issue(s)');
+    rank = Math.min(rank, 3);
+  }
+  const coverage = c.availability || {};
+  const incomplete = ['schedule', 'milestones', 'risks', 'issues', 'financialMonitoring']
+    .some(key => coverage[key] === false);
+  if (incomplete) reasons.push('Some controls data is unavailable to this user');
+  if (rank === 4 && incomplete) rank = 5;
+  const level = rank === 1 ? 'urgent' : rank === 2 ? 'high'
+    : rank === 3 ? 'attention' : rank === 5 ? 'incomplete' : 'monitor';
+  if (!reasons.length) reasons.push('No recorded exceptions in available controls');
+  return { level, rank, reasons };
+}
+
+function sortProjectsByExceptionPriority(projects) {
+  return projects.map((project, index) => ({
+    project,
+    originalIndex: index,
+    priority: prioritizeProjectExceptions(project)
+  })).sort((a, b) => a.priority.rank - b.priority.rank || a.originalIndex - b.originalIndex)
+    .map(item => Object.assign({}, item.project, { exceptionPriority: item.priority }));
+}
+
+module.exports = { buildPmsPortfolioDashboardModel, prioritizeProjectExceptions, sortProjectsByExceptionPriority };
