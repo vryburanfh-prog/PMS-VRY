@@ -776,6 +776,9 @@ function assertRecordProjectOwnership_(existing, requestedProjectId, recordLabel
 
 function apiCreateProject(payload) {
   const ctx = assertPermission_('Projects', 'create', null);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   payload = payload || {};
 
   const projectName = String(payload.Project_Name || '').trim();
@@ -826,27 +829,40 @@ function apiCreateProject(payload) {
     Updated_At: nowTs
   };
 
-  insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
-
-  // Assign creator automatically if not global admin/management
+  // Assign creator automatically; compensate if the second table write fails.
   const assignId = generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4);
-  insertRecord_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, {
-    Assignment_ID: assignId,
-    Project_ID: newId,
-    User_ID: ctx.user.userId || '',
-    User_Email: ctx.user.email,
-    Project_Role: ctx.role || 'Project Lead',
-    Assigned_Role: ctx.role || 'Project Lead',
-    Assignment_Status: 'Active',
-    Assigned_By: ctx.user.email,
-    Assigned_At: nowDate,
-    Assignment_Date: nowDate,
-    Last_Updated: nowTs,
-    Is_Active: 'TRUE'
-  });
+  const assignmentRecord = {
+    Assignment_ID: assignId, Project_ID: newId, User_ID: ctx.user.userId || '',
+    User_Email: ctx.user.email, Project_Role: ctx.role || 'Project Lead',
+    Assigned_Role: ctx.role || 'Project Lead', Assignment_Status: 'Active',
+    Assigned_By: ctx.user.email, Assigned_At: nowDate, Assignment_Date: nowDate,
+    Last_Updated: nowTs, Is_Active: 'TRUE'
+  };
+  try {
+    insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
+    insertRecord_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, assignmentRecord);
+  } catch (creationError) {
+    const cleanupErrors = [];
+    try { deleteRecordsByIds_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', [assignId]); }
+    catch (cleanupError) { cleanupErrors.push('assignment cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+    try { deleteRecordsByIds_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', [newId]); }
+    catch (cleanupError) { cleanupErrors.push('project cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+    if (cleanupErrors.length) {
+      throw new Error('Project creation failed: ' + String(creationError && creationError.message || creationError) + '. Compensating cleanup also had errors: ' + cleanupErrors.join('; '));
+    }
+    throw creationError;
+  }
 
-  writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
-  return { success: true, project: record };
+  let auditWarning = '';
+  try {
+    writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
+  } catch (auditError) {
+    auditWarning = 'Project was created successfully, but audit logging failed: ' + String(auditError && auditError.message || auditError);
+  }
+  return { success: true, project: record, warning: auditWarning };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
