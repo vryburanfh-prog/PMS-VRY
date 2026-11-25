@@ -13,6 +13,7 @@
 - [ ] Registry field allowlists and approval-only status permissions tested.
 - [ ] CRUD, delete snapshots and audit-failure behavior tested.
 - [ ] Formula injection and import/rollback/formula-preservation tests passed.
+- [ ] Main index.html XSS escaping and share-link sanitizer regression tests passed.
 - [ ] Public deck scope, token archive/revoke and sensitive-field review passed.
 - [ ] Backup/restore drill passed on sandbox.
 - [ ] Quota, latency, lock contention and cache invalidation measured.
