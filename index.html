@@ -2283,6 +2283,14 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           (cpm && cpm.available ? fmt(cpm.durationWorkingDays) + ' working days · ' + cpm.criticalActivityCount + ' critical activities' : 'Unavailable');
         const cpmReason = cpm && !cpm.available ? String(cpm.reason || 'Insufficient or invalid schedule data') : '';
         const criticalPath = cpm && cpm.available && Array.isArray(cpm.criticalActivityIds) ? cpm.criticalActivityIds.slice(0, 8).join(' → ') : '';
+        const baselineSummary = res.access.schedule ? res.baselineSummary : null;
+        const baselineQuality = !res.access.schedule ? 'Restricted' :
+          (baselineSummary && baselineSummary.available
+            ? 'Baseline r' + (baselineSummary.revision == null ? '—' : baselineSummary.revision) +
+              ' · matched ' + baselineSummary.matchedActivityCount + '/' + baselineSummary.activeActivityCount +
+              ' · missing ' + baselineSummary.missingActivityCount +
+              ' · changed start/finish ' + baselineSummary.changedBaselineStartCount + '/' + baselineSummary.changedBaselineFinishCount
+            : (baselineSummary && baselineSummary.reason || 'Unavailable'));
         const highCritical = riskRows.filter(row => {
           const status = String(row.Current_Status || row.Status || '').toLowerCase();
           const rating = String(row.Risk_Rating || '').toUpperCase();
@@ -2299,6 +2307,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
               ' · Actual: ' + (res.access.schedule ? weightedProgress(scheduleRows, 'Actual_Progress') : 'Restricted'),
             extra: 'Late: ' + (res.access.schedule ? overdue(scheduleRows, 'Forecast_Finish_Date', 'Status') : 'Restricted') +
               ' · CPM: ' + cpmSummary + (criticalPath ? ' · Critical path: ' + criticalPath + (cpm.criticalActivityIds.length > 8 ? ' …' : '') : '') + (cpmReason ? ' (' + cpmReason + ')' : '') +
+              ' · Baseline quality: ' + baselineQuality +
               ' · Dependencies: ' + metric(count(res.dependencies)) + ' · Baseline snapshots: ' + metric(count(res.baselines)) },
           { title: 'Milestones', allowed: res.access.milestones, value: res.access.milestones ? metric(count(res.milestones)) : 'Restricted',
             detail: 'Milestones', extra: 'Overdue: ' + (res.access.milestones ? overdue(milestoneRows, 'Forecast_Date', 'Milestone_Status') : 'Restricted') },
