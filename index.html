@@ -2289,6 +2289,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             ? 'Baseline r' + (baselineSummary.revision == null ? '—' : baselineSummary.revision) +
               ' · matched ' + baselineSummary.matchedActivityCount + '/' + baselineSummary.activeActivityCount +
               ' · missing ' + baselineSummary.missingActivityCount +
+              ' · snapshot-only ' + baselineSummary.snapshotOnlyActivityCount +
               ' · changed start/finish ' + baselineSummary.changedBaselineStartCount + '/' + baselineSummary.changedBaselineFinishCount
             : (baselineSummary && baselineSummary.reason || 'Unavailable'));
         const highCritical = riskRows.filter(row => {
