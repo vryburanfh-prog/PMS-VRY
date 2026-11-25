@@ -758,6 +758,9 @@ function assertRecordProjectOwnership_(existing, requestedProjectId, recordLabel
 
 function apiCreateProject(payload) {
   const ctx = assertPermission_('Projects', 'create', null);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   payload = payload || {};
 
   const projectName = String(payload.Project_Name || '').trim();
@@ -829,6 +832,9 @@ function apiCreateProject(payload) {
 
   writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
   return { success: true, project: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
