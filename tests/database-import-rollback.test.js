@@ -52,7 +52,7 @@ function runHarness({failOnB = false} = {}) {
 test('successful import writes rows and invalidates each destination cache', () => {
   const state = runHarness();
   const result = state.context.applyDatabaseImportPlanWithRollback_(state.plan, 'backup-id', 'backup-url');
-  assert.deepEqual(result, [{tab:'A',rows:1},{tab:'B',rows:1}]);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), [{tab:'A',rows:1},{tab:'B',rows:1}]);
   assert.deepEqual(state.destA.rows, [['A-new']]);
   assert.deepEqual(state.destB.rows, [['B-new']]);
   assert.deepEqual(state.invalidated, ['A','B']);
