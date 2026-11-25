@@ -1835,6 +1835,9 @@ function apiGetProgressAndWeeklyReports(projectId) {
  * and recalculates project weighted progress.
  */
 function apiSaveProgressLog(projectId, payload, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -1962,6 +1965,10 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
   }
 
   return { success: true, log: record, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1969,6 +1976,9 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
  * Optionally applies approved progress to the linked Activity and recalculates project roll-up.
  */
 function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !logId) throw new Error('Project_ID and Log_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Progress', 'approve', pid);
@@ -2021,6 +2031,10 @@ function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
   }
 
   return { success: true, log: updatedClean, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
