@@ -86,3 +86,15 @@ The portfolio endpoint uses the PMS risk score bands: scores 10–14 are High an
 The existing portfolio KPI response was also tightened so delayed-milestone, critical-risk, and open-issue totals are permission-gated. When a user lacks the relevant module permission, the API returns `null` and the dashboard displays an em dash rather than a misleading zero.
 
 The watchlist now includes a project-level exceptions table alongside the portfolio totals. It shows only aggregate counts and budget/commitment flags for each project in the already-authorized portfolio. It does not expose raw risk descriptions, issue narratives, or financial line items.
+
+## Exception prioritization
+
+The dashboard model now exposes `prioritizedProjects` in addition to the original project ordering. It applies transparent, rule-based exception ordering; it is not a project-health score and does not introduce organization-wide thresholds:
+
+1. **Urgent** — any open High/Critical risk, actual spending above budget, or overdue milestone.
+2. **High** — commitments above budget or delayed activities, unless an Urgent condition is present.
+3. **Attention** — open issues without a higher-priority exception.
+4. **Monitor** — no recorded exceptions in the available controls.
+5. **Incomplete / unavailable** — controls are missing or one or more module datasets are unavailable and no higher-priority exception can be established.
+
+Each project includes reason text explaining its priority. Projects with equal priority retain their original portfolio order. The dashboard does not label a project Green/Amber/Red from this prioritizer; configurable health thresholds remain a separate, explicitly configured feature. Unavailable module data is never interpreted as evidence of good health.
