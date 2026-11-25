@@ -33,7 +33,7 @@ test('main HTML templates escape server-controlled dynamic values', () => {
 test('registry links allow HTTPS only and escape the resulting attribute', () => {
   const htmlEscaper = extractFunction(index, 'escapeHtmlSafe_');
   const escapeHtmlSafe_ = new Function(htmlEscaper + '; return escapeHtmlSafe_;')();
-  assert.equal(escapeHtmlSafe_('<>&"\''), '&lt;&gt;&amp;&quot;&#39;');
+  assert.equal(escapeHtmlSafe_('<>&' + String.fromCharCode(34, 39)), '&lt;&gt;&amp;&quot;&#39;');
   const helper = extractFunction(index, 'safeExternalHref_');
   const safeExternalHref_ = new Function(helper + '; return safeExternalHref_;')();
   assert.equal(safeExternalHref_('https://example.com/path?a=1&b=2'), 'https://example.com/path?a=1&b=2');
