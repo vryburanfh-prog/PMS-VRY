@@ -54,7 +54,7 @@ test('single and bulk insert helpers validate mapped primary keys', { skip: !pkF
 
 test('primary-key mapping includes core generated-ID tables', { skip: !pkFixPresent && 'Pending primary-key enforcement remediation PR' }, () => {
   const mapping = section(db, 'const PRIMARY_KEY_COLUMNS_BY_TAB_', 'function assertUniquePrimaryKeyForInsert_');
-  for (const table of ['Users', 'Projects', 'Audit_Logs', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring']) {
+  for (const table of ['Users', 'Auth_Credentials', 'Auth_Sessions', 'Projects', 'Audit_Logs', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring']) {
     assert.match(mapping, new RegExp(table + ':'));
   }
 });
