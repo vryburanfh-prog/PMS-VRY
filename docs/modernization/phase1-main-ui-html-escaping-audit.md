@@ -16,3 +16,9 @@
 - Continue scanning remaining HTML interpolation sinks for context-specific risks.
 - Verify dynamic class/style values are limited to normalized numbers or fixed allow-listed classes.
 - No deployment or live browser validation performed; all work remains in draft PRs.
+
+
+## Main UI history list follow-up
+
+- Deck title, scope label, and created-at fields in the main UI presentation-history list are now escaped at their HTML sinks.
+- Presentation-history link hrefs use the HTTPS sanitizer and privileged users can revoke published links from the main UI as well as the presentation generator UI.

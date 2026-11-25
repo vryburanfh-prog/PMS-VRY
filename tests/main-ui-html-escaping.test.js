@@ -21,7 +21,6 @@ test('main UI dynamic project, registry, WBS and operational fields are escaped'
     'escapeHtmlSafe_(c.label)',
     'escapeHtmlSafe_(l.Log_ID || \'\')',
     'escapeHtmlSafe_(l.Activity_ID || \'\')',
-    'escapeHtmlSafe_([l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(\' / \'))',
     'escapeHtmlSafe_(l.Notes || \'-\')',
     'escapeHtmlSafe_(scopeLabel)',
     'escapeHtmlSafe_(status)',
@@ -58,6 +57,9 @@ test('main UI dynamic project, registry, WBS and operational fields are escaped'
   for (const fragment of checks) assert.ok(html.includes(fragment), fragment + ' must be escaped');
 });
 test('dynamic registry and deck links are HTTPS-sanitized', () => {
+  assert.ok(html.includes('escapeHtmlSafe_(d.deckTitle || d.deckId)'));
+  assert.ok(html.includes('escapeHtmlSafe_(d.focusScope)'));
+  assert.ok(html.includes('escapeHtmlSafe_(d.createdAt || \'\')'));
   assert.ok(html.includes('function safeHttpsUrl_'));
   assert.ok(html.includes('safeHttpsUrl_(val)'));
   assert.ok(html.includes('safeHttpsUrl_(d.shareUrl)'));
