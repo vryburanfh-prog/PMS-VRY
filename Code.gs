@@ -1632,11 +1632,9 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
     throw new Error('Record does not belong to the active project.');
   }
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(cfg.tab);
-  sheet.deleteRow(existing._rowIndex);
-
-  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
+  const deleted = deleteRecordById_(cfg.tab, cfg.idCol, recordId);
+  delete deleted._rowIndex;
+  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, deleted, null, 'Deleted ' + registryKey + ' record');
   return { success: true };
 }
 
@@ -2033,9 +2031,7 @@ function apiDeleteWeeklyReport(projectId, reportId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.WEEKLY_REPORTS);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId);
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
@@ -2293,9 +2289,7 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.TEAM_WORKLOAD);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId);
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
@@ -2524,8 +2518,7 @@ function apiDeleteProcurementItem(projectId, procurementId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(procTab).deleteRow(existing._rowIndex);
+  deleteRecordById_(procTab, 'Procurement_ID', procurementId);
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
@@ -2599,8 +2592,7 @@ function apiDeleteFinancialItem(projectId, financialId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(finTab).deleteRow(existing._rowIndex);
+  deleteRecordById_(finTab, 'Financial_ID', financialId);
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
