@@ -2514,6 +2514,9 @@ function apiGetProcurementFinancialData(projectId) {
 function apiSaveProcurementItem(projectId, payload) {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
 
   const rawId = String(payload.Procurement_ID || '').trim();
   const procTab = resolvePhase10TabName_('procurement');
@@ -2561,6 +2564,9 @@ function apiSaveProcurementItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2569,6 +2575,9 @@ function apiSaveProcurementItem(projectId, payload) {
 function apiDeleteProcurementItem(projectId, procurementId) {
   if (!projectId || !procurementId) throw new Error('Project_ID and Procurement_ID are required.');
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Procurement', 'delete', pid);
 
   const procTab = resolvePhase10TabName_('procurement');
@@ -2586,6 +2595,9 @@ function apiDeleteProcurementItem(projectId, procurementId) {
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2594,6 +2606,9 @@ function apiDeleteProcurementItem(projectId, procurementId) {
 function apiSaveFinancialItem(projectId, payload) {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
 
   const rawId = String(payload.Financial_ID || '').trim();
   const finTab = resolvePhase10TabName_('financials');
@@ -2636,6 +2651,9 @@ function apiSaveFinancialItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2644,6 +2662,9 @@ function apiSaveFinancialItem(projectId, payload) {
 function apiDeleteFinancialItem(projectId, financialId) {
   if (!projectId || !financialId) throw new Error('Project_ID and Financial_ID are required.');
   const pid = String(projectId).trim();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Financials', 'delete', pid);
 
   const finTab = resolvePhase10TabName_('financials');
@@ -2661,6 +2682,9 @@ function apiDeleteFinancialItem(projectId, financialId) {
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
