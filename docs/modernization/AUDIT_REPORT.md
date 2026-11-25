@@ -208,3 +208,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** Direct `deleteRow(existing._rowIndex)` calls were found in Project Controls registry, Weekly Reports, Team Workload, Procurement, and Financial Monitoring deletion endpoints. These paths read a row index before deletion and delete directly without the shared Script Lock/ID re-lookup helper.
 **Remediation:** Draft PR #12 routes those five endpoints through `deleteRecordById_`, which performs stable-ID lookup under Script Lock and existing cleanup/cache-invalidation behavior. The registry delete audit snapshot is cleaned of the internal row index.
 **Limitations:** The business deletion and subsequent audit-log insert remain separate operations; no transaction/compensation is implemented. Runtime concurrency/fault-injection tests are pending.
+
+
+### S15 — P1 investigation: escalation upsert lacked project-ownership validation
+**Evidence:** `apiUpsertEscalationItem` checked the privileged-management role and edit permission for the requested `targetPid`, then located an existing escalation by `Escalation_ID`. The inspected path did not compare the stored record's `Project_ID` with the requested project/portfolio scope before updating the row, allowing a privileged user authorized for one project to potentially edit an escalation belonging to another project by ID.
+**Remediation:** Draft PR #13 compares the existing escalation's stored project ID with the requested project or `PORTFOLIO` scope and rejects mismatches before update. Test plan PR #2 adds SEC-16 through SEC-18.
+**Status:** Source-level fix; runtime direct-call tests and project-scope authorization confirmation remain outstanding. Severity is provisional until verified in an isolated environment.
