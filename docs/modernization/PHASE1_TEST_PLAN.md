@@ -240,3 +240,6 @@ This matrix has not been executed. The current audit is source-level inspection 
 | DEL-04 | Concurrently move/change a record's project scope while a scoped delete request is in flight (test-only harness or controlled fault injection) | The delete helper re-reads the stable-ID record while holding the Script Lock and rejects deletion if its current scope does not match the caller's expected project; no other-project record is deleted | Not run |
 
 Draft PR #18 extends the locked delete helper with an optional expected-scope guard and passes the expected project field/value from the scoped delete endpoints. The pre-lock API ownership check remains for fast rejection; the helper repeats the scope check under lock to close the stale-row race. This static safeguard still requires an isolated concurrency/fault-injection test.
+
+
+**Latest validation note (2026-11-25):** The temporary integrated validation branch including the atomic-delete-scope regression ran **11 passed, 0 failed, 2 skipped**. The skipped checks were the UI interpolation and password-failure counter remediations, which were not included in that validation branch. The test-only CI branch ran **1 passed, 0 failed, 12 skipped**. All remaining skipped tests are static checks awaiting code integration; this does not substitute for runtime spreadsheet/App Script testing.
