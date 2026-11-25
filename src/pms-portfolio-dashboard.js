@@ -47,7 +47,8 @@ function buildPmsPortfolioDashboardModel(portfolioData, projectControlReports) {
     source: 'authorized-apiGetPortfolioData',
     portfolioKpis: portfolioData.kpis || {},
     projectControls: controls,
-    projects
+    projects,
+    prioritizedProjects: sortProjectsByExceptionPriority(projects)
   };
 }
 
