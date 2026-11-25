@@ -1069,6 +1069,60 @@ function buildAppsScriptCpmSummary_(activities, dependencies, projectId) {
   };
 }
 
+
+/**
+ * Compare the active schedule against the latest stored baseline snapshot.
+ * This is diagnostic only; it does not approve, revise, or write a baseline.
+ */
+function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
+  const candidates = (baselines || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId);
+  }).sort(function (a, b) {
+    const revision = Number(b.Revision_Number || 0) - Number(a.Revision_Number || 0);
+    if (revision) return revision;
+    return String(b.Approved_Date || '').localeCompare(String(a.Approved_Date || ''));
+  });
+  if (!candidates.length) return { available: false, reason: 'No baseline snapshot is recorded' };
+  const latest = candidates[0];
+  if (!latest.Snapshot_JSON) return { available: false, reason: 'Latest baseline has no Snapshot_JSON' };
+  let snapshot;
+  try { snapshot = JSON.parse(latest.Snapshot_JSON); }
+  catch (error) { return { available: false, reason: 'Latest baseline Snapshot_JSON is invalid' }; }
+  if (!snapshot || !Array.isArray(snapshot.activities)) {
+    return { available: false, reason: 'Latest baseline snapshot has no activities array' };
+  }
+  const saved = {};
+  snapshot.activities.forEach(function (row) {
+    const id = String(row.Activity_ID || '').trim();
+    if (id) saved[id] = row;
+  });
+  const active = (activities || []).filter(function (row) {
+    return String(row.Project_ID || '').trim() === String(projectId) &&
+      !isTruthySheetFlag_(row.Is_Archived);
+  });
+  let matched = 0, missing = 0, changedStart = 0, changedFinish = 0;
+  active.forEach(function (row) {
+    const baseline = saved[String(row.Activity_ID || '').trim()];
+    if (!baseline) { missing += 1; return; }
+    matched += 1;
+    if (String(row.Baseline_Start_Date || '') !== String(baseline.Baseline_Start_Date || '')) changedStart += 1;
+    if (String(row.Baseline_Finish_Date || '') !== String(baseline.Baseline_Finish_Date || '')) changedFinish += 1;
+  });
+  return {
+    available: true,
+    baselineId: String(latest.Baseline_ID || ''),
+    revision: Number(latest.Revision_Number) || null,
+    name: String(latest.Baseline_Name || ''),
+    approvedDate: String(latest.Approved_Date || ''),
+    snapshotActivityCount: snapshot.activities.length,
+    activeActivityCount: active.length,
+    matchedActivityCount: matched,
+    missingActivityCount: missing,
+    changedBaselineStartCount: changedStart,
+    changedBaselineFinishCount: changedFinish
+  };
+}
+
 function apiGetProjectControlsInputs(projectId) {
   const pid = String(projectId || '').trim();
   if (!pid) throw new Error('Project_ID is required.');
@@ -1109,9 +1163,11 @@ function apiGetProjectControlsInputs(projectId) {
   const issues = readRows(DB_CONFIG.TABS.ISSUES, issuesAllowed, true);
   const financialItems = readRows(DB_CONFIG.TABS.FINANCIAL, financeAllowed, false);
   let cpm = null;
+  let baselineSummary = null;
   if (scheduleAllowed) {
     try { cpm = buildAppsScriptCpmSummary_(activities, dependencies, pid); }
     catch (error) { cpm = { available: false, reason: String(error && error.message || error) }; }
+    baselineSummary = buildAppsScriptBaselineSummary_(activities, baselines, pid);
   }
 
   return {
@@ -1137,7 +1193,8 @@ function apiGetProjectControlsInputs(projectId) {
     risks: risks,
     issues: issues,
     financialItems: financialItems,
-    cpm: cpm
+    cpm: cpm,
+    baselineSummary: baselineSummary
   };
 }
 
