@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'Code.gs'
+      - 'index.html'
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
@@ -20,6 +21,7 @@ on:
       - 'pms-modernization/**'
     paths:
       - 'Code.gs'
+      - 'index.html'
       - 'src/project-controls.js'
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
