@@ -152,7 +152,7 @@ function insertRecords_(tabName, records) {
   } finally { if (ownsLock) lock.releaseLock(); }
 }
 
-function updateRecordById_(tabName, idColumn, recordId, updatesObj) {
+function updateRecordById_(tabName, idColumn, recordId, updatesObj, expectedScope) {
   const lock = LockService.getScriptLock();
   const ownsLock = !lock.hasLock();
   if (ownsLock) lock.waitLock(10000);
@@ -174,7 +174,7 @@ function updateRecordById_(tabName, idColumn, recordId, updatesObj) {
         updated[header] = next;
         if (updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, header)) changed.push({ index:c, value:next });
       });
-      // Write contiguous changed-column runs only; preserve formulas and avoid one RPC per cell.
+      if (expectedScope) {\n        const scopeField = String(expectedScope.field || '').trim();\n        const expectedValue = String(expectedScope.value === undefined || expectedScope.value === null ? '' : expectedScope.value).trim();\n        const actualValue = String(previous[scopeField] === undefined || previous[scopeField] === null ? '' : previous[scopeField]).trim();\n        if (!scopeField || actualValue !== expectedValue) throw new Error('Record does not belong to the expected scope.');\n      }\n      // Write contiguous changed-column runs only; preserve formulas and avoid one RPC per cell.
       changed.sort((a,b) => a.index-b.index);
       let i = 0;
       while (i < changed.length) {
