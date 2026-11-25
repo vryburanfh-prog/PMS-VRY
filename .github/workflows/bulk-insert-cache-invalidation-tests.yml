@@ -1,0 +1,32 @@
+name: Bulk Insert Cache Invalidation Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Database.gs'
+      - 'tests/bulk-insert-cache-invalidation.test.js'
+      - '.github/workflows/bulk-insert-cache-invalidation-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Database.gs'
+      - 'tests/bulk-insert-cache-invalidation.test.js'
+      - '.github/workflows/bulk-insert-cache-invalidation-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bulk-insert-cache-invalidation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bulk-insert-cache-invalidation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/bulk-insert-cache-invalidation.test.js
