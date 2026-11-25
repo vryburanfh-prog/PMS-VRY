@@ -193,7 +193,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
 | #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
 | #10 | Backup/recovery runbook | Open draft | Source-based guidance; runtime recovery and failure-injection tests not run |
-| #11 | Temporary integrated validation | Closed unmerged | CI passed 11/11 static regression tests with all Phase 1 source fixes combined, including locked deletes, escalation scope, Phase 18/19 helper refactor, and client deck inserts; closed after validation |
+| #11 | Temporary integrated validation | Closed unmerged | CI passed 12/12 static regression tests with all Phase 1 source fixes combined, including locked deletes, escalation scope, Phase 18/19/client-deck helper refactors, and atomic login failures; closed after validation |
 | #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
 | #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
 | #14 | Phase 18/19 mutation helper integrity | Open draft (stacked on #13) | Static helper callsite check; runtime concurrency/audit tests pending |
