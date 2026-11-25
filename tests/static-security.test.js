@@ -71,3 +71,28 @@ test('registry labels are escaped in loading and empty-state HTML templates', { 
     assert.ok(html.includes('No ${escapeHtmlSafe_(st.key.toLowerCase())} found'));
   }
 });
+
+test('deletion APIs use the locked delete helper', { skip: !['apiDeleteProjectControlRecord','apiDeleteWeeklyReport','apiDeleteTeamWorkloadAssignment','apiDeleteProcurementItem','apiDeleteFinancialItem'].every(name => code.includes('function ' + name) && code.slice(code.indexOf('function ' + name), code.indexOf('\nfunction ', code.indexOf('function ' + name) + 10)).includes('deleteRecordById_')) && 'Pending locked-delete-helper remediation PR' }, () => {
+  for (const name of ['apiDeleteProjectControlRecord','apiDeleteWeeklyReport','apiDeleteTeamWorkloadAssignment','apiDeleteProcurementItem','apiDeleteFinancialItem']) {
+    const start = code.indexOf('function ' + name);
+    const next = code.indexOf('\nfunction ', start + 10);
+    const body = code.slice(start, next === -1 ? code.length : next);
+    assert.ok(body.includes('deleteRecordById_('));
+  }
+});
+
+
+test('escalation updates enforce project/portfolio ownership', { skip: !code.includes('Escalation does not belong to the active project or portfolio scope.') && 'Pending escalation ownership remediation PR' }, () => {
+  const body = section(code, 'function apiUpsertEscalationItem', 'function apiCapturePmoSnapshot');
+  assert.ok(body.includes('existingEscalation.Project_ID'));
+  assert.ok(body.includes('requestedProjectId'));
+  assert.ok(body.includes('storedProjectId !== requestedProjectId'));
+});
+
+
+test('escalation updates enforce project/portfolio ownership', { skip: !code.includes('Escalation does not belong to the active project or portfolio scope.') && 'Pending escalation ownership remediation PR' }, () => {
+  const body = section(code, 'function apiUpsertEscalationItem', 'function apiCapturePmoSnapshot');
+  assert.ok(body.includes('existingEscalation.Project_ID'));
+  assert.ok(body.includes('requestedProjectId'));
+  assert.ok(body.includes('storedProjectId !== requestedProjectId'));
+});
