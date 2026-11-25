@@ -181,6 +181,15 @@ Draft PR #13 adds a stored-project-versus-requested-project check before the ups
 
 Draft PR #14 refactors Phase 18/19 direct mutations to the shared insert/update helpers. Primary-key enforcement for these custom tables is included in draft PR #6 and should be merged/reviewed before the helper-integrity refactor.
 
+## 3.13 Client presentation insert integrity regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| DECK-10 | Generate concurrent client presentations | Insert uses locked helper; duplicate Deck_ID rejected; append is serialized | Not run |
+| DECK-11 | Create client deck with missing Deck_ID in a mapped table | Insert helper rejects missing key before write | Not run |
+
+Draft PR #15 routes new presentation records through `insertRecord_`; PR #6 adds `Client_Presentations` primary-key mapping. The share-token endpoint and data-minimization fixes are separately tracked in PR #4.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
