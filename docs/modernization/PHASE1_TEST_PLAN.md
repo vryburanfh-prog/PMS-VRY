@@ -161,6 +161,16 @@ Draft backup/recovery runbook PR #10 describes these procedures. Do not run dest
 
 Draft PR #12 routes five direct-delete paths through `deleteRecordById_`. This improves lock/cache-helper consistency but does not make the deletion and audit-log write transactional.
 
+## 3.11 Escalation project-scope integrity regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| SEC-16 | Privileged user updates an escalation ID belonging to another project while supplying their assigned project ID | Server rejects update; stored Project_ID and escalation content remain unchanged | Not run |
+| SEC-17 | Update an escalation within the same assigned project | Update allowed only if role and project edit permission are valid; Project_ID cannot be reassigned by record-ID lookup | Not run |
+| SEC-18 | Portfolio-level escalation update | Only portfolio/global scope can update an existing portfolio escalation; project escalation IDs cannot be overwritten as portfolio records | Not run |
+
+Draft PR #13 adds a stored-project-versus-requested-project check before the upsert's row update/append path. Runtime authorization tests remain pending.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
