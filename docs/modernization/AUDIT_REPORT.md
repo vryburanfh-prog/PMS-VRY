@@ -98,3 +98,15 @@ The code has useful foundations: a server-side role permission ceiling, project 
 - API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
 
 This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
+
+## Phase 1 final static audit update (November 2026)
+
+Targeted remediation has addressed additional findings discovered during the final source scan:
+
+- Server-side field allowlists and required-field validation are added for all seven Project Controls registry modules; approval status updates require the module approve permission.
+- Presentation HTML interpolations have been further escaped, including resource/project values, progress and numeric fields, registry keys, and KPI classes. Inline-script parsing and static interpolation regression checks pass.
+- Generic database writes and several direct mutation paths neutralize formula-like text values. Administrator database import and compensating rollback paths sanitize text and preserve actual source formulas.
+- Google ID-token verification now handles fetch/JSON failures safely and validates audience, optional authorized party, issuer, subject, verified email, finite expiry, and future-issued timestamps.
+- The scheduled digest status/save API declaration boundary was repaired.
+
+These are code-review/static-validation results from draft PRs, not production verification. GitHub Actions runner allocation has blocked actual CI jobs, and staging role/CRUD/import/restore/quota tests remain outstanding. Audit status: static review substantially complete; Phase 1 acceptance pending runtime gates.
