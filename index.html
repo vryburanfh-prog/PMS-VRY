@@ -2218,7 +2218,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Health || '-')}</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(p.Overall_Actual_Progress || 0)}% / ${escapeHtmlSafe_(p.Overall_Planned_Progress || 0)}%</td>
             <td class="py-2 px-3 text-right space-x-2">
-              <button onclick='startEditProject(${JSON.stringify(p).replace(/'/g, "&#39;")})' class="text-indigo-600 hover:underline font-medium">Edit</button>
+              <button onclick="startEditProject(${escapeHtmlSafe_(JSON.stringify(p))})" class="text-indigo-600 hover:underline font-medium">Edit</button>
               <button onclick="archiveProject(${safeJsArg_(p.Project_ID)}, ${!archived})" class="text-amber-700 hover:underline font-medium">${archived ? 'Restore' : 'Archive'}</button>
             </td>
           </tr>
@@ -3603,21 +3603,21 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                     ${r.Main_WBS_ID ? `<span class="ml-2 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">${escapeHtmlSafe_(r.Main_WBS_ID)}</span>` : ''}
                   </div>
                   <div class="flex items-center gap-3">
-                    <span class="font-semibold text-indigo-700">Planned: ${r.Overall_Planned_Progress || 0}% | Actual: ${r.Overall_Actual_Progress || 0}%</span>
+                    <span class="font-semibold text-indigo-700">Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% | Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%</span>
                     ${st.permissions.weeklyEdit ? `<button onclick="editWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-indigo-600 hover:underline font-medium">Edit</button>` : ''}
                     ${st.permissions.weeklyDelete ? `<button onclick="deleteWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-rose-600 hover:underline font-medium">Delete</button>` : ''}
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                  <div><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</div>
-                  <div><strong>Ongoing:</strong> ${r.Ongoing_Activities || '-'}</div>
-                  <div><strong>Pending:</strong> ${r.Pending_Activities || '-'}</div>
-                  <div><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</div>
-                  <div><strong>Issues:</strong> ${r.Issues_Encountered || '-'}</div>
-                  <div><strong>Mitigation:</strong> ${r.Mitigation_Measures || '-'}</div>
-                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</div>
+                  <div><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</div>
+                  <div><strong>Ongoing:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</div>
+                  <div><strong>Pending:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</div>
+                  <div><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</div>
+                  <div><strong>Issues:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</div>
+                  <div><strong>Mitigation:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</div>
+                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</div>
                 </div>
-                <div class="text-[11px] text-slate-400">Lead: ${r.Responsible_Team_Lead || '-'}${r.Remarks ? ' • Remarks: ' + r.Remarks : ''}</div>
+                <div class="text-[11px] text-slate-400">Lead: ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')}${r.Remarks ? ' • Remarks: ' + r.Remarks : ''}</div>
               </div>
             `).join('') : `<div class="p-6 text-center text-slate-400 border border-slate-200 rounded-lg">No weekly reports recorded yet for this project.</div>`}
           </div>
@@ -3703,7 +3703,21 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         .apiDeleteWeeklyReport(APP_STATE.selectedProjectId, reportId);
     }
 
-    function exportPhase8Csv() {
+    function neutralizeCsvFormula_(value) {
+  if (value === null || value === undefined) return '';
+  const raw = String(value);
+  const trimmed = raw.replace(/^\s+/, '');
+  const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(trimmed);
+  const first = trimmed.charAt(0);
+  const formulaLike = first === '=' || first === '@' || ((first === '+' || first === '-') && !numeric);
+  return formulaLike ? "'" + raw : raw;
+}
+
+function escapeCsvCell_(value) {
+  return '"' + neutralizeCsvFormula_(value).replace(/"/g, '""') + '"';
+}
+
+function exportPhase8Csv() {
       const st = APP_STATE.phase8State;
       const isLogs = st.activeSubTab === 'logs';
       const rows = isLogs ? st.logs : st.weeklyReports;
@@ -3713,14 +3727,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       }
 
       const headers = Object.keys(rows[0]);
-      const escapeCsv = (val) => {
-        const str = val === null || val === undefined ? '' : String(val);
-        return '"' + str.replace(/"/g, '""') + '"';
-      };
-
       const csvLines = [
-        headers.map(escapeCsv).join(','),
-        ...rows.map(r => headers.map(h => escapeCsv(r[h])).join(','))
+        headers.map(escapeCsvCell_).join(','),
+        ...rows.map(r => headers.map(h => escapeCsvCell_(r[h])).join(','))
       ];
 
       const blob = new Blob([csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
@@ -3757,14 +3766,14 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <tbody>
               ${st.logs.map(l => `
                 <tr>
-                  <td>${l.Log_ID || ''}</td>
-                  <td>${l.Log_Date || ''}</td>
-                  <td>${l.Activity_ID || ''}</td>
-                  <td>${[l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(' / ')}</td>
+                  <td>${escapeHtmlSafe_(l.Log_ID || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Log_Date || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Activity_ID || '')}</td>
+                  <td>${escapeHtmlSafe_([l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(' / '))}</td>
                   <td>${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
                   <td>${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
-                  <td>${l.Submitted_By || ''}</td>
-                  <td>${l.Approval_Status || ''}</td>
+                  <td>${escapeHtmlSafe_(l.Submitted_By || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Approval_Status || '')}</td>
                   <td>${escapeHtmlSafe_(l.Notes || '')}</td>
                 </tr>
               `).join('')}
@@ -3776,16 +3785,16 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           ${st.weeklyReports.map(r => `
             <div style="border:1px solid #cbd5e1;padding:12px;margin-bottom:14px;border-radius:6px;font-size:12px;">
               <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">
-                ${escapeHtmlSafe_(r.Report_ID)} — ${r.Reporting_Week || ''} (${r.Reporting_Period || ''}) | Planned: ${r.Overall_Planned_Progress || 0}% / Actual: ${r.Overall_Actual_Progress || 0}%
+                ${escapeHtmlSafe_(r.Report_ID)} — ${escapeHtmlSafe_(r.Reporting_Week || '')} (${escapeHtmlSafe_(r.Reporting_Period || '')}) | Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% / Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%
               </div>
-              <p><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</p>
-              <p><strong>Ongoing Activities:</strong> ${r.Ongoing_Activities || '-'}</p>
-              <p><strong>Pending Activities:</strong> ${r.Pending_Activities || '-'}</p>
-              <p><strong>Issues Encountered:</strong> ${r.Issues_Encountered || '-'}</p>
-              <p><strong>Mitigation Measures:</strong> ${r.Mitigation_Measures || '-'}</p>
-              <p><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</p>
-              <p><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</p>
-              <p style="color:#64748b;"><strong>Lead:</strong> ${r.Responsible_Team_Lead || '-'} | <strong>Remarks:</strong> ${r.Remarks || '-'}</p>
+              <p><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</p>
+              <p><strong>Ongoing Activities:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</p>
+              <p><strong>Pending Activities:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</p>
+              <p><strong>Issues Encountered:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</p>
+              <p><strong>Mitigation Measures:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</p>
+              <p><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</p>
+              <p><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</p>
+              <p style="color:#64748b;"><strong>Lead:</strong> ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')} | <strong>Remarks:</strong> ${escapeHtmlSafe_(r.Remarks || '-')}</p>
             </div>
           `).join('')}
         `;
@@ -6308,7 +6317,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                     <span class="font-semibold text-slate-900">${escapeHtmlSafe_(cand.title)}</span>
                     <span class="text-[11px] text-slate-500 ml-1">(${escapeHtmlSafe_(cand.projectId || '-')})</span>
                   </div>
-                  <button type="button" onclick='promoteCandidateToEscalation_(${JSON.stringify(cand)})'
+                  <button type="button" onclick="promoteCandidateToEscalation_(${escapeHtmlSafe_(JSON.stringify(cand))})"
                     class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold shrink-0">
                     + Escalate
                   </button>
@@ -6355,8 +6364,8 @@ button, input, select, textarea { min-height: 2.25rem; }
                           <td class="py-2 px-3">${escapeHtmlSafe_(row.Owner_Email || '')}</td>
                           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${stBadge}">${escapeHtmlSafe_(stUpper)}</span></td>
                           <td class="py-2 px-3 whitespace-nowrap space-x-1">
-                            <button type="button" onclick='editEscalationRow_(${JSON.stringify(row)})' class="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-[11px]">Edit</button>
-                            ${stUpper !== 'RESOLVED' ? `<button type="button" onclick='resolveEscalationRow_(${JSON.stringify(row)})' class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold">Resolve</button>` : ''}
+                            <button type="button" onclick="editEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})" class="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-[11px]">Edit</button>
+                            ${stUpper !== 'RESOLVED' ? `<button type="button" onclick="resolveEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})" class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold">Resolve</button>` : ''}
                           </td>
                         </tr>
                       `;
@@ -6900,7 +6909,7 @@ button, input, select, textarea { min-height: 2.25rem; }
                         </td>
                         <td class="py-2 px-3 whitespace-nowrap">
                           ${typeof openEscalationsModal === 'function'
-                            ? `<button type="button" onclick='escalateWorkItem_(${JSON.stringify(it)})' class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-semibold">+ Escalate</button>`
+                            ? `<button type="button" onclick="escalateWorkItem_(${escapeHtmlSafe_(JSON.stringify(it))})" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-semibold">+ Escalate</button>`
                             : '—'}
                         </td>
                       </tr>
@@ -7439,7 +7448,7 @@ function renderUsersTable(users) {
           <td class="py-2.5 px-3 text-right">
             <button
               type="button"
-              onclick="handleToggleUserActive(${JSON.stringify(String(userId))}, ${nextActive})"
+              onclick="handleToggleUserActive(${safeJsArg_(userId)}, ${nextActive})"
               class="text-xs font-medium px-2.5 py-1 rounded border border-slate-300 hover:bg-slate-50 text-slate-700"
             >
               ${isActive ? 'Deactivate' : 'Activate'}
