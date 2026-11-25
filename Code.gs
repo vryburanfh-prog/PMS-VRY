@@ -179,45 +179,39 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
 
 function apiCreateUser(userPayload) {
   const ctx = assertPermission_('Users_Admin', 'create', null);
+  userPayload = userPayload || {};
+  const email = String(userPayload.email || '').trim().toLowerCase();
+  const fullName = String(userPayload.fullName || '').trim();
+  const roleName = String(userPayload.roleName || '').trim();
+  const deptVal = String(userPayload.department || '').trim();
+  const posVal = String(userPayload.position || '').trim();
+  const username = String(userPayload.username || '').trim().toLowerCase();
+  const initialPassword = String(userPayload.initialPassword || '');
+  const wantsPasswordLogin = Boolean(username || initialPassword);
+  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('Enter a valid Google email address.');
+  if (!email && !wantsPasswordLogin) throw new Error('Provide a Google email or create a username/password login.');
+  if (wantsPasswordLogin && (!username || !initialPassword)) throw new Error('Both username and temporary password are required for password login.');
+  if (wantsPasswordLogin && canonicalRoleIsAdmin_(roleName)) throw new Error('Administrators must use trusted Google account authentication only.');
+  if (wantsPasswordLogin && (username.length < 3 || username.length > 64 || !/^[a-z0-9._-]+$/.test(username))) throw new Error('Username must be 3–64 characters and use only letters, numbers, dots, underscores, or hyphens.');
+  if (wantsPasswordLogin && initialPassword.length < 12) throw new Error('Temporary password must be at least 12 characters.');
+  if (email.length > 254 || fullName.length > 150 || roleName.length > 80) throw new Error('One or more user fields exceed the allowed length.');
+  if (!ctx.isAdmin && /^(admin|administrator)$/i.test(roleName)) throw new Error('Only an Administrator can create an Administrator account.');
+  const canonicalRole = normalizeRoleName_(roleName);
+  if (REQUIRED_SYSTEM_ROLES.indexOf(canonicalRole) === -1) throw new Error('The selected role is not one of the supported system roles.');
+  if ((!email && !wantsPasswordLogin) || !fullName || !roleName) throw new Error('Google email or password-login credentials, Full Name, and Role are required.');
+
+  // Serialize duplicate checks, ID generation, and the multi-table creation sequence.
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    userPayload = userPayload || {};
-
-    const email = String(userPayload.email || '').trim().toLowerCase();
-    const fullName = String(userPayload.fullName || '').trim();
-    const roleName = String(userPayload.roleName || '').trim();
-    const deptVal = String(userPayload.department || '').trim();
-    const posVal = String(userPayload.position || '').trim();
-
-    const username = String(userPayload.username || '').trim().toLowerCase();
-    const initialPassword = String(userPayload.initialPassword || '');
-    const wantsPasswordLogin = Boolean(username || initialPassword);
-    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('Enter a valid Google email address.');
-    if (!email && !wantsPasswordLogin) throw new Error('Provide a Google email or create a username/password login.');
-    if (wantsPasswordLogin && (!username || !initialPassword)) throw new Error('Both username and temporary password are required for password login.');
-    if (wantsPasswordLogin && canonicalRoleIsAdmin_(roleName)) throw new Error('Administrators must use trusted Google account authentication only.');
-    if (wantsPasswordLogin && (username.length < 3 || username.length > 64 || !/^[a-z0-9._-]+$/.test(username))) throw new Error('Username must be 3–64 characters and use only letters, numbers, dots, underscores, or hyphens.');
-    if (wantsPasswordLogin && initialPassword.length < 12) throw new Error('Temporary password must be at least 12 characters.');
-    if (email.length > 254 || fullName.length > 150 || roleName.length > 80) throw new Error('One or more user fields exceed the allowed length.');
-    if (!ctx.isAdmin && /^(admin|administrator)$/i.test(roleName)) throw new Error('Only an Administrator can create an Administrator account.');
-    const canonicalRole = normalizeRoleName_(roleName);
-    if (REQUIRED_SYSTEM_ROLES.indexOf(canonicalRole) === -1) throw new Error('The selected role is not one of the supported system roles.');
-
-    if ((!email && !wantsPasswordLogin) || !fullName || !roleName) {
-      throw new Error('Google email or password-login credentials, Full Name, and Role are required.');
-    }
-
     if (wantsPasswordLogin) {
       ensureHybridAuthTables_();
       const existingCredentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
       if (existingCredentials.some(r => String(r.Username || '').trim().toLowerCase() === username)) throw new Error('Username is already registered.');
     }
-    const existingUsers = getTableRecords_(DB_CONFIG.TABS.USERS);
-    if (email && existingUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) {
-      throw new Error('A user with email "' + email + '" already exists.');
-    }
-    // Validate project references before creating the user row.
+    const existingUsers = getTableRecords_(DB_CONFIG.TABS.USERS) || [];
+    if (email && existingUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) throw new Error('A user with email "' + email + '" already exists.');
+
     const requestedAssignments = Array.isArray(userPayload.assignedProjectIds) ? userPayload.assignedProjectIds : [];
     const knownProjectIds = {};
     (getTableRecords_(DB_CONFIG.TABS.PROJECTS) || []).forEach(function (p) { knownProjectIds[String(p.Project_ID || '').trim()] = true; });
@@ -228,29 +222,26 @@ function apiCreateUser(userPayload) {
 
     const newUser = {
       User_ID: generateNextId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3),
-      Email: email,
-      Full_Name: fullName,
-      Position: posVal,
-      Department: deptVal,
-      Department_Or_Team: deptVal,
-      Role_Name: canonicalRole,
-      Role_ID: canonicalRole,
-      Is_Active: 'TRUE',
-      Created_At: getNowTimestamp_(),
-      Updated_At: getNowTimestamp_()
+      Email: email, Full_Name: fullName, Position: posVal, Department: deptVal,
+      Department_Or_Team: deptVal, Role_Name: canonicalRole, Role_ID: canonicalRole,
+      Is_Active: 'TRUE', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_()
     };
-
     insertRecord_(DB_CONFIG.TABS.USERS, newUser);
     if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
     if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
-    const assignedProjectIds = syncUserProjectAssignments_(newUser, userPayload.assignedProjectIds || [], ctx);
-    writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
-
-    return { success: true, user: newUser, assignedProjectIds: assignedProjectIds };
+    const assignedProjectIds = syncUserProjectAssignments_(newUser, requestedAssignments, ctx);
+    let auditWarning = '';
+    try {
+      writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
+    } catch (auditError) {
+      auditWarning = 'User was created successfully, but audit logging failed: ' + String(auditError && auditError.message || auditError);
+    }
+    return { success: true, user: newUser, assignedProjectIds: assignedProjectIds, warning: auditWarning };
   } finally {
     lock.releaseLock();
   }
 }
+
 function apiUpdateUser(userId, payload) {
   const ctx = assertAdministrator_();
   const lock = LockService.getScriptLock();
