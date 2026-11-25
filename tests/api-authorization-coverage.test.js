@@ -24,7 +24,7 @@ const allowlist = JSON.parse(allowlistMatch[1]);
 
 test('private Code.gs API endpoints are allowlisted and guarded', () => {
   const publicTokenEndpoint = 'apiGetPublishedClientDeckByToken';
-  const guardPattern = /assertPermission_\\(|assertPageAccess_\\(|assertAdministrator_\\(|assertDatabaseTransferAdmin_\\(|assertProjectAssignment_\\(|getCurrentUserContext_\\(/;
+  const guardPattern = /assertPrivilegedWbsRole_\\(|assertPermission_\\(|assertPageAccess_\\(|assertAdministrator_\\(|assertDatabaseTransferAdmin_\\(|assertProjectAssignment_\\(|getCurrentUserContext_\\(/;
   const privateApis = getApiNames(code).filter(name => name !== publicTokenEndpoint);
   for (const name of privateApis) {
     assert.ok(allowlist.includes(name), name + ' must be included in the dispatcher allowlist');
