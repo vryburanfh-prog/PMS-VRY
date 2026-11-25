@@ -839,6 +839,9 @@ function apiCreateProject(payload) {
  * Updates an existing project and logs previous/updated values in Audit_Logs.
  */
 function apiUpdateProject(projectId, updates, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   updates = updates || {};
   if (!projectId) throw new Error('Project_ID is required.');
@@ -861,12 +864,19 @@ function apiUpdateProject(projectId, updates, reason) {
   writeAuditLog_(ctx, 'UPDATE_PROJECT', 'Projects', projectId, result.previous, result.updated, reason || 'Updated project details');
 
   return { success: true, project: result.updated };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Archives or restores a project (soft-delete protection).
  */
 function apiArchiveProject(projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -887,6 +897,10 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
   );
 
   return { success: true, project: result.updated };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -937,6 +951,9 @@ function assertPrivilegedWbsRole_(projectId, action) {
 
 /** Archive or restore a Main WBS, Sub WBS, or Activity. */
 function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'edit');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -948,6 +965,10 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
   const result = updateRecordById_(cfg[0], cfg[1], recordId, { Is_Archived: flag });
   writeAuditLog_(ctx, archiveFlag ? 'ARCHIVE_WBS_RECORD' : 'RESTORE_WBS_RECORD', 'WBS_Structure', recordId, result.previous, result.updated, reason || (archiveFlag ? 'Archived WBS record' : 'Restored WBS record'));
   return { success: true, recordType: type, recordId: String(recordId), isArchived: Boolean(archiveFlag) };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** Permanently delete a WBS record only when no dependent records remain. */
