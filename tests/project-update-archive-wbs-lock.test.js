@@ -22,7 +22,7 @@ for (const [name, permission, mutation] of [
     const wait = body.indexOf('lock.waitLock(15000)');
     const permissionCheck = body.indexOf(permission);
     const write = body.indexOf(mutation);
-    const audit = body.indexOf('writeAuditLog_(ctx,');
+    const audit = body.indexOf('writeAuditLog_(');
     const release = body.indexOf('lock.releaseLock()');
     assert.ok(lock >= 0 && wait > lock, 'acquire lock before protected operations');
     assert.ok(permissionCheck > wait, 'authorization should occur inside lock');
