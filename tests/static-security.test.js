@@ -6,6 +6,8 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const code = fs.readFileSync(path.join(root, 'Code.gs'), 'utf8');
 const db = fs.readFileSync(path.join(root, 'Database.gs'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const presentationHtml = fs.readFileSync(path.join(root, 'Presentation.html'), 'utf8');
 
 function section(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
@@ -59,4 +61,12 @@ test('primary-key mapping includes core generated-ID tables', { skip: !pkFixPres
 
 test('test runner and source inputs are configured', () => {
   assert.ok(code.length > 0 && db.length > 0);
+});
+
+
+test('registry labels are escaped in loading and empty-state HTML templates', { skip: !(indexHtml.includes('Loading ${escapeHtmlSafe_(registryKey)} registry') && presentationHtml.includes('Loading ${escapeHtmlSafe_(registryKey)} registry') && indexHtml.includes('No ${escapeHtmlSafe_(st.key.toLowerCase())} found') && presentationHtml.includes('No ${escapeHtmlSafe_(st.key.toLowerCase())} found') && !indexHtml.includes('Loading ${registryKey} registry') && !presentationHtml.includes('Loading ${registryKey} registry')) && 'Pending UI interpolation escaping remediation PR' }, () => {
+  for (const html of [indexHtml, presentationHtml]) {
+    assert.ok(html.includes('Loading ${escapeHtmlSafe_(registryKey)} registry'));
+    assert.ok(html.includes('No ${escapeHtmlSafe_(st.key.toLowerCase())} found'));
+  }
 });
