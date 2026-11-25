@@ -80,3 +80,39 @@ test('ranks over-budget and overdue milestones ahead of routine open issues', ()
   assert.equal(prioritizeProjectExceptions({ controls: base }).level, 'attention');
 });
 
+test('exposes a project drill-down summary without copying risk or issue records', () => {
+  const model = buildPmsPortfolioDashboardModel(portfolio, [{
+    projectId: 'P-1',
+    statusDate: '2026-11-25',
+    progress: { planned: { value: 60 }, actual: { value: 52 }, variancePercentagePoints: -8 },
+    baseline: { revision: 3, approvedDate: '2026-10-01' },
+    schedule: { durationInWorkingDays: 45, criticalActivities: ['A-1', 'A-2'], activities: [{ id: 'A-1' }] },
+    scheduleAlerts: { delayedActivityCount: 2, overdueMilestoneCount: 1 },
+    riskSummary: { total: 4, open: 3, highOrCriticalOpen: 1, records: [{ id: 'R-1', description: 'private narrative' }] },
+    issueSummary: { total: 5, open: 2, records: [{ id: 'I-1', description: 'private narrative' }] },
+    finance: { budget: 1000, committed: 800, actualSpend: 1100, uncommittedBudget: 200,
+      remainingBudgetAfterActual: -100, overBudget: true, overCommitment: false, currency: null },
+    availability: { schedule: true, milestones: true, risks: true, issues: true, financialMonitoring: true },
+    warnings: []
+  }]);
+  const detail = model.projects[0].drilldown;
+  assert.equal(detail.progress.variancePercentagePoints, -8);
+  assert.equal(detail.schedule.criticalActivityCount, 2);
+  assert.equal(detail.risks.highOrCriticalOpen, 1);
+  assert.equal(detail.issues.open, 2);
+  assert.equal(detail.finance.remainingBudgetAfterActual, -100);
+  assert.equal(JSON.stringify(detail).includes('private narrative'), false);
+  assert.equal(detail.risks.records, undefined);
+});
+
+test('treats missing metric coverage as incomplete rather than monitor', () => {
+  const { prioritizeProjectExceptions } = require('../src/pms-portfolio-dashboard');
+  const priority = prioritizeProjectExceptions({ controls: {
+    highOrCriticalOpenRisks: null, openIssues: 0, overdueMilestones: 0,
+    delayedActivities: 0, overBudget: false, overCommitment: false,
+    hasFinancialData: true,
+    availability: { schedule: true, milestones: true, risks: false, issues: true, financialMonitoring: true }
+  } });
+  assert.equal(priority.level, 'incomplete');
+});
+
