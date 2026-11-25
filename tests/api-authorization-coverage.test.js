@@ -38,6 +38,15 @@ test('dispatcher allowlist entries resolve to a known API or an explicit auth en
   for (const name of allowlist) assert.ok(known.has(name), name + ' is allowlisted but not declared');
 });
 
+test('digest trigger status and save endpoints are separate top-level functions', () => {
+  const statusBody = extractTopLevelFunction(code, 'apiGetDigestTriggerStatus');
+  const saveBody = extractTopLevelFunction(code, 'apiSaveDigestTriggerConfig');
+  assert.match(statusBody, /getPhase17History_\(ctx, visibleIds\)/);
+  assert.match(saveBody, /isPhase17Admin_\(ctx\)/);
+  assert.match(saveBody, /ScriptApp\.newTrigger/);
+  assert.match(saveBody, /lock\.releaseLock/);
+});
+
 test('public client deck endpoint remains token-gated and outside private dispatcher allowlist', () => {
   const name = 'apiGetPublishedClientDeckByToken';
   assert.ok(!allowlist.includes(name), 'public token endpoint must not be part of private dispatcher allowlist');
