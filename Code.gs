@@ -4136,7 +4136,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
-    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900),
+    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Utilities.getUuid().replace(/-/g, ''),
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
     Captured_By: actor,
@@ -4155,21 +4155,35 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     var key = String(h).trim();
     return record[key] !== undefined ? record[key] : '';
   });
-  sheet.appendRow(rowValues);
-
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      'CAPTURE_SNAPSHOT',
-      'PMO_Snapshots',
-      record.Project_ID,
-      null,
-      record,
-      'Captured PMO snapshot ' + record.Snapshot_ID + ' (' + record.Label + ')'
-    );
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    sheet.appendRow(rowValues);
+    if (typeof invalidateTableCache_ === 'function') invalidateTableCache_(resolvePhase19TabName_());
+  } finally {
+    lock.releaseLock();
   }
 
-  return apiGetSnapshotsAndTemplatesData(activeProjectId);
+  var auditWarning = null;
+  if (typeof writeAuditLog_ === 'function') {
+    try {
+      writeAuditLog_(
+        ctx,
+        'CAPTURE_SNAPSHOT',
+        'PMO_Snapshots',
+        record.Project_ID,
+        null,
+        record,
+        'Captured PMO snapshot ' + record.Snapshot_ID + ' (' + record.Label + ')'
+      );
+    } catch (auditError) {
+      auditWarning = 'Snapshot was saved, but audit logging failed: ' + auditError.message;
+    }
+  }
+
+  var response = apiGetSnapshotsAndTemplatesData(activeProjectId);
+  if (auditWarning) response.warning = auditWarning;
+  return response;
 }
 
 // ============================================================================
