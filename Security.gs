@@ -523,16 +523,30 @@ function apiLoginWithGoogleCredential(idToken) {
   if (String(claims.aud || '') !== clientId || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
     return { success:false, error:'Google identity verification failed.' };
   }
-  const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.Email || '').trim().toLowerCase() === email);
-  if (!user || !isTruthySheetFlag_(user.Is_Active)) return { success:false, error:'This Google account is not registered or is inactive.' };
-  const role = normalizeRoleName_(user.Role_Name || user.Role_ID);
-  const isAdmin = role === 'Administrator' && isTrustedAdministratorEmail_(email);
-  if (role === 'Administrator' && !isAdmin) return { success:false, error:'Administrator access requires a trusted Google account.' };
-  const bearer = authRandomToken_();
-  const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
-  writeAuditLog_({email:email,fullName:user.Full_Name,user:{email:email,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'GOOGLE_OAUTH'}, 'Google OAuth login');
-  return { success:true, token:bearer, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name,role:role,isAdmin:isAdmin} };
+
+  // Serialize final authorization checks and session creation with status changes,
+  // role changes, and trusted-admin allowlist mutations.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.Email || '').trim().toLowerCase() === email);
+    if (!user || !isTruthySheetFlag_(user.Is_Active)) return { success:false, error:'This Google account is not registered or is inactive.' };
+    const role = normalizeRoleName_(user.Role_Name || user.Role_ID);
+    const isAdmin = role === 'Administrator' && isTrustedAdministratorEmail_(email);
+    if (role === 'Administrator' && !isAdmin) return { success:false, error:'Administrator access requires a trusted Google account.' };
+    const bearer = authRandomToken_();
+    const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
+    insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+    let auditWarning = '';
+    try {
+      writeAuditLog_({email:email,fullName:user.Full_Name,user:{email:email,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'GOOGLE_OAUTH'}, 'Google OAuth login');
+    } catch (auditError) {
+      auditWarning = 'Login succeeded, but audit logging failed: ' + auditError.message;
+    }
+    return { success:true, token:bearer, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name,role:role,isAdmin:isAdmin}, warning:auditWarning };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiLogout() {
