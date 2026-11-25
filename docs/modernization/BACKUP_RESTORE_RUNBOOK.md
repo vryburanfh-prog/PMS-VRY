@@ -112,7 +112,7 @@ The workflow creates the Projects row, creates a creator Project_Assignments row
 
 1. Stop retrying and search the Projects table for the exact `Project_ID`/project name created by the request; verify identity from the request timestamp and operator.
 2. If the Projects row exists, inspect active Project_Assignments for the creator and that `Project_ID`. A missing assignment can make the project inaccessible to the creator even though the project record exists.
-3. Use supported project/user administration paths to reconcile the creator assignment and validate role/scope. Do not create a duplicate project to “fix” the failure.
+3. Use the Administrator `apiUpdateUser` workflow to synchronize the creator's assigned-project IDs (the endpoint updates active Project_Assignments), then validate role/scope. Do not create a duplicate project to “fix” the failure.
 4. If a project row is not intended to remain, preserve the incident copy and ask the authorized maintainer to determine a safe cleanup path. The reviewed source does not provide a verified transactional rollback for project creation; avoid manual row deletion or edits on the live spreadsheet.
 5. Verify project access, assignment role, key dashboard/module reads, and audit evidence before closing the incident.
 
