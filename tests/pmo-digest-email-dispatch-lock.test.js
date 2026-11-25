@@ -34,5 +34,5 @@ test('scheduled PMO digest dispatch is serialized', () => {
   assert.ok(lock >= 0 && wait > lock, 'acquires script lock');
   assert.ok(send > wait && release > send, 'scheduled email is protected and lock released afterward');
   assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
-  assert.equal((body.match(/lock\\.releaseLock\\(\\)/g) || []).length, 1, 'exactly one lock release');
+  assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1, 'exactly one lock release');
 });
