@@ -1528,6 +1528,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Milestone_ID',
     prefix: 'MLS',
     pad: 4,
+    editableFields: ["Main_WBS_ID","Sub_WBS_ID","Milestone_Name","Responsible_Person","Milestone_Status","Baseline_Date","Forecast_Date","Actual_Date","Description","Remarks"], requiredFields: ["Milestone_Name"],
     wbsMainCol: 'Main_WBS_ID',
     wbsSubCol: 'Sub_WBS_ID'
   },
@@ -1537,6 +1538,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Deliverable_ID',
     prefix: 'DEL',
     pad: 4,
+    editableFields: ["Main_WBS_ID","Sub_WBS_ID","Deliverable_Description","Responsible_Person","Revision_Number","Internal_Submission_Date","Client_Submission_Date","Actual_Submission_Date","Approval_Status","General_Status","Priority","Remarks"], requiredFields: ["Deliverable_Description"], approvalFields: ["Approval_Status"], createDefaults: {"Approval_Status":"Not Submitted"},
     wbsMainCol: 'Main_WBS_ID',
     wbsSubCol: 'Sub_WBS_ID'
   },
@@ -1546,6 +1548,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Permit_ID',
     prefix: 'PMT',
     pad: 4,
+    editableFields: ["Related_Main_WBS_ID","Related_Sub_WBS_ID","Permit_Name","Permit_Category","Government_Agency","Responsible_Person","Permit_Status","Submission_Date","Expected_Approval_Date","Actual_Approval_Date","Validity_Start_Date","Expiration_Date","Required_Documents","Pending_Requirements","Remarks"], requiredFields: ["Permit_Name","Government_Agency"],
     wbsMainCol: 'Related_Main_WBS_ID',
     wbsSubCol: 'Related_Sub_WBS_ID'
   },
@@ -1555,6 +1558,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Risk_ID',
     prefix: 'RSK',
     pad: 4,
+    editableFields: ["Related_Main_WBS_ID","Related_Sub_WBS_ID","Risk_Description","Risk_Cause","Potential_Impact","Probability","Impact_Level","Risk_Owner","Target_Resolution_Date","Current_Status","Mitigation_Plan","Contingency_Plan","Remarks"], requiredFields: ["Risk_Description"],
     wbsMainCol: 'Related_Main_WBS_ID',
     wbsSubCol: 'Related_Sub_WBS_ID'
   },
@@ -1564,6 +1568,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Issue_ID',
     prefix: 'ISS',
     pad: 4,
+    editableFields: ["Related_Main_WBS_ID","Related_Sub_WBS_ID","Issue_Subject","Issue_Description","Impact","Responsible_Person","Priority","Due_Date","Resolution_Date","Issue_Status","Course_Of_Action","Corrective_Action","Remarks"], requiredFields: ["Issue_Subject"],
     wbsMainCol: 'Related_Main_WBS_ID',
     wbsSubCol: 'Related_Sub_WBS_ID'
   },
@@ -1573,6 +1578,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Repository_ID',
     prefix: 'REP',
     pad: 4,
+    editableFields: ["Related_Main_WBS_ID","Repository_Name","Cloud_Storage_Provider","Access_Classification","Repository_URL","Responsible_Person","Description","Remarks"], requiredFields: ["Repository_Name","Repository_URL"],
     wbsMainCol: 'Related_Main_WBS_ID',
     wbsSubCol: ''
   },
@@ -1582,6 +1588,7 @@ const CONTROLS_REGISTRY_CONFIG = {
     idCol: 'Approval_ID',
     prefix: 'APR',
     pad: 4,
+    editableFields: ["Related_Main_WBS_ID","Related_Sub_WBS_ID","Approval_Category","Approval_Description","Requesting_Person","Approving_Person_Or_Authority","Submission_Date","Required_Approval_Date","Actual_Approval_Date","Approval_Status","Priority","Pending_Requirements","Remarks"], requiredFields: ["Approval_Description"], approvalFields: ["Approval_Status"], createDefaults: {"Approval_Status":"Pending Submission"},
     wbsMainCol: 'Related_Main_WBS_ID',
     wbsSubCol: 'Related_Sub_WBS_ID'
   }
@@ -1664,6 +1671,8 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
   if (!projectId) throw new Error('Project_ID is required.');
 
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Record payload must be an object.');
+
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
@@ -1680,8 +1689,32 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
     ? rawId
     : generateNextId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad);
 
-  const cleanRecord = Object.assign({}, payload);
-  delete cleanRecord._rowIndex;
+  const allowedFields = cfg.editableFields || [];
+  const unknownFields = Object.keys(payload || {}).filter(function(key) {
+    return key !== cfg.idCol && key !== '_rowIndex' && !allowedFields.includes(key);
+  });
+  if (unknownFields.length) throw new Error('Unsupported fields for ' + registryKey + ': ' + unknownFields.join(', '));
+
+  const cleanRecord = {};
+  allowedFields.forEach(function(field) {
+    if (Object.prototype.hasOwnProperty.call(payload || {}, field)) cleanRecord[field] = payload[field];
+  });
+  const approvalFields = cfg.approvalFields || [];
+  const canApprove = Boolean(ctx.permissions && ctx.permissions[cfg.module] && ctx.permissions[cfg.module].approve);
+  approvalFields.forEach(function(field) {
+    if (Object.prototype.hasOwnProperty.call(cleanRecord, field) && !canApprove) {
+      throw new Error('Approval permission is required to change ' + field + '.');
+    }
+  });
+  if (!isUpdate && cfg.createDefaults) {
+    Object.keys(cfg.createDefaults).forEach(function(field) {
+      if (!Object.prototype.hasOwnProperty.call(cleanRecord, field)) cleanRecord[field] = cfg.createDefaults[field];
+    });
+  }
+  (cfg.requiredFields || []).forEach(function(field) {
+    const value = Object.prototype.hasOwnProperty.call(cleanRecord, field) ? cleanRecord[field] : (existing ? existing[field] : '');
+    if (String(value || '').trim() === '') throw new Error(field + ' is required.');
+  });
   cleanRecord[cfg.idCol] = recordId;
   cleanRecord.Project_ID = pid;
 
