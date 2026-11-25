@@ -2306,7 +2306,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           { title: 'Issues', allowed: res.access.issues, value: res.access.issues ? metric(count(res.issues)) : 'Restricted',
             detail: 'Issue records', extra: 'Open: ' + (res.access.issues ? openIssues : 'Restricted') },
           { title: 'Financial monitoring', allowed: res.access.financialMonitoring, value: res.access.financialMonitoring ? metric(count(res.financialItems)) : 'Restricted',
-            detail: 'Financial records · Currency not inferred',
+            detail: 'Financial records · Currency not inferred · EVM unavailable without approved time-phased PV/EV',
             extra: res.access.financialMonitoring && financeRows.length ? 'Budget: ' + fmt(budget) + ' · Committed: ' + fmt(committed) + ' · Spent: ' + fmt(actual) : (res.access.financialMonitoring ? 'No financial records' : 'Restricted') }
         ];
         const cards = sections.map(function (section) {
