@@ -5288,17 +5288,7 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
     if (!plan.length) throw new Error('No matching database tabs were found in the source spreadsheet.');
     // Always create a full backup only after all source headers have passed validation.
     var backup = DriveApp.getFileById(getMasterSpreadsheetId_()).makeCopy('PMO_PRE_IMPORT_BACKUP_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss'));
-    var updated = [];
-    plan.forEach(function(item) {
-      var dstLast = item.dst.getLastRow();
-      if (dstLast > 1) item.dst.getRange(2, 1, dstLast - 1, item.cols).clearContent();
-      if (item.rows.length) {
-        var requiredLastRow = item.rows.length + 1;
-        if (requiredLastRow > item.dst.getMaxRows()) item.dst.insertRowsAfter(item.dst.getMaxRows(), requiredLastRow - item.dst.getMaxRows());
-        item.dst.getRange(2, 1, item.rows.length, item.cols).setValues(item.rows);
-      }
-      updated.push({ tab: item.tab, rows: item.rows.length });
-    });
+    var updated = applyDatabaseImportPlanWithRollback_(plan, backup.getId(), backup.getUrl());
     writeAuditLog_(ctx, 'DATABASE_IMPORT', 'Database', sourceId[0], null, { tabs: updated, backupId: backup.getId() }, 'Imported matching tabs from Google Sheets source');
     return { success: true, updated: updated, backupUrl: backup.getUrl(), backupId: backup.getId() };
   } finally { lock.releaseLock(); }
