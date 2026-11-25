@@ -962,8 +962,10 @@ function apiGetPortfolioControlsSummary(filters) {
     };
   });
   const total = function (key) {
-    const known = rows.filter(function (row) { return row[key] !== null; });
-    return known.length ? known.reduce(function (sum, row) { return sum + row[key]; }, 0) : null;
+    // A portfolio total is only reliable when every included project has this module's data.
+    // Never present a partial sum as if it covered the full authorized portfolio.
+    if (rows.some(function (row) { return row[key] === null; })) return null;
+    return rows.reduce(function (sum, row) { return sum + row[key]; }, 0);
   };
   return {
     success: true,
