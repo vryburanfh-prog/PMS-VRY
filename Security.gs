@@ -437,6 +437,36 @@ function findValidAuthSession_(token) {
   return record;
 }
 
+/**
+ * Apply a login outcome to the credential's attempt counter under lock.
+ * Re-read under lock and ignore stale attempts if the credential hash changed
+ * during password verification (for example, a concurrent password reset).
+ */
+function updateCredentialLoginState_(credentialId, verifiedPasswordHash, successful) {
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const current = findRecordRowById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialId);
+    if (!current || String(current.Password_Hash || '') !== String(verifiedPasswordHash || '')) {
+      return { updated:false, locked:false, stale:true };
+    }
+    if (current.Locked_Until && new Date(current.Locked_Until).getTime() > Date.now()) {
+      return { updated:false, locked:true, stale:false };
+    }
+    const attempts = successful ? 0 : Number(current.Failed_Attempts || 0) + 1;
+    const lockedUntil = !successful && attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : '';
+    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialId, {
+      Failed_Attempts: attempts,
+      Locked_Until: lockedUntil,
+      Updated_At: getNowTimestamp_()
+    });
+    return { updated:true, locked:!!lockedUntil, stale:false, attempts:attempts };
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
+}
+
 function apiLoginWithPassword(username, password) {
   ensureHybridAuthTables_();
   const name = String(username || '').trim().toLowerCase();
@@ -448,13 +478,15 @@ function apiLoginWithPassword(username, password) {
   if (cred.Locked_Until && new Date(cred.Locked_Until).getTime() > Date.now()) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.User_ID) === String(cred.User_ID));
   if (!user || !isTruthySheetFlag_(user.Is_Active) || normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') return { success:false, error:'This account is inactive or not eligible for password login.' };
+  const observedHash = String(cred.Password_Hash || '');
   const candidate = hashPassword_(pass, cred.Password_Salt);
-  if (candidate !== String(cred.Password_Hash || '')) {
-    const attempts = Number(cred.Failed_Attempts || 0) + 1;
-    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts: attempts, Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '', Updated_At: getNowTimestamp_() });
+  if (candidate !== observedHash) {
+    const state = updateCredentialLoginState_(cred.Credential_ID, observedHash, false);
+    if (state.locked) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
     Utilities.sleep(500); return { success:false, error:'Invalid username or password.' };
   }
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
+  const state = updateCredentialLoginState_(cred.Credential_ID, observedHash, true);
+  if (!state.updated) return { success:false, error:state.locked ? 'Account temporarily locked. Contact an Administrator.' : 'Password changed during login. Please try again.' };
   const token = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
   insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
