@@ -841,6 +841,9 @@ function apiCreateProject(payload) {
  * Updates an existing project and logs previous/updated values in Audit_Logs.
  */
 function apiUpdateProject(projectId, updates, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   updates = updates || {};
   if (!projectId) throw new Error('Project_ID is required.');
@@ -862,13 +865,19 @@ function apiUpdateProject(projectId, updates, reason) {
   const result = updateRecordById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', projectId, cleanUpdates);
   writeAuditLog_(ctx, 'UPDATE_PROJECT', 'Projects', projectId, result.previous, result.updated, reason || 'Updated project details');
 
-  return { success: true, project: result.updated };
+  return { success: true, project: result.updated };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /**
  * Archives or restores a project (soft-delete protection).
  */
 function apiArchiveProject(projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -888,8 +897,11 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
     reason || (archiveFlag ? 'Archived project' : 'Restored project')
   );
 
-  return { success: true, project: result.updated };
+  return { success: true, project: result.updated };  } finally {
+    lock.releaseLock();
+  }
 }
+
 
 /**
  * Fetches Main WBS, Sub WBS, Activities, and Schedule Dependencies for a project.
