@@ -31,6 +31,9 @@ test('main HTML templates escape server-controlled dynamic values', () => {
 });
 
 test('registry links allow HTTPS only and escape the resulting attribute', () => {
+  const htmlEscaper = extractFunction(index, 'escapeHtmlSafe_');
+  const escapeHtmlSafe_ = new Function(htmlEscaper + '; return escapeHtmlSafe_;')();
+  assert.equal(escapeHtmlSafe_('<>&"\''), '&lt;&gt;&amp;&quot;&#39;');
   const helper = extractFunction(index, 'safeExternalHref_');
   const safeExternalHref_ = new Function(helper + '; return safeExternalHref_;')();
   assert.equal(safeExternalHref_('https://example.com/path?a=1&b=2'), 'https://example.com/path?a=1&b=2');
@@ -46,10 +49,13 @@ test('project edit handler JSON is HTML-encoded inside its inline attribute', ()
 });
 
 test('all inline index scripts parse as JavaScript', () => {
-  const scripts = [...index.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
-    .filter(match => !/\\bsrc\\s*=/.test(match[1]))
+  const scripts = [...index.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(match => !/\bsrc\s*=/.test(match[1]))
     .map(match => match[2])
     .filter(script => script.trim());
   assert.ok(scripts.length > 0, 'inline script should exist');
-  for (const script of scripts) assert.doesNotThrow(() => new Function(script));
+  for (const script of scripts) {
+    const normalized = script.replace(/<\?!=[\s\S]*?\?>/g, 'null');
+    assert.doesNotThrow(() => new Function(normalized));
+  }
 });
