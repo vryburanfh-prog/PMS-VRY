@@ -5,6 +5,8 @@ on:
     paths:
       - 'Code.gs'
       - 'Security.gs'
+      - 'Presentation.html'
+      - 'tests/presentation-html-escaping.test.js'
       - 'tests/api-authorization-coverage.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
   push:
@@ -24,4 +26,4 @@ jobs:
           node-version: '20'
       - run: node --check < Code.gs
       - run: node --check < Security.gs
-      - run: node --test tests/api-authorization-coverage.test.js tests/presentation-html-escaping.test.js
+      - run: node --test tests/api-authorization-coverage.test.js tests/presentation-html-escaping.test.js tests/presentation-html-escaping.test.js
