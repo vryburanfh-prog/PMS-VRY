@@ -5429,6 +5429,29 @@ function apiCreateDatabaseTemplateCopy() {
  * Applies a validated import plan and attempts compensating restoration from
  * the pre-import Drive backup if any destination write fails.
  */
+/**
+ * Import data values safely, then restore only actual source formulas.
+ * Formula cells are trusted only because database imports are Administrator-gated.
+ */
+function writeImportRowsPreservingFormulas_(sheet, startRow, rows, formulas, columnCount) {
+  if (!rows || !rows.length) return;
+  const safeRows = rows.map(function(row) {
+    return row.map(sanitizeSpreadsheetCellValue_);
+  });
+  sheet.getRange(startRow, 1, safeRows.length, columnCount).setValues(safeRows);
+  (formulas || []).forEach(function(row, rowIndex) {
+    var colIndex = 0;
+    while (colIndex < columnCount) {
+      if (!row || !row[colIndex]) { colIndex++; continue; }
+      var runStart = colIndex;
+      while (colIndex + 1 < columnCount && row[colIndex + 1]) colIndex++;
+      var formulasRun = row.slice(runStart, colIndex + 1);
+      sheet.getRange(startRow + rowIndex, runStart + 1, 1, formulasRun.length).setFormulas([formulasRun]);
+      colIndex++;
+    }
+  });
+}
+
 function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupUrl) {
   var touched = [];
   var updated = [];
@@ -5440,7 +5463,7 @@ function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupU
       if (item.rows.length) {
         var requiredLastRow = item.rows.length + 1;
         if (requiredLastRow > item.dst.getMaxRows()) item.dst.insertRowsAfter(item.dst.getMaxRows(), requiredLastRow - item.dst.getMaxRows());
-        item.dst.getRange(2, 1, item.rows.length, item.cols).setValues(item.rows);
+        writeImportRowsPreservingFormulas_(item.dst, 2, item.rows, item.formulas, item.cols);
       }
       invalidateTableCache_(item.tab);
       updated.push({ tab: item.tab, rows: item.rows.length });
@@ -5463,9 +5486,11 @@ function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupU
         var currentLast = item.dst.getLastRow();
         if (currentLast > 1) item.dst.getRange(2, 1, currentLast - 1, item.cols).clearContent();
         if (backupLast > 1) {
-          var restoreRows = backupSheet.getRange(2, 1, backupLast - 1, item.cols).getValues();
+          var backupRange = backupSheet.getRange(2, 1, backupLast - 1, item.cols);
+          var restoreRows = backupRange.getValues();
+          var restoreFormulas = backupRange.getFormulas();
           if (restoreRows.length + 1 > item.dst.getMaxRows()) item.dst.insertRowsAfter(item.dst.getMaxRows(), restoreRows.length + 1 - item.dst.getMaxRows());
-          item.dst.getRange(2, 1, restoreRows.length, item.cols).setValues(restoreRows);
+          writeImportRowsPreservingFormulas_(item.dst, 2, restoreRows, restoreFormulas, item.cols);
         }
         invalidateTableCache_(item.tab);
       } catch (rollbackError) {
@@ -5477,9 +5502,7 @@ function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupU
       : 'Rollback was attempted for all touched tabs from the backup copy.';
     throw new Error('Database import failed: ' + importError.message + '. ' + detail + ' Backup URL: ' + backupUrl);
   }
-}
-
-function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
+}function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
   var ctx = assertDatabaseTransferAdmin_();
   var sourceId = String(sourceSpreadsheetId || '').trim().match(/[-\w]{25,}/);
   if (!sourceId) throw new Error('Enter a valid Google Sheets URL or spreadsheet ID.');
@@ -5504,9 +5527,11 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
         throw new Error('Header mismatch in tab "' + tabName + '". No import was applied.');
       }
       var srcLast = src.getLastRow();
-      var importRows = srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [];
+      var sourceRange = srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols) : null;
+      var importRows = sourceRange ? sourceRange.getValues() : [];
+      var importFormulas = sourceRange ? sourceRange.getFormulas() : [];
       validateImportedPrimaryKeys_(tabName, srcHeaders, importRows);
-      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: importRows });
+      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: importRows, formulas: importFormulas });
     });
     if (!plan.length) throw new Error('No matching database tabs were found in the source spreadsheet.');
     // Always create a full backup only after all source headers have passed validation.
