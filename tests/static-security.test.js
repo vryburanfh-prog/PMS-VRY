@@ -95,7 +95,7 @@ test('escalation updates enforce project/portfolio ownership', { skip: !code.inc
 
 test('Phase 18 escalation and Phase 19 snapshot use locked insert/update helpers', { skip: !(code.includes('insertRecord_(\'Escalations\', record)') && code.includes('updateRecordById_(\'Escalations\'') && code.includes('insertRecord_(\'PMO_Snapshots\', record)') && db.includes("Escalations: 'Escalation_ID'") && db.includes("PMO_Snapshots: 'Snapshot_ID'")) && 'Pending Phase 18/19 helper-integrity remediation PR' }, () => {
   const esc = section(code, 'function apiUpsertEscalationItem', 'function apiCapturePmoSnapshot');
-  const snap = section(code, 'function apiCapturePmoSnapshot', 'function apiGetSnapshotsAndTemplatesData');
+  const snap = section(code, 'function apiCapturePmoSnapshot', 'function parsePhase20DateSafe_');
   assert.ok(esc.includes("insertRecord_('Escalations', record)"));
   assert.ok(esc.includes("updateRecordById_('Escalations', 'Escalation_ID'"));
   assert.ok(snap.includes("insertRecord_('PMO_Snapshots', record)"));
