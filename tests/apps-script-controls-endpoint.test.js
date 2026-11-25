@@ -357,3 +357,9 @@ test('project controls API exposes CPM only when schedule permission is granted'
   assert.match(fn, /cpm: cpm/);
   assert.match(fn, /if \(scheduleAllowed\)/);
 });
+
+test('project drill-down displays a bounded CPM critical-path sequence', () => {
+  assert.match(indexSource, /criticalActivityIds\.slice\(0, 8\)\.join\(' → '\)/);
+  assert.match(indexSource, /Critical path:/);
+  assert.match(indexSource, /criticalActivityIds\.length > 8/);
+});
