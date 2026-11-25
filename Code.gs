@@ -3883,24 +3883,16 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
     throw new Error('Escalation title is required.');
   }
 
-  var sheet = ensurePhase18Sheet_();
-  var lastRow = sheet.getLastRow();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colIdx = {};
-  headers.forEach(function(h, i) { colIdx[String(h).trim()] = i + 1; });
-
+  ensurePhase18Sheet_();
   var nowIso = new Date().toISOString();
   var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
   var escId = String(p.Escalation_ID || '').trim();
-
-  var existingRowIndex = -1;
-  if (escId && lastRow >= 2 && colIdx['Escalation_ID']) {
-    var ids = sheet.getRange(2, colIdx['Escalation_ID'], lastRow - 1, 1).getValues();
-    for (var r = 0; r < ids.length; r++) {
-      if (String(ids[r][0]).trim() === escId) {
-        existingRowIndex = r + 2;
-        break;
-      }
+  var existingEscalation = escId ? findRecordRowById_('Escalations', 'Escalation_ID', escId) : null;
+  if (existingEscalation) {
+    var storedProjectId = String(existingEscalation.Project_ID || '').trim();
+    var requestedProjectId = targetPid || 'PORTFOLIO';
+    if (storedProjectId !== requestedProjectId) {
+      throw new Error('Escalation does not belong to the active project or portfolio scope.');
     }
   }
 
@@ -3913,40 +3905,32 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
     Owner_Email: String(p.Owner_Email || actor).trim(),
     Status: String(p.Status || 'OPEN').trim().toUpperCase(),
     Notes: String(p.Notes || '').trim(),
-    Created_By: actor,
-    Created_At: nowIso,
+    Created_By: existingEscalation ? (existingEscalation.Created_By || actor) : actor,
+    Created_At: existingEscalation ? (existingEscalation.Created_At || nowIso) : nowIso,
     Updated_At: nowIso
   };
 
-  if (existingRowIndex > 0) {
-    if (colIdx['Created_By']) {
-      record.Created_By = sheet.getRange(existingRowIndex, colIdx['Created_By']).getValue() || actor;
-    }
-    if (colIdx['Created_At']) {
-      record.Created_At = sheet.getRange(existingRowIndex, colIdx['Created_At']).getValue() || nowIso;
-    }
-    Object.keys(record).forEach(function(k) {
-      if (colIdx[k]) {
-        sheet.getRange(existingRowIndex, colIdx[k]).setValue(record[k]);
-      }
-    });
-  } else {
-    var newRowValues = headers.map(function(h) {
-      var key = String(h).trim();
-      return record[key] !== undefined ? record[key] : '';
-    });
-    sheet.appendRow(newRowValues);
-  }
-
-  if (typeof writeAuditLog_ === 'function') {
+  if (existingEscalation) {
+    var updateResult = updateRecordById_('Escalations', 'Escalation_ID', record.Escalation_ID, record);
     writeAuditLog_(
       ctx,
-      existingRowIndex > 0 ? 'UPDATE_ESCALATION' : 'CREATE_ESCALATION',
+      'UPDATE_ESCALATION',
       'Escalations',
-      record.Project_ID,
+      record.Escalation_ID,
+      updateResult.previous,
+      updateResult.updated,
+      'Updated escalation ' + record.Escalation_ID
+    );
+  } else {
+    insertRecord_('Escalations', record);
+    writeAuditLog_(
+      ctx,
+      'CREATE_ESCALATION',
+      'Escalations',
+      record.Escalation_ID,
       null,
       record,
-      (existingRowIndex > 0 ? 'Updated' : 'Created') + ' escalation ' + record.Escalation_ID
+      'Created escalation ' + record.Escalation_ID
     );
   }
 
@@ -4127,7 +4111,6 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
   var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var metrics = computePhase19CurrentMetrics_(targetPid);
 
   var now = new Date();
@@ -4151,11 +4134,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
-  sheet.appendRow(rowValues);
+  insertRecord_('PMO_Snapshots', record);
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(
