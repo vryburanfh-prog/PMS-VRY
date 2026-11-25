@@ -64,3 +64,9 @@ test('user ID event arguments use safe JSON/HTML encoding', () => {
   assert.ok(presentation.includes('onclick="handleToggleUserStatus(${safeUid}, true)"'));
   assert.ok(presentation.includes('onclick="openEditUserModal_(${safeUid})"'));
 });
+
+test('workload WBS/date summaries and portfolio resource counts are escaped', () => {
+  assert.ok(presentation.includes('${escapeHtmlSafe_(wbsStr)}'));
+  assert.ok(presentation.includes('${escapeHtmlSafe_(dateStr)}'));
+  assert.ok(presentation.includes('${escapeHtmlSafe_(r.Overallocated_Resources)}'));
+});
