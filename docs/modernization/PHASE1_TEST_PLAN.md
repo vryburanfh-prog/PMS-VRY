@@ -4,7 +4,8 @@
 
 Current repository tests:
 - api-authorization-coverage.test.js: API inventory, allowlist/guard coverage, public deck classification, dispatcher/wrapper checks, digest API structure.
-- presentation-html-escaping.test.js: escaped dynamic interpolation regressions.
+- presentation-html-escaping.test.js: Presentation dynamic interpolation regressions.
+- index-html-escaping.test.js: main index dynamic field escaping, inline-script parsing after Apps Script template preprocessing, and HTTPS-only share URL validation.
 - project-control-field-authorization.test.js: server allowlists match UI schema; reserved/required/protected fields.
 - spreadsheet-formula-safety.test.js: generic/direct write sanitizer and import path.
 - google-token-validation.test.js: provider/JSON failures and Google claim checks.
