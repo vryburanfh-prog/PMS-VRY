@@ -535,9 +535,12 @@ function apiGetPortfolioData(filters) {
 
   const allProjects = getTableRecords_(DB_CONFIG.TABS.PROJECTS);
   const assignments = ctx.isAdmin ? getTableRecords_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS) : [];
-  const milestones = getTableRecords_(DB_CONFIG.TABS.MILESTONES);
-  const risks = getTableRecords_(DB_CONFIG.TABS.RISKS);
-  const issues = getTableRecords_(DB_CONFIG.TABS.ISSUES);
+  const canViewMilestones = Boolean(ctx.isAdmin || (ctx.permissions['Milestones'] && ctx.permissions['Milestones'].view));
+  const canViewRisks = Boolean(ctx.isAdmin || (ctx.permissions['Risks'] && ctx.permissions['Risks'].view));
+  const canViewIssues = Boolean(ctx.isAdmin || (ctx.permissions['Issues'] && ctx.permissions['Issues'].view));
+  const milestones = canViewMilestones ? getTableRecords_(DB_CONFIG.TABS.MILESTONES) : [];
+  const risks = canViewRisks ? getTableRecords_(DB_CONFIG.TABS.RISKS) : [];
+  const issues = canViewIssues ? getTableRecords_(DB_CONFIG.TABS.ISSUES) : [];
   const deliverables = getTableRecords_(DB_CONFIG.TABS.DELIVERABLES);
   const permits = getTableRecords_(DB_CONFIG.TABS.PERMITS);
   const approvals = getTableRecords_(DB_CONFIG.TABS.APPROVALS);
@@ -685,9 +688,9 @@ function apiGetPortfolioData(filters) {
       projectsAhead: aheadCount,
       projectsBehind: behindCount,
       avgPortfolioProgress: avgPortfolioProgress,
-      delayedMilestones: delayedMilestones,
-      criticalRisks: criticalRisks,
-      openIssues: openIssues,
+      delayedMilestones: canViewMilestones ? delayedMilestones : null,
+      criticalRisks: canViewRisks ? criticalRisks : null,
+      openIssues: canViewIssues ? openIssues : null,
       pendingDeliverables: pendingDeliverables,
       pendingPermitsAndApprovals: pendingPermitsAndApprovals,
       avgResourceUtilization: avgResourceUtilization,
@@ -938,8 +941,8 @@ function apiGetPortfolioControlsSummary(filters) {
     return {
       projectId: pid,
       projectName: String(project.Project_Name || ''),
-      criticalRisks: criticalRisks,
-      openIssues: openIssues,
+      criticalRisks: canViewRisks ? criticalRisks : null,
+      openIssues: canViewIssues ? openIssues : null,
       overdueMilestones: overdueMilestones,
       delayedActivities: delayedActivities,
       overBudget: budget === null ? null : actual > budget,
