@@ -397,6 +397,7 @@ test('baseline summary reports matching, missing and changed activity baselines'
   assert.equal(result.baselineId, 'BL-2');
   assert.equal(result.matchedActivityCount, 2);
   assert.equal(result.missingActivityCount, 0);
+  assert.equal(result.snapshotOnlyActivityCount, 0);
   assert.equal(result.changedBaselineStartCount, 0);
   assert.equal(result.changedBaselineFinishCount, 1);
 });
@@ -413,4 +414,23 @@ test('project controls API includes baseline quality only behind schedule permis
   assert.match(fn, /baselineSummary: baselineSummary/);
   assert.match(fn, /if \(scheduleAllowed\)/);
   assert.match(indexSource, /Baseline quality:/);
+});
+
+test('baseline summary rejects duplicate and unidentified snapshot activities', () => {
+  const duplicate = [{ Project_ID: 'P-1', Snapshot_JSON: JSON.stringify({ activities: [
+    { Activity_ID: 'A' }, { Activity_ID: 'A' }
+  ] }) }];
+  const unidentified = [{ Project_ID: 'P-1', Snapshot_JSON: JSON.stringify({ activities: [{}] }) }];
+  assert.match(runAppsScriptBaseline([], duplicate).reason, /duplicate Activity_ID/);
+  assert.match(runAppsScriptBaseline([], unidentified).reason, /without Activity_ID/);
+});
+
+test('baseline summary counts snapshot-only activities', () => {
+  const result = runAppsScriptBaseline([
+    { Project_ID: 'P-1', Activity_ID: 'A' }
+  ], [{ Project_ID: 'P-1', Snapshot_JSON: JSON.stringify({ activities: [
+    { Activity_ID: 'A' }, { Activity_ID: 'REMOVED' }
+  ] }) }]);
+  assert.equal(result.matchedActivityCount, 1);
+  assert.equal(result.snapshotOnlyActivityCount, 1);
 });
