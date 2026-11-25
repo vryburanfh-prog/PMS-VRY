@@ -5289,8 +5289,15 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
     // Always create a full backup only after all source headers have passed validation.
     var backup = DriveApp.getFileById(getMasterSpreadsheetId_()).makeCopy('PMO_PRE_IMPORT_BACKUP_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss'));
     var updated = applyDatabaseImportPlanWithRollback_(plan, backup.getId(), backup.getUrl());
-    writeAuditLog_(ctx, 'DATABASE_IMPORT', 'Database', sourceId[0], null, { tabs: updated, backupId: backup.getId() }, 'Imported matching tabs from Google Sheets source');
-    return { success: true, updated: updated, backupUrl: backup.getUrl(), backupId: backup.getId() };
+    var auditWarning = null;
+    try {
+      writeAuditLog_(ctx, 'DATABASE_IMPORT', 'Database', sourceId[0], null, { tabs: updated, backupId: backup.getId() }, 'Imported matching tabs from Google Sheets source');
+    } catch (auditError) {
+      // The import has already been applied. Report it as completed, not failed,
+      // so callers do not retry and accidentally perform a second import.
+      auditWarning = 'Import completed, but audit logging failed: ' + auditError.message;
+    }
+    return { success: true, updated: updated, backupUrl: backup.getUrl(), backupId: backup.getId(), warning: auditWarning };
   } finally { lock.releaseLock(); }
 }
 
