@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+const database = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
 
 function extractFunction(source, name) {
   const marker = 'function ' + name + '(';
@@ -13,7 +14,9 @@ function extractFunction(source, name) {
   return source.slice(start, next < 0 ? undefined : start + marker.length + next);
 }
 
-const writer = new Function(extractFunction(code, 'writeImportRowsPreservingFormulas_') + '; return writeImportRowsPreservingFormulas_;')();
+const sanitizerSource = extractFunction(database, 'sanitizeSpreadsheetCellValue_');
+const writerSource = extractFunction(code, 'writeImportRowsPreservingFormulas_');
+const writer = new Function(sanitizerSource + writerSource + '; return writeImportRowsPreservingFormulas_;')();
 
 test('import writer escapes formula-like text and restores formula cells', () => {
   const calls = [];
