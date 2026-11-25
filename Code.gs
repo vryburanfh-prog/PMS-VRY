@@ -3885,6 +3885,14 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   var nowIso = new Date().toISOString();
   var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
   var escId = String(p.Escalation_ID || '').trim();
+  var existingEscalation = escId ? findRecordRowById_('Escalations', 'Escalation_ID', escId) : null;
+  if (existingEscalation) {
+    var storedProjectId = String(existingEscalation.Project_ID || '').trim();
+    var requestedProjectId = targetPid || 'PORTFOLIO';
+    if (storedProjectId !== requestedProjectId) {
+      throw new Error('Escalation does not belong to the active project or portfolio scope.');
+    }
+  }
 
   var existingRowIndex = -1;
   if (escId && lastRow >= 2 && colIdx['Escalation_ID']) {
