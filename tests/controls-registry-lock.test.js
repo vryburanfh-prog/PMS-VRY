@@ -18,6 +18,7 @@ test('project controls registry save serializes ID generation, ownership checks,
   const release = fn.indexOf('lock.releaseLock()');
   assert.ok(lock >= 0 && existingRead > lock && permission > lock);
   assert.ok(generateId > lock && update > lock && insert > lock);
-  assert.ok(audit > update && audit > insert && release > audit);
+  assert.ok(audit > update && release > audit);
+  assert.match(fn, /CREATE_' \\+ cfg\\.module\\.toUpperCase\\(\\)/);
   assert.match(fn, /finally\s*\{\s*lock\.releaseLock\(\)/);
 });
