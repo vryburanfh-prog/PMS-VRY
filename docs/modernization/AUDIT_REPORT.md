@@ -159,3 +159,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** A fresh static scan of `Code.gs` identified 66 API functions. Fifty-six directly contain a recognized permission/admin assertion string. The remaining ten were manually reviewed for helper-based guard paths or intentional public behavior: session context, bootstrap, project register, WBS archive/delete/save/depth, project reference names, and published client deck token retrieval.
 **Review notes:** The ten endpoints were not found to be unguarded merely because the static scanner did not find direct guard strings. The inspected source shows authentication/page-access/project-assignment/privileged-WBS helper checks for nine endpoints; the client deck share-token endpoint is intentionally public and checks token shape plus published status. The public payload data-minimization remediation is tracked in draft PR #4.
 **Status:** Source-level call-path review only. Endpoint direct-call tests and deployed-code reconciliation remain outstanding. Test plan PR #2 now records the inventory and test cases.
+
+
+### S10 — P2 defense-in-depth: unescaped registry labels in HTML templates
+**Evidence:** Both `index.html` and `Presentation.html` interpolated registry module labels into loading and empty-state HTML templates without explicit escaping. The labels are normally controlled by registry configuration, reducing likelihood, but explicit escaping is warranted.
+**Remediation:** Draft PR #8 applies `escapeHtmlSafe_` to both dynamic label interpolations in both HTML files.
+**Status:** Source-only focused remediation. Runtime/browser tests and full dynamic HTML taint tracing remain outstanding; other innerHTML paths are not yet fully audited.
