@@ -42,6 +42,29 @@ test('project-controls endpoint independently gates every module dataset', () =>
   assert.match(fn, /key !== '_rowIndex'/);
 });
 
+
+test('portfolio controls endpoint derives projects from the authorized portfolio API', () => {
+  const fn = extractFunction('apiGetPortfolioControlsSummary');
+  assert.doesNotThrow(() => new Function(fn));
+  assert.match(fn, /apiGetPortfolioData\(filters \|\| \{\}\)/);
+  assert.match(fn, /ids\.has\(id\)/);
+  assert.match(fn, /canView\('Risks'\)/);
+  assert.match(fn, /canView\('Issues'\)/);
+  assert.match(fn, /canView\('Milestones'\)/);
+  assert.match(fn, /canView\('WBS_Schedule'\)/);
+  assert.match(fn, /canView\('Financial_Monitoring'\)/);
+  assert.doesNotMatch(fn, /insertRecord_|updateRecordById_|deleteRecordById_|writeAuditLog_/);
+});
+
+test('portfolio controls endpoint returns aggregate indicators, not source records', () => {
+  const fn = extractFunction('apiGetPortfolioControlsSummary');
+  for (const key of ['criticalRisks', 'openIssues', 'overdueMilestones', 'delayedActivities', 'projectsOverBudget', 'projectsOverCommitted']) {
+    assert.ok(fn.includes(key), 'missing portfolio indicator: ' + key);
+  }
+  assert.match(fn, /return \{\s*success: true/);
+  assert.match(fn, /availability:/);
+});
+
 test('project-controls endpoint denies inaccessible projects before reading datasets', () => {
   const fn = extractFunction('apiGetProjectControlsInputs');
   const projectGate = fn.indexOf("assertPermission_('Projects', 'view', pid)");
