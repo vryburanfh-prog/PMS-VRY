@@ -4764,6 +4764,11 @@ function apiGetPresentationScopeOptions(projectId) {
 /**
  * Gathers scoped project data, calls Gemini to structure slides, and stores a token snapshot.
  */
+function generateClientDeckId_() {
+  const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  return 'DECK-' + timestamp + '-' + Utilities.getUuid().replace(/-/g, '').slice(0, 12);
+}
+
 function apiGenerateClientPresentation(config) {
   const cfg = config || {};
   const pid = String(cfg.projectId || '').trim();
@@ -4885,7 +4890,7 @@ function apiGenerateClientPresentation(config) {
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
   const sh = ensureClientPresentationsSheet_();
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  const deckId = generateClientDeckId_();
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
