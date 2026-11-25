@@ -76,6 +76,18 @@ The following ID-generator call sites were identified in Code.gs on the main bra
 
 This is a static call-site inventory (14 occurrences, including APIs that allocate more than one ID), not a complete test or confirmed race reproduction. Prioritize concurrent creates for project, WBS, activities/dependencies, and module registry records; then verify all remaining API paths. The implementation should preserve each entity's prefix, padding, and existing legacy IDs.
 
+## 3.4 Focused regression cases for Phase 1 security fixes
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| IMP-08 | Import source text beginning with `=`, `+`, `-`, or `@`, including leading whitespace | Destination cells are stored as literal text, not formulas; numeric/date cells remain values | Not run |
+| IMP-09 | Import formula-like text in multiple tabs, with a validation failure in one tab before writes begin | All header validation completes before any destination tab is changed; sanitizer is applied to planned imported rows | Not run |
+| DECK-07 | Generate a new published deck and inspect stored/public response payload | Newly generated deck payload contains curated presentation fields only and omits raw fact packet | Not run |
+| DECK-08 | Fetch an existing published deck whose stored JSON contains a `rawMetrics` field using a valid share token | Public endpoint response omits `rawMetrics`; curated deck rendering remains intact | Not run |
+| DECK-09 | Fetch a published deck with invalid token, archived status, and valid token separately | Invalid/archive cases fail closed; only a published record is returned | Not run |
+
+These cases cover the focused changes in the public-deck minimization and import formula-safety draft PRs. Static verification has been completed; live spreadsheet behavior and renderer compatibility still require isolated Apps Script execution.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
