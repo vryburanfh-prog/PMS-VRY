@@ -11,22 +11,23 @@ const helperSource = code.slice(start, end);
 function makeSheet(rows, failFirstSet = false) {
   let maxRows = 100;
   let fail = failFirstSet;
-  return {
+  const sheet = {
     rows: rows.map(r => r.slice()),
-    getLastRow() { return this.rows.length + 1; },
+    getLastRow() { return sheet.rows.length + 1; },
     getMaxRows() { return maxRows; },
     insertRowsAfter(_after, count) { maxRows += count; },
     getRange(row, _col, count, _cols) {
       return {
-        clearContent: () => { if (row === 2) this.rows = []; },
-        getValues: () => row === 2 ? this.rows.slice(0, count).map(r => r.slice()) : [],
+        clearContent: () => { if (row === 2) sheet.rows = []; },
+        getValues: () => row === 2 ? sheet.rows.slice(0, count).map(r => r.slice()) : [],
         setValues: values => {
           if (fail) { fail = false; throw new Error('simulated destination write failure'); }
-          if (row === 2) this.rows = values.map(r => r.slice());
+          if (row === 2) sheet.rows = values.map(r => r.slice());
         }
       };
     }
   };
+  return sheet;
 }
 function runHarness({failOnB = false} = {}) {
   const originalA = [['A-old-1'], ['A-old-2']];
