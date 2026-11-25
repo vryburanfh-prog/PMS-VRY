@@ -6,14 +6,17 @@ on:
       - 'Code.gs'
       - 'Security.gs'
       - 'Presentation.html'
+      - 'index.html'
       - 'tests/presentation-html-escaping.test.js'
       - 'tests/project-control-field-authorization.test.js'
       - 'tests/spreadsheet-formula-safety.test.js'
       - 'tests/google-token-validation.test.js'
       - 'tests/import-formula-preservation.test.js'
+      - 'tests/index-html-escaping.test.js'
       - 'tests/presentation-html-escaping.test.js'
       - 'tests/spreadsheet-formula-safety.test.js'
       - 'tests/api-authorization-coverage.test.js'
+      - 'tests/index-html-escaping.test.js'
       - '.github/workflows/api-authorization-coverage-tests.yml'
   push:
     paths:
@@ -35,4 +38,4 @@ jobs:
           node-version: '20'
       - run: node --check < Code.gs
       - run: node --check < Security.gs
-      - run: node --test tests/api-authorization-coverage.test.js tests/presentation-html-escaping.test.js tests/project-control-field-authorization.test.js tests/spreadsheet-formula-safety.test.js tests/google-token-validation.test.js tests/import-formula-preservation.test.js
+      - run: node --test tests/api-authorization-coverage.test.js tests/presentation-html-escaping.test.js tests/project-control-field-authorization.test.js tests/spreadsheet-formula-safety.test.js tests/google-token-validation.test.js tests/import-formula-preservation.test.js tests/index-html-escaping.test.js
