@@ -165,3 +165,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** Both `index.html` and `Presentation.html` interpolated registry module labels into loading and empty-state HTML templates without explicit escaping. The labels are normally controlled by registry configuration, reducing likelihood, but explicit escaping is warranted.
 **Remediation:** Draft PR #8 applies `escapeHtmlSafe_` to both dynamic label interpolations in both HTML files.
 **Status:** Source-only focused remediation. Runtime/browser tests and full dynamic HTML taint tracing remain outstanding; other innerHTML paths are not yet fully audited.
+
+
+### S11 — P1 improvement: automated static security regression checks
+**Remediation:** Draft PR #7 adds a Node 20 GitHub Actions workflow and source-level tests for the focused Phase 1 fixes. Tests for code fixes not yet merged into `main` skip with explicit pending-remediation messages; they will activate when the corresponding code is merged.
+**CI evidence:** Run `Static Security Checks` on PR #7 completed successfully. The job reported 1 passing baseline test, 0 failures, and 6 skipped tests (skips correspond to remediation branches not yet in main). This is not runtime validation of Apps Script.
+**Status:** CI workflow and runner are functional; fix-specific checks remain pending until their implementation PRs merge.
