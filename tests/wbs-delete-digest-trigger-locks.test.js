@@ -21,7 +21,8 @@ test('apiDeleteWbsRecord serializes validation, dependency checks, deletion and 
   assert.ok(deleteCall > auth, 'deletion follows authorization and checks');
   assert.ok(audit > deleteCall, 'audit protected');
   assert.ok(release > audit, 'release after deletion and audit');
-  assert.ok(body.includes('finally') && body.includes('lock.releaseLock()'), 'releases in finally');
+  assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
+  assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1, 'exactly one lock release');
 });
 test('apiSaveDigestTriggerConfig serializes properties and trigger replacement', () => {
   const body = bodyFor('apiSaveDigestTriggerConfig');
@@ -38,5 +39,6 @@ test('apiSaveDigestTriggerConfig serializes properties and trigger replacement',
   assert.ok(props > auth, 'config persistence protected');
   assert.ok(triggerDelete > props && triggerCreate > triggerDelete, 'trigger replacement protected');
   assert.ok(audit > triggerCreate && release > audit, 'audit and release follow');
-  assert.ok(body.includes('finally') && body.includes('lock.releaseLock()'), 'releases in finally');
+  assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
+  assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1, 'exactly one lock release');
 });

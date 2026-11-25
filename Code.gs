@@ -1001,10 +1001,6 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   } finally {
     lock.releaseLock();
   }
-
-  } finally {
-    lock.releaseLock();
-  }
 }
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
@@ -3653,6 +3649,9 @@ function apiBuildUnifiedPmoDigest(activeProjectId, options) {
  * and logs a governance audit event.
  */
 function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const pid = activeProjectId ? String(activeProjectId).trim() : '';
   assertPrivilegedManagementRole_(pid || null);
   const ctx = assertPermission_('Projects', 'view', pid || null);
@@ -3703,15 +3702,11 @@ function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, acti
     recipients: toList,
     subject: subj
   };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
-
-// ============================================================================
-// PHASE 17: AUTOMATED TIME-DRIVEN DIGEST TRIGGERS & RUN HISTORY
-// ============================================================================
-
-var PHASE17_TRIGGER_HANDLER_ = 'runScheduledPmoDigestTrigger';
-var PHASE17_PROP_KEY_ = 'PHASE17_DIGEST_SCHEDULE_CONFIG';
-
 function isPhase17Admin_(ctx) {
   if (!ctx) return false;
   if (ctx.isGlobalViewer) return true;
