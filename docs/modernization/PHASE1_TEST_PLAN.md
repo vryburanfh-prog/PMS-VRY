@@ -129,6 +129,10 @@ This is a static scan and manual call-path review, not proof that the server gua
 
 Focused escaping for the registry loading and empty-state labels is in draft PR #8. The broader `innerHTML` taint audit is not complete; static counts alone are not a vulnerability verdict or proof of safety.
 
+## 3.8 CI regression runner status
+
+Draft PR #7 adds a Node 20 GitHub Actions workflow to run source-level checks. Its initial run completed successfully: **1 baseline test passed, 0 failed, 6 skipped**. The skipped tests are feature-specific checks waiting for the corresponding remediation code to merge into `main`; they are not counted as validated fixes. Once those remediation PRs merge, the tests activate on subsequent runs.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
