@@ -1347,6 +1347,9 @@ function apiGetGanttAndBaselines(projectId) {
 function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   const ctx = assertPermission_('WBS_Schedule', 'approve', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
 
   const pid = String(projectId).trim();
   const existingBaselines = getTableRecords_(DB_CONFIG.TABS.BASELINES)
@@ -1384,6 +1387,9 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
   return { success: true, baseline: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
