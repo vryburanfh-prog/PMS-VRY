@@ -513,14 +513,37 @@ function apiLoginWithGoogleCredential(idToken) {
   if (!clientId) return { success:false, error:'Google sign-in is not configured. Contact the Administrator.' };
   const token = String(idToken || '').trim();
   if (!token || token.length > 10000) return { success:false, error:'Invalid Google sign-in response.' };
-  const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions:true });
-  if (response.getResponseCode() !== 200) return { success:false, error:'Google could not verify this sign-in. Please try again.' };
-  const claims = JSON.parse(response.getContentText() || '{}');
+
+  let claims = null;
+  try {
+    const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions:true });
+    if (response.getResponseCode() !== 200) return { success:false, error:'Google could not verify this sign-in. Please try again.' };
+    claims = JSON.parse(response.getContentText() || '{}');
+  } catch (verificationError) {
+    // Do not log the token or tokeninfo request URL.
+    return { success:false, error:'Google sign-in verification is temporarily unavailable. Please try again.' };
+  }
+  if (!claims || typeof claims !== 'object' || Array.isArray(claims)) return { success:false, error:'Google identity verification failed.' };
+
   const email = String(claims.email || '').trim().toLowerCase();
   const issuer = String(claims.iss || '');
+  const subject = String(claims.sub || '').trim();
   const expires = Number(claims.exp || 0);
+  const issuedAt = Number(claims.iat || 0);
+  const nowSeconds = Math.floor(Date.now()/1000);
   const verified = String(claims.email_verified || '').toLowerCase() === 'true';
-  if (String(claims.aud || '') !== clientId || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
+  const authorizedParty = String(claims.azp || '').trim();
+  if (
+    String(claims.aud || '') !== clientId ||
+    (authorizedParty && authorizedParty !== clientId) ||
+    !['accounts.google.com','https://accounts.google.com'].includes(issuer) ||
+    !subject ||
+    !verified ||
+    !email ||
+    !Number.isFinite(expires) ||
+    expires <= nowSeconds ||
+    (issuedAt && issuedAt > nowSeconds + 60)
+  ) {
     return { success:false, error:'Google identity verification failed.' };
   }
 
@@ -547,9 +570,7 @@ function apiLoginWithGoogleCredential(idToken) {
   } finally {
     lock.releaseLock();
   }
-}
-
-function apiLogout() {
+}function apiLogout() {
   const token = String(AUTH_CALL_TOKEN_ || '').trim();
   if (token) {
     const row = findValidAuthSession_(token);
