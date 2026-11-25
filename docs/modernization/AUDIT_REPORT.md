@@ -197,6 +197,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
 | #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
 | #14 | Phase 18/19 mutation helper integrity | Open draft (stacked on #13) | Static helper callsite check; runtime concurrency/audit tests pending |
+| #15 | Locked client-presentation insert | Open draft | Static helper callsite check; runtime concurrent generation test pending |
 
 
 
@@ -222,3 +223,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** `apiUpsertEscalationItem` directly updates cells by row index or appends rows; `apiCapturePmoSnapshot` appends directly. These paths do not use the shared Script-Lock insert/update helpers. Escalation update audit snapshots were also incomplete in the inspected path.
 **Remediation:** Draft PR #14 uses `insertRecord_` and `updateRecordById_` for escalation upsert and `insertRecord_` for PMO snapshots; update audit entries use returned previous/updated values. Draft PR #6 adds primary-key mappings for Escalations and PMO_Snapshots so duplicate/missing IDs are checked once that guard is merged.
 **Limitations:** Runtime concurrency and fault-injection tests are pending; business mutation and audit writes remain separate operations.
+
+
+### S17 — P2 integrity: client presentation append bypasses shared insert helper
+**Evidence:** `apiGenerateClientPresentation` appended published deck records directly with `appendRow`, without the shared Script Lock/primary-key duplicate check.
+**Remediation:** Draft PR #15 uses `insertRecord_` for the presentation row. Draft PR #6 adds `Client_Presentations: Deck_ID` to the primary-key map.
+**Status:** Source-level change; runtime concurrent deck-generation test pending.
