@@ -112,7 +112,7 @@ function getTableRecords_(tabName) {
 // Duplicate IDs are rejected while the Script Lock is held, preventing concurrent
 // max+1 generators from silently inserting the same key.
 const PRIMARY_KEY_COLUMNS_BY_TAB_ = {
-  Users: 'User_ID', Projects: 'Project_ID', Project_Assignments: 'Assignment_ID',
+  Users: 'User_ID', Projects: 'Project_ID', Project_Assignments: 'Assignment_ID', Audit_Logs: 'Audit_ID',
   Main_WBS: 'Main_WBS_ID', Sub_WBS: 'Sub_WBS_ID', Activities_Schedule: 'Activity_ID',
   Schedule_Dependencies: 'Dependency_ID', Project_Baselines: 'Baseline_ID',
   Progress_Updates: 'Log_ID', Milestones: 'Milestone_ID', Deliverables: 'Deliverable_ID',
