@@ -5227,7 +5227,9 @@ function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
         throw new Error('Header mismatch in tab "' + tabName + '". No import was applied.');
       }
       var srcLast = src.getLastRow();
-      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [] });
+      var importRows = srcLast > 1 ? src.getRange(2, 1, srcLast - 1, srcCols).getValues() : [];
+      validateImportedPrimaryKeys_(tabName, srcHeaders, importRows);
+      plan.push({ tab: tabName, src: src, dst: dst, cols: srcCols, rows: importRows });
     });
     if (!plan.length) throw new Error('No matching database tabs were found in the source spreadsheet.');
     // Always create a full backup only after all source headers have passed validation.
