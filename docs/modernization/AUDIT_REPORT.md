@@ -196,6 +196,7 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 | #11 | Temporary integrated validation | Closed unmerged | CI passed 9/9 static regression tests with all Phase 1 source fixes combined, including locked deletes and escalation scope; closed after validation |
 | #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
 | #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
+| #14 | Phase 18/19 mutation helper integrity | Open draft | Static helper callsite check; runtime concurrency/audit tests pending |
 
 
 
@@ -215,3 +216,9 @@ The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08
 **Evidence:** `apiUpsertEscalationItem` checked the privileged-management role and edit permission for the requested `targetPid`, then located an existing escalation by `Escalation_ID`. The inspected path did not compare the stored record's `Project_ID` with the requested project/portfolio scope before updating the row, allowing a privileged user authorized for one project to potentially edit an escalation belonging to another project by ID.
 **Remediation:** Draft PR #13 compares the existing escalation's stored project ID with the requested project or `PORTFOLIO` scope and rejects mismatches before update. Test plan PR #2 adds SEC-16 through SEC-18.
 **Status:** Source-level fix; runtime direct-call tests and project-scope authorization confirmation remain outstanding. Severity is provisional until verified in an isolated environment.
+
+
+### S16 — P2 integrity: Phase 18 escalation and Phase 19 snapshot writes bypass common helpers
+**Evidence:** `apiUpsertEscalationItem` directly updates cells by row index or appends rows; `apiCapturePmoSnapshot` appends directly. These paths do not use the shared Script-Lock insert/update helpers. Escalation update audit snapshots were also incomplete in the inspected path.
+**Remediation:** Draft PR #14 uses `insertRecord_` and `updateRecordById_` for escalation upsert and `insertRecord_` for PMO snapshots; update audit entries use returned previous/updated values. Draft PR #6 adds primary-key mappings for Escalations and PMO_Snapshots so duplicate/missing IDs are checked once that guard is merged.
+**Limitations:** Runtime concurrency and fault-injection tests are pending; business mutation and audit writes remain separate operations.
