@@ -34,7 +34,7 @@ test('public token endpoint strips rawMetrics from stored legacy decks', { skip:
 test('database import sanitizes formula-like strings before destination writes', { skip: !importFixPresent && 'Pending import formula-safety remediation PR' }, () => {
   const importer = section(code, 'function apiImportDatabaseFromGoogleSheet', 'function apiGetProjectModuleReportData');
   assert.match(importer, /importedRows\s*=\s*importedRows\.map/);
-  assert.match(importer, /if \(typeof value === 'string' && \/\^\[\\s\]\*\[=\+\\-@\]\/\.test\(value\)\)/);
+  assert.ok(importer.includes("if (typeof value === 'string' && /^[\\s]*[=+\\-@]/.test(value))"));
   const sanitizePos = importer.indexOf('importedRows = importedRows.map');
   const writePos = importer.indexOf('setValues(item.rows)');
   assert.ok(sanitizePos !== -1 && writePos > sanitizePos, 'sanitization should precede destination writes');
