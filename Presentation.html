@@ -2137,13 +2137,13 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           const mgrSel = document.getElementById('filter-manager');
           const curMgr = mgrSel.value;
           mgrSel.innerHTML = '<option value="ALL">All Project Managers</option>' +
-            (pRes.filterOptions.managers || []).map(m => `<option value="${m}">${m}</option>`).join('');
+            (pRes.filterOptions.managers || []).map(m => `<option value="${escapeHtmlSafe_(m)}">${escapeHtmlSafe_(m)}</option>`).join('');
           mgrSel.value = curMgr || 'ALL';
 
           const cliSel = document.getElementById('filter-client');
           const curCli = cliSel.value;
           cliSel.innerHTML = '<option value="ALL">All Clients</option>' +
-            (pRes.filterOptions.clients || []).map(c => `<option value="${c}">${c}</option>`).join('');
+            (pRes.filterOptions.clients || []).map(c => `<option value="${escapeHtmlSafe_(c)}">${escapeHtmlSafe_(c)}</option>`).join('');
           cliSel.value = curCli || 'ALL';
 
           renderKPIs(pRes.kpis);
@@ -2495,7 +2495,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
         } else if (f.type === 'sub_wbs') {
           control = `<select id="reg-f-${escapeHtmlSafe_(f.name)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">${subOpts}</select>`;
         } else if (f.type === 'select') {
-          const opts = f.options.map(o => `<option value="${o}">${o}</option>`).join('');
+          const opts = f.options.map(o => `<option value="${escapeHtmlSafe_(o)}">${escapeHtmlSafe_(o)}</option>`).join('');
           control = `<select id="reg-f-${escapeHtmlSafe_(f.name)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">${opts}</select>`;
         } else {
           control = `<input type="${f.type || 'text'}" id="reg-f-${escapeHtmlSafe_(f.name)}" ${reqAttr} placeholder="${escapeHtmlSafe_(f.placeholder || '')}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">`;
@@ -2511,7 +2511,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
 
       const uniqueStatuses = [...new Set(st.records.map(r => String(r[schema.statusField] || '').trim()).filter(Boolean))];
       const statusFilterOpts = '<option value="ALL">All Statuses</option>' +
-        uniqueStatuses.map(s => `<option value="${s}">${s}</option>`).join('');
+        uniqueStatuses.map(s => `<option value="${escapeHtmlSafe_(s)}">${escapeHtmlSafe_(s)}</option>`).join('');
 
       const canWrite = st.permissions.create || st.permissions.edit;
 
@@ -2704,7 +2704,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
           const val = rec[col.key] || '-';
           if (col.isLink) {
             return val !== '-'
-              ? `<td class="py-2 px-3"><a href="${val}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
+              ? `<td class="py-2 px-3"><a href="${escapeHtmlSafe_(safeDeckShareUrl_(val))}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
               : `<td class="py-2 px-3 text-slate-400">-</td>`;
           }
           if (col.riskBadge) {
@@ -2713,13 +2713,13 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
               : s.includes('High') ? 'bg-amber-100 text-amber-800'
               : s.includes('Medium') ? 'bg-yellow-100 text-yellow-800'
               : 'bg-emerald-100 text-emerald-800';
-            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-bold ${cls}">${val}</span></td>`;
+            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-bold ${cls}">${escapeHtmlSafe_(val)}</span></td>`;
           }
           if (col.badge) {
-            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${val}</span></td>`;
+            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(val)}</span></td>`;
           }
           const cls = col.mono ? 'font-mono text-slate-600' : col.bold ? 'font-semibold text-slate-900' : '';
-          return `<td class="py-2 px-3 ${cls}">${val}</td>`;
+          return `<td class="py-2 px-3 ${cls}">${escapeHtmlSafe_(val)}</td>`;
         }).join('');
 
         const editBtn = st.permissions.edit
@@ -3265,7 +3265,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 mb-1">Responsible Team Lead</label>
-                  <input type="text" id="p8-wk-lead" value="${proj.Project_Manager || ''}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
+                  <input type="text" id="p8-wk-lead" value="${escapeHtmlSafe_(proj.Project_Manager || '')}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
                 </div>
 
                 <div>
