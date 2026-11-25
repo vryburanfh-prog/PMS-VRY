@@ -55,7 +55,7 @@ test('single and bulk insert helpers validate mapped primary keys', { skip: !pkF
 
 test('primary-key mapping includes core generated-ID tables', { skip: !pkFixPresent && 'Pending primary-key enforcement remediation PR' }, () => {
   const mapping = section(db, 'const PRIMARY_KEY_COLUMNS_BY_TAB_', 'function assertUniquePrimaryKeyForInsert_');
-  for (const table of ['Users', 'Auth_Credentials', 'Auth_Sessions', 'Projects', 'Audit_Logs', 'Role_Permissions', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring']) {
+  for (const table of ['Users', 'Auth_Credentials', 'Auth_Sessions', 'Projects', 'Audit_Logs', 'Role_Permissions', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring', 'Escalations', 'PMO_Snapshots']) {
     assert.match(mapping, new RegExp(table + ':'));
   }
 });
@@ -91,3 +91,12 @@ test('escalation updates enforce project/portfolio ownership', { skip: !code.inc
 
 
 
+
+
+test('Phase 18 escalation and Phase 19 snapshot use locked insert/update helpers', { skip: !(code.includes('insertRecord_(\'Escalations\', record)') && code.includes('updateRecordById_(\'Escalations\'') && code.includes('insertRecord_(\'PMO_Snapshots\', record)') && db.includes("Escalations: 'Escalation_ID'") && db.includes("PMO_Snapshots: 'Snapshot_ID'")) && 'Pending Phase 18/19 helper-integrity remediation PR' }, () => {
+  const esc = section(code, 'function apiUpsertEscalationItem', 'function apiCapturePmoSnapshot');
+  const snap = section(code, 'function apiCapturePmoSnapshot', 'function apiGetSnapshotsAndTemplatesData');
+  assert.ok(esc.includes("insertRecord_('Escalations', record)"));
+  assert.ok(esc.includes("updateRecordById_('Escalations', 'Escalation_ID'"));
+  assert.ok(snap.includes("insertRecord_('PMO_Snapshots', record)"));
+});
