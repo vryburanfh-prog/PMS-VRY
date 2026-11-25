@@ -5372,7 +5372,7 @@ function apiStartFreshDatabase(confirmationText) {
 function apiCreateDatabaseBackupCopy() {
   var ctx = assertDatabaseTransferAdmin_();
   var source = DriveApp.getFileById(getMasterSpreadsheetId_());
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var copy = source.makeCopy('PMO_DATABASE_BACKUP_' + stamp);
   if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'DATABASE_EXPORT', 'Database', getMasterSpreadsheetId_(), null, { backupId: copy.getId() }, 'Created full Google Sheets database backup');
   return { success: true, id: copy.getId(), name: copy.getName(), url: copy.getUrl() };
