@@ -88,6 +88,18 @@ This is a static call-site inventory (14 occurrences, including APIs that alloca
 
 These cases cover the focused changes in the public-deck minimization and import formula-safety draft PRs. Static verification has been completed; live spreadsheet behavior and renderer compatibility still require isolated Apps Script execution.
 
+## 3.5 Primary-key integrity regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| ID-07 | Insert a record with a primary key already present in the same table | Insert helper rejects the duplicate before writing | Not run |
+| ID-08 | Bulk insert contains duplicate IDs within the batch | Batch rejected before write | Not run |
+| ID-09 | Two concurrent create requests produce the same max+1 candidate | One insert succeeds; the competing insert is rejected with duplicate-ID error rather than corrupting the table | Not run |
+| ID-10 | Insert helper used on a mapped table with a missing primary-key header | Helper fails closed with a clear schema error | Not run |
+| ID-11 | Create record on a table not listed in primary-key map | Existing insert behavior is preserved; coverage of nonmapped IDs must be separately reviewed | Not run |
+
+The primary-key guard draft PR #6 uses the Script Lock around duplicate detection and append. It prevents duplicate keys from being silently inserted, but it does not automatically retry ID generation after a collision; the competing create may return an error and require a retry. Runtime concurrency tests are still needed.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
