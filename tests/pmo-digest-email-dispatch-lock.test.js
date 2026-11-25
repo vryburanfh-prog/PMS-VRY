@@ -21,5 +21,6 @@ test('manual PMO digest dispatch serializes authorization, validation, email and
   assert.ok(auth > wait, 'authorization inside lock');
   assert.ok(validation > auth && send > validation, 'validates recipient/content before send');
   assert.ok(audit > send && release > audit, 'audit and release follow email send');
-  assert.ok(body.includes('finally') && body.includes('lock.releaseLock()'), 'release in finally');
+  assert.equal((body.match(/finally/g) || []).length, 1, 'exactly one finally block');
+  assert.equal((body.match(/lock\\.releaseLock\\(\\)/g) || []).length, 1, 'exactly one lock release');
 });

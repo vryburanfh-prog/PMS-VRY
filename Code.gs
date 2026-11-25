@@ -1001,10 +1001,6 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   } finally {
     lock.releaseLock();
   }
-
-  } finally {
-    lock.releaseLock();
-  }
 }
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
