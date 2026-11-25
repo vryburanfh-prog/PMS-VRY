@@ -5202,6 +5202,60 @@ function apiCreateDatabaseTemplateCopy() {
   return { success: true, id: template.getId(), name: template.getName(), url: template.getUrl() };
 }
 
+/**
+ * Applies a validated import plan and attempts compensating restoration from
+ * the pre-import Drive backup if any destination write fails.
+ */
+function applyDatabaseImportPlanWithRollback_(plan, backupSpreadsheetId, backupUrl) {
+  var touched = [];
+  var updated = [];
+  try {
+    plan.forEach(function(item) {
+      touched.push(item);
+      var dstLast = item.dst.getLastRow();
+      if (dstLast > 1) item.dst.getRange(2, 1, dstLast - 1, item.cols).clearContent();
+      if (item.rows.length) {
+        var requiredLastRow = item.rows.length + 1;
+        if (requiredLastRow > item.dst.getMaxRows()) item.dst.insertRowsAfter(item.dst.getMaxRows(), requiredLastRow - item.dst.getMaxRows());
+        item.dst.getRange(2, 1, item.rows.length, item.cols).setValues(item.rows);
+      }
+      invalidateTableCache_(item.tab);
+      updated.push({ tab: item.tab, rows: item.rows.length });
+    });
+    return updated;
+  } catch (importError) {
+    var rollbackErrors = [];
+    var backupSpreadsheet = null;
+    try {
+      backupSpreadsheet = SpreadsheetApp.openById(backupSpreadsheetId);
+    } catch (backupOpenError) {
+      rollbackErrors.push('Unable to open backup copy: ' + backupOpenError.message);
+    }
+    touched.slice().reverse().forEach(function(item) {
+      try {
+        if (!backupSpreadsheet) throw new Error('Backup spreadsheet unavailable');
+        var backupSheet = backupSpreadsheet.getSheetByName(item.tab);
+        if (!backupSheet) throw new Error('Backup tab missing: ' + item.tab);
+        var backupLast = backupSheet.getLastRow();
+        var currentLast = item.dst.getLastRow();
+        if (currentLast > 1) item.dst.getRange(2, 1, currentLast - 1, item.cols).clearContent();
+        if (backupLast > 1) {
+          var restoreRows = backupSheet.getRange(2, 1, backupLast - 1, item.cols).getValues();
+          if (restoreRows.length + 1 > item.dst.getMaxRows()) item.dst.insertRowsAfter(item.dst.getMaxRows(), restoreRows.length + 1 - item.dst.getMaxRows());
+          item.dst.getRange(2, 1, restoreRows.length, item.cols).setValues(restoreRows);
+        }
+        invalidateTableCache_(item.tab);
+      } catch (rollbackError) {
+        rollbackErrors.push(item.tab + ': ' + rollbackError.message);
+      }
+    });
+    var detail = rollbackErrors.length
+      ? 'Rollback was incomplete (' + rollbackErrors.join('; ') + '). Use the backup copy to manually reconcile.'
+      : 'Rollback was attempted for all touched tabs from the backup copy.';
+    throw new Error('Database import failed: ' + importError.message + '. ' + detail + ' Backup URL: ' + backupUrl);
+  }
+}
+
 function apiImportDatabaseFromGoogleSheet(sourceSpreadsheetId) {
   var ctx = assertDatabaseTransferAdmin_();
   var sourceId = String(sourceSpreadsheetId || '').trim().match(/[-\w]{25,}/);
