@@ -7,9 +7,10 @@ on:
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
       - 'src/pms-portfolio-dashboard.js'
+      - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
-      - 'tests/pms-project-controls.test.js tests/pms-portfolio-dashboard.test.js'
       - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-controls-tests.yml'
   push:
@@ -21,9 +22,13 @@ on:
       - 'src/project-controls-adapter.js'
       - 'src/pms-project-controls.js'
       - 'src/pms-portfolio-dashboard.js'
+      - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-controls.test.js'
       - 'tests/project-controls-adapter.test.js'
       - 'tests/pms-project-controls.test.js'
+      - 'tests/apps-script-controls-endpoint.test.js'
+      - 'Code.gs'
       - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-controls-tests.yml'
 
@@ -45,4 +50,4 @@ jobs:
         with:
           node-version: 20
       - name: Run project-controls and adapter tests
-        run: node --test tests/project-controls.test.js tests/project-controls-adapter.test.js tests/pms-project-controls.test.js
+        run: node --test tests/project-controls.test.js tests/project-controls-adapter.test.js tests/pms-project-controls.test.js tests/pms-portfolio-dashboard.test.js tests/apps-script-controls-endpoint.test.js
