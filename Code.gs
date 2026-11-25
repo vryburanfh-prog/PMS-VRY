@@ -930,9 +930,9 @@ function apiGetPortfolioControlsSummary(filters) {
       const forecast = String(row.Forecast_Finish_Date || '').trim();
       return !['completed', 'complete', 'closed'].includes(status) && /^\d{4}-\d{2}-\d{2}$/.test(forecast) && forecast < today;
     }).length : null;
-    const budget = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Budget_Amount) || 0); }, 0) : null;
-    const committed = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Committed_Amount) || 0); }, 0) : null;
-    const actual = pFinancial ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Actual_Spend) || 0); }, 0) : null;
+    const budget = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Budget_Amount) || 0); }, 0) : null;
+    const committed = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Committed_Amount) || 0); }, 0) : null;
+    const actual = pFinancial && pFinancial.length ? pFinancial.reduce(function (sum, row) { return sum + (Number(row.Actual_Spend) || 0); }, 0) : null;
     return {
       projectId: pid,
       projectName: String(project.Project_Name || ''),
@@ -963,12 +963,10 @@ function apiGetPortfolioControlsSummary(filters) {
     openIssues: total('openIssues'),
     overdueMilestones: total('overdueMilestones'),
     delayedActivities: total('delayedActivities'),
-    projectsOverBudget: rows.some(function (row) { return row.overBudget === true; })
-      ? rows.filter(function (row) { return row.overBudget === true; }).length
-      : (rows.some(function (row) { return row.overBudget === false; }) ? 0 : null),
-    projectsOverCommitted: rows.some(function (row) { return row.overCommitment === true; })
-      ? rows.filter(function (row) { return row.overCommitment === true; }).length
-      : (rows.some(function (row) { return row.overCommitment === false; }) ? 0 : null),
+    projectsOverBudget: rows.some(function (row) { return row.overBudget === null; }) ? null
+      : rows.filter(function (row) { return row.overBudget === true; }).length,
+    projectsOverCommitted: rows.some(function (row) { return row.overCommitment === null; }) ? null
+      : rows.filter(function (row) { return row.overCommitment === true; }).length,
     projects: rows
   };
 }
