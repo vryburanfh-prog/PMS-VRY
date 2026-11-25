@@ -88,3 +88,13 @@ The code has useful foundations: a server-side role permission ceiling, project 
 4. Review backup/restore and import/export for destructive behavior, permissions, validation, formula handling, and audit.
 5. Build test matrix: unauthenticated, each role, unassigned project, assigned project, cross-project record ID, invalid payload, concurrent create/update, deleted/archived record, expired/revoked session.
 6. Confirm backup restore on a non-production copy before any remediation deployment.
+
+## Additional targeted review notes (API inventory and transfer/public endpoints)
+
+- The API inventory includes project WBS, schedule, progress, reports, workload, procurement, financials, portfolio, PMO digest, escalation, snapshots, database transfer, and presentation endpoints. Most inspected project APIs include server-side permission assertions; continue checking every endpoint and permission mapping.
+- Destructive database reset and import functions include Administrator/transfer checks, lock use, and pre-operation full-spreadsheet backups. These controls are positive, but restore tests, backup access/retention, and import formula/data validation remain to be verified.
+- Public client deck access is intentionally token-based. Published deck retrieval validates token shape and publication status but no expiry field was visible in this inspected function. Review token entropy, revocation/archiving, sharing scope, sensitive fields in deck JSON, and whether expiry is needed for the business use case.
+- Direct deletion paths in several module APIs appear to delete sheet rows and then audit separately. Confirm they are protected by shared locking and cache invalidation; centralize where they are not.
+- API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
+
+This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
