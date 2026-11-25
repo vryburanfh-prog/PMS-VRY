@@ -209,7 +209,7 @@ function runPortfolioControlsSummary(options) {
   const reads = [];
   const tabs = {
     RISKS: 'Risks', ISSUES: 'Issues', MILESTONES: 'Milestones',
-    ACTIVITIES: 'Activities', FINANCIAL: 'Financial'
+    ACTIVITIES: 'Activities', BASELINES: 'Baselines', FINANCIAL: 'Financial'
   };
   const context = {
     DB_CONFIG: { TABS: tabs },
@@ -221,6 +221,10 @@ function runPortfolioControlsSummary(options) {
     isTruthySheetFlag_: function (value) {
       return value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase());
     },
+    buildAppsScriptBaselineSummary_: vm.runInNewContext(
+      '(' + extractFunction('buildAppsScriptBaselineSummary_') + ')',
+      { isTruthySheetFlag_: value => value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase()) }
+    ),
     Utilities: { formatDate: () => opts.today || '2026-11-25' },
     Date
   };
@@ -237,17 +241,22 @@ test('runtime: portfolio summary only reads authorized modules and scopes rows t
     ],
     Issues: [{ Project_ID: 'P-1', Issue_Status: 'Open' }, { Project_ID: 'P-2', Issue_Status: 'Open' }],
     Milestones: [{ Project_ID: 'P-1', Milestone_Status: 'In Progress', Forecast_Date: '2026-11-24' }],
-    Activities: [{ Project_ID: 'P-1', Status: 'In Progress', Forecast_Finish_Date: '2026-11-20' }],
+    Activities: [{ Project_ID: 'P-1', Activity_ID: 'A-1', Baseline_Start_Date: '2026-11-01', Baseline_Finish_Date: '2026-11-10', Status: 'In Progress', Forecast_Finish_Date: '2026-11-20' }],
+    Baselines: [{ Project_ID: 'P-1', Baseline_ID: 'BL-1', Revision_Number: 1, Snapshot_JSON: JSON.stringify({ activities: [{ Activity_ID: 'A-1', Baseline_Start_Date: '2026-11-01', Baseline_Finish_Date: '2026-11-10' }] }) }],
     Financial: [{ Project_ID: 'P-1', Budget_Amount: 100, Committed_Amount: 120, Actual_Spend: 110 }]
   };
   const permissions = Object.fromEntries(['Risks','Issues','Milestones','WBS_Schedule','Financial_Monitoring'].map(k => [k, { view: true }]));
   const { result, reads } = runPortfolioControlsSummary({ projects, datasets, context: { isAdmin: false, permissions }, filters: { includeArchived: false } });
-  assert.deepEqual(reads, ['Risks','Issues','Milestones','Activities','Financial']);
+  assert.deepEqual(reads, ['Risks','Issues','Milestones','Activities','Baselines','Financial']);
   assert.equal(result.projectCount, 1);
   assert.equal(result.criticalRisks, 1);
   assert.equal(result.openIssues, 1);
   assert.equal(result.overdueMilestones, 1);
   assert.equal(result.delayedActivities, 1);
+  assert.equal(result.baselineDriftActivities, 0);
+  assert.equal(result.unbaselinedActivities, 0);
+  assert.equal(result.snapshotOnlyActivities, 0);
+  assert.equal(result.projectsWithBaselineDrift, 0);
   assert.equal(result.projectsOverBudget, 1);
   assert.equal(result.projectsOverCommitted, 1);
   assert.equal(result.projects[0].projectId, 'P-1');
@@ -283,6 +292,7 @@ test('runtime: archived records are excluded and financial aggregates remain nul
     projects, context: { isAdmin: false, permissions },
     datasets: {
       Risks: [{ Project_ID: 'P-1', Risk_Rating: '15 - Critical', Current_Status: 'Open', Is_Archived: true }],
+      Baselines: [],
       Issues: [], Milestones: [], Activities: [], Financial: []
     }
   });
@@ -433,4 +443,38 @@ test('baseline summary counts snapshot-only activities', () => {
   ] }) }]);
   assert.equal(result.matchedActivityCount, 1);
   assert.equal(result.snapshotOnlyActivityCount, 1);
+});
+
+test('portfolio baseline indicators count date drift, missing active rows and stale snapshot rows', () => {
+  const permissions = { WBS_Schedule: { view: true } };
+  const { result } = runPortfolioControlsSummary({
+    projects: [{ Project_ID: 'P-1', Project_Name: 'Alpha' }],
+    context: { isAdmin: false, permissions },
+    datasets: {
+      Activities: [
+        { Project_ID: 'P-1', Activity_ID: 'A', Baseline_Start_Date: '2026-01-01', Baseline_Finish_Date: '2026-01-05' },
+        { Project_ID: 'P-1', Activity_ID: 'B', Baseline_Start_Date: '2026-01-06', Baseline_Finish_Date: '2026-01-10' }
+      ],
+      Baselines: [{ Project_ID: 'P-1', Revision_Number: 2, Snapshot_JSON: JSON.stringify({ activities: [
+        { Activity_ID: 'A', Baseline_Start_Date: '2026-01-02', Baseline_Finish_Date: '2026-01-05' },
+        { Activity_ID: 'REMOVED', Baseline_Start_Date: '2026-01-01', Baseline_Finish_Date: '2026-01-02' }
+      ] }) }]
+    }
+  });
+  assert.equal(result.baselineDriftActivities, 1);
+  assert.equal(result.unbaselinedActivities, 1);
+  assert.equal(result.snapshotOnlyActivities, 1);
+  assert.equal(result.projectsWithBaselineDrift, 1);
+  assert.equal(result.projects[0].baselineQualityAvailable, true);
+});
+
+test('portfolio baseline indicators remain unavailable when schedule permission is missing', () => {
+  const { result, reads } = runPortfolioControlsSummary({
+    projects: [{ Project_ID: 'P-1' }],
+    context: { isAdmin: false, permissions: {} }
+  });
+  assert.deepEqual(reads, []);
+  assert.equal(result.baselineDriftActivities, null);
+  assert.equal(result.unbaselinedActivities, null);
+  assert.equal(result.projectsWithBaselineDrift, null);
 });
