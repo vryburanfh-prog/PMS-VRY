@@ -165,6 +165,43 @@ test('adapts permission-aware Apps Script API data without treating denied modul
   assert.equal(report.availability.issues, true);
 });
 
+
+test('adapts all authorized Apps Script datasets into a controls report', () => {
+  const report = buildPmsProjectControlsReportFromApi({
+    success: true, project, statusDate: '2026-02-01',
+    access: { schedule: true, milestones: true, risks: true, issues: true, financialMonitoring: true },
+    activities, dependencies, baselines: [baseline],
+    milestones: [{ Project_ID: 'P-1', Milestone_ID: 'M-1', Forecast_Date: '2026-01-01', Milestone_Status: 'In Progress' }],
+    risks: [{ Project_ID: 'P-1', Risk_ID: 'R-1', Risk_Rating: '15 - Critical', Current_Status: 'Open' }],
+    issues: [{ Project_ID: 'P-1', Issue_ID: 'I-1', Issue_Status: 'Open' }],
+    financialItems: [{ Project_ID: 'P-1', Budget_Amount: 1000, Committed_Amount: 500, Actual_Spend: 300 }]
+  });
+  assert.equal(report.availability.schedule, true);
+  assert.equal(report.schedule.durationInWorkingDays, 5);
+  assert.equal(report.riskSummary.highOrCriticalOpen, 1);
+  assert.equal(report.issueSummary.open, 1);
+  assert.equal(report.scheduleAlerts.overdueMilestoneCount, 1);
+  assert.equal(report.finance.budget, 1000);
+});
+
+test('portfolio summaries preserve unavailable module values as null', () => {
+  const summary = buildPmsPortfolioControlsSummary([{
+    projectId: 'P-1',
+    availability: { schedule: false, milestones: false, risks: false, issues: true, financialMonitoring: false },
+    riskSummary: null, issueSummary: { open: 2 },
+    scheduleAlerts: { overdueMilestoneCount: null, delayedActivityCount: 0 },
+    finance: null
+  }]);
+  const row = summary.projects[0];
+  assert.equal(row.highOrCriticalOpenRisks, null);
+  assert.equal(row.overdueMilestones, null);
+  assert.equal(row.openIssues, 2);
+  assert.equal(row.overBudget, null);
+  assert.equal(summary.highOrCriticalOpenRisks, null);
+  assert.equal(summary.overdueMilestones, null);
+  assert.equal(summary.openIssues, 2);
+});
+
 test('continues risk and issue reporting when an authorized schedule has no activities', () => {
   const report = buildPmsProjectControlsReport({
     project, statusDate: '2026-02-01', activities: [],
