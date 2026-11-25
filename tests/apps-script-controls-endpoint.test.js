@@ -285,3 +285,22 @@ test('runtime: archived records are excluded and financial aggregates remain nul
   assert.equal(result.projects[0].overBudget, null);
   assert.equal(result.projectsOverBudget, null);
 });
+
+
+test('project controls drill-down renders derived progress, exception and financial indicators', () => {
+  for (const indicator of [
+    'weightedProgress(scheduleRows, \'Planned_Progress\')',
+    'weightedProgress(scheduleRows, \'Actual_Progress\')',
+    'overdue(scheduleRows, \'Forecast_Finish_Date\', \'Status\')',
+    'overdue(milestoneRows, \'Forecast_Date\', \'Milestone_Status\')',
+    'Open high / critical:',
+    'Open: ',
+    'Budget: ',
+    'Committed: ',
+    'Spent: ',
+    'Currency not inferred'
+  ]) assert.ok(indexSource.includes(indicator), 'missing drill-down indicator: ' + indicator);
+  assert.match(indexSource, /const highCritical = riskRows\.filter/);
+  assert.match(indexSource, /const openIssues = issueRows\.filter/);
+  assert.match(indexSource, /section\.allowed/);
+});
