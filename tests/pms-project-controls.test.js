@@ -47,7 +47,7 @@ test('isolates projects and ignores archived activities and inactive dependencie
     dependencies: [{ Project_ID: 'P-1', Predecessor_ID: 'A', Successor_ID: 'B', Is_Active: 'FALSE' }]
   });
   assert.equal(report.schedule.activities.length, 2);
-  assert.equal(report.schedule.criticalActivities.length, 2);
+  assert.deepEqual(report.schedule.criticalActivities, ['B']);
 });
 
 test('reports missing baseline and missing weights as data-quality gaps', () => {
