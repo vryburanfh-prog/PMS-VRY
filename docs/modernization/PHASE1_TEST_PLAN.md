@@ -200,6 +200,15 @@ Draft PR #15 routes new presentation records through `insertRecord_`; PR #6 adds
 
 Draft PR #16 moves the failed-login counter read/modify/write into a Script-Lock-protected helper. Runtime concurrent authentication tests are pending.
 
+## 3.15 Multi-step user/project creation failure-injection cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| MUT-22 | Inject failure after user row creation but before credential/assignment/audit completion | No orphaned user/credential/assignment or trusted-admin entry remains, or an explicit recovery state is recorded | Not run |
+| MUT-23 | Inject failure after project row creation but before assignment/audit completion | Project and assignment consistency is restored or marked for reconciliation; caller receives clear recovery status | Not run |
+
+These workflows span multiple sheets and are not transactional in the inspected source. Runtime fault injection and rollback/compensation design remain required.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
