@@ -6797,9 +6797,29 @@ function renderDeckHistoryList_() {
         <span class="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">${escapeHtmlSafe_(d.focusScope)}</span>
         <span class="text-slate-400 ml-1">${escapeHtmlSafe_(d.createdAt || '')}</span>
       </div>
-      <a href="${escapeHtmlSafe_(d.shareUrl)}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold shrink-0">Open ↗</a>
+      <div class="flex gap-2 shrink-0">
+        <a href="${escapeHtmlSafe_(d.shareUrl)}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open ↗</a>
+        <button type="button" onclick="archiveClientDeck('${safeJsArg_(d.deckId)}')" class="text-rose-600 hover:underline font-semibold">Revoke</button>
+      </div>
     </div>
   `).join('');
+}
+
+function archiveClientDeck(deckId) {
+  const pid = APP_STATE.selectedProjectId;
+  if (!pid || !deckId) return;
+  if (!confirm('Revoke this client presentation link? The public link will stop working immediately.')) return;
+  google.script.run
+    .withSuccessHandler(res => {
+      if (!res || !res.success) {
+        alert('Unable to revoke presentation link.');
+        return;
+      }
+      openClientDeckModal();
+      alert('Presentation link revoked.');
+    })
+    .withFailureHandler(err => alert('Revoke failed: ' + (err && err.message ? err.message : err)))
+    .apiArchiveClientPresentation(deckId, pid);
 }
 
 function submitGenerateClientDeck() {
