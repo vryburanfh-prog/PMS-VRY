@@ -902,6 +902,7 @@ function apiGetPortfolioControlsSummary(filters) {
   if (!ids.size) return {
     success: true, statusDate: today, projectCount: 0,
     criticalRisks: 0, openIssues: 0, overdueMilestones: 0, delayedActivities: 0,
+    baselineDriftActivities: 0, unbaselinedActivities: 0, snapshotOnlyActivities: 0, projectsWithBaselineDrift: 0,
     projectsOverBudget: 0, projectsOverCommitted: 0, projects: []
   };
   const risks = readScoped(DB_CONFIG.TABS.RISKS, 'Risks', 'Project_ID', true);
@@ -1123,13 +1124,16 @@ function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
     return String(row.Project_ID || '').trim() === String(projectId) &&
       !isTruthySheetFlag_(row.Is_Archived);
   });
-  let matched = 0, missing = 0, changedStart = 0, changedFinish = 0;
+  let matched = 0, missing = 0, changedStart = 0, changedFinish = 0, changedActivities = 0;
   active.forEach(function (row) {
     const baseline = saved[String(row.Activity_ID || '').trim()];
     if (!baseline) { missing += 1; return; }
     matched += 1;
-    if (String(row.Baseline_Start_Date || '') !== String(baseline.Baseline_Start_Date || '')) changedStart += 1;
-    if (String(row.Baseline_Finish_Date || '') !== String(baseline.Baseline_Finish_Date || '')) changedFinish += 1;
+    const startChanged = String(row.Baseline_Start_Date || '') !== String(baseline.Baseline_Start_Date || '');
+    const finishChanged = String(row.Baseline_Finish_Date || '') !== String(baseline.Baseline_Finish_Date || '');
+    if (startChanged) changedStart += 1;
+    if (finishChanged) changedFinish += 1;
+    if (startChanged || finishChanged) changedActivities += 1;
   });
   return {
     available: true,
@@ -1145,7 +1149,8 @@ function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
       return !active.some(function (row) { return String(row.Activity_ID || '').trim() === id; });
     }).length,
     changedBaselineStartCount: changedStart,
-    changedBaselineFinishCount: changedFinish
+    changedBaselineFinishCount: changedFinish,
+    changedActivityCount: changedActivities
   };
 }
 
