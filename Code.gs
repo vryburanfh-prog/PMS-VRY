@@ -1651,6 +1651,7 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
   } finally {
     lock.releaseLock();
   }
+}
 
 /**
  * Deletes a record from a Phase 7 Project Controls registry (requires Can_Delete permission)
