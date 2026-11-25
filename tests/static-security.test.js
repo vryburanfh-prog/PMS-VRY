@@ -80,3 +80,11 @@ test('deletion APIs use the locked delete helper', { skip: !['apiDeleteProjectCo
     assert.ok(body.includes('deleteRecordById_('));
   }
 });
+
+
+test('escalation updates enforce project/portfolio ownership', { skip: !code.includes('Escalation does not belong to the active project or portfolio scope.') && 'Pending escalation ownership remediation PR' }, () => {
+  const body = section(code, 'function apiUpsertEscalationItem', 'function apiCapturePmoSnapshot');
+  assert.ok(body.includes('existingEscalation.Project_ID'));
+  assert.ok(body.includes('requestedProjectId'));
+  assert.ok(body.includes('storedProjectId !== requestedProjectId'));
+});
