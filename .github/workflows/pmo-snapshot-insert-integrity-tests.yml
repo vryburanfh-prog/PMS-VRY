@@ -1,0 +1,28 @@
+name: PMO Snapshot Insert Integrity Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/pmo-snapshot-insert-integrity.test.js'
+      - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/pmo-snapshot-insert-integrity.test.js'
+      - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pmo-snapshot-integrity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pmo-snapshot-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/pmo-snapshot-insert-integrity.test.js
