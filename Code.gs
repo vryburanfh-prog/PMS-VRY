@@ -1661,21 +1661,27 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
   if (!projectId || !recordId) throw new Error('Project_ID and Record ID are required.');
 
-  const pid = String(projectId).trim();
-  const ctx = assertPermission_(cfg.module, 'delete', pid);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const pid = String(projectId).trim();
+    const ctx = assertPermission_(cfg.module, 'delete', pid);
 
-  const existing = findRecordRowById_(cfg.tab, cfg.idCol, recordId);
-  if (!existing) throw new Error('Record not found: ' + recordId);
-  if (String(existing.Project_ID || '').trim() !== pid) {
-    throw new Error('Record does not belong to the active project.');
+    const existing = findRecordRowById_(cfg.tab, cfg.idCol, recordId);
+    if (!existing) throw new Error('Record not found: ' + recordId);
+    if (String(existing.Project_ID || '').trim() !== pid) {
+      throw new Error('Record does not belong to the active project.');
+    }
+
+    const ss = getMasterSpreadsheet_();
+    const sheet = ss.getSheetByName(cfg.tab);
+    sheet.deleteRow(existing._rowIndex);
+
+    writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
   }
-
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(cfg.tab);
-  sheet.deleteRow(existing._rowIndex);
-
-  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
-  return { success: true };
 }
 
 // ============================================================================
