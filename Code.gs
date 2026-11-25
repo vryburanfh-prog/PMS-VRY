@@ -4111,7 +4111,6 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
   var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var metrics = computePhase19CurrentMetrics_(targetPid);
 
   var now = new Date();
@@ -4135,11 +4134,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
-  sheet.appendRow(rowValues);
+  insertRecord_('PMO_Snapshots', record);
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(
