@@ -99,7 +99,7 @@ test('runtime: project endpoint scopes every returned dataset and strips interna
 test('runtime: denied module permissions return null without reading that module', () => {
   const rows = { Projects: [{ Project_ID: 'P-1', Project_Name: 'Alpha' }], Activities: [{ Project_ID: 'P-1' }] };
   const { result, reads } = runProjectControlsEndpoint({ datasets: rows, context: { isAdmin: false, permissions: { WBS_Schedule: { view: true } } } });
-  assert.deepEqual(result.access, { schedule: true, milestones: false, risks: false, issues: false, financialMonitoring: false });
+  assert.equal(JSON.stringify(result.access), JSON.stringify({ schedule: true, milestones: false, risks: false, issues: false, financialMonitoring: false }));
   assert.equal(result.activities.length, 1);
   for (const key of ['milestones','risks','issues','financialItems']) assert.equal(result[key], null);
   assert.ok(!reads.includes('Milestones') && !reads.includes('Risks') && !reads.includes('Issues') && !reads.includes('Financial'));
