@@ -39,6 +39,42 @@ function buildPmsPortfolioDashboardModel(portfolioData, projectControlReports) {
       plannedProgress: Number(project.Overall_Planned_Progress) || 0,
       actualProgress: Number(project.Overall_Actual_Progress) || 0,
       controls: controlsProject,
+      drilldown: report ? {
+        statusDate: report.statusDate || null,
+        progress: report.progress || null,
+        baseline: report.baseline ? {
+          revision: report.baseline.revision || null,
+          approvedDate: report.baseline.approvedDate || null
+        } : null,
+        schedule: report.schedule ? {
+          durationInWorkingDays: report.schedule.durationInWorkingDays,
+          criticalActivityCount: Array.isArray(report.schedule.criticalActivities) ? report.schedule.criticalActivities.length : null
+        } : null,
+        scheduleAlerts: report.scheduleAlerts ? {
+          delayedActivityCount: report.scheduleAlerts.delayedActivityCount,
+          overdueMilestoneCount: report.scheduleAlerts.overdueMilestoneCount
+        } : null,
+        risks: report.riskSummary ? {
+          total: report.riskSummary.total,
+          open: report.riskSummary.open,
+          highOrCriticalOpen: report.riskSummary.highOrCriticalOpen
+        } : null,
+        issues: report.issueSummary ? {
+          total: report.issueSummary.total,
+          open: report.issueSummary.open
+        } : null,
+        finance: report.finance ? {
+          budget: report.finance.budget,
+          committed: report.finance.committed,
+          actualSpend: report.finance.actualSpend,
+          uncommittedBudget: report.finance.uncommittedBudget,
+          remainingBudgetAfterActual: report.finance.remainingBudgetAfterActual,
+          overBudget: report.finance.overBudget,
+          overCommitment: report.finance.overCommitment,
+          currency: report.finance.currency || null
+        } : null,
+        availability: report.availability || null
+      } : null,
       warnings: report && Array.isArray(report.warnings) ? report.warnings.slice() : []
     };
   });
@@ -62,7 +98,7 @@ function buildPmsPortfolioDashboardModel(portfolioData, projectControlReports) {
 function prioritizeProjectExceptions(project) {
   if (!project || !project.controls) {
     return {
-      level: 'unavailable',
+      level: 'incomplete',
       rank: 5,
       reasons: ['Project controls report is unavailable']
     };
@@ -96,7 +132,9 @@ function prioritizeProjectExceptions(project) {
   }
   const coverage = c.availability || {};
   const incomplete = ['schedule', 'milestones', 'risks', 'issues', 'financialMonitoring']
-    .some(key => coverage[key] === false);
+    .some(key => coverage[key] === false) || c.hasFinancialData === false ||
+    ['highOrCriticalOpenRisks', 'openIssues', 'overdueMilestones', 'delayedActivities', 'overBudget', 'overCommitment']
+      .some(key => c[key] == null);
   if (incomplete) reasons.push('Some controls data is unavailable to this user');
   if (rank === 4 && incomplete) rank = 5;
   const level = rank === 1 ? 'urgent' : rank === 2 ? 'high'
