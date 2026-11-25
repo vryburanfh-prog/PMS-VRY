@@ -213,4 +213,51 @@ function buildPmsProjectControlsReport(input) {
   };
 }
 
-module.exports = { buildPmsProjectControlsReport };
+
+/**
+ * Aggregates already-authorized, project-scoped reports for a portfolio view.
+ * This function does not load records or make access-control decisions.
+ */
+function buildPmsPortfolioControlsSummary(reports) {
+  if (!Array.isArray(reports)) throw new TypeError('reports must be an array');
+  const seen = new Set();
+  const projects = reports.map(report => {
+    const projectId = text(report && report.projectId, 'report projectId');
+    if (seen.has(projectId)) throw new Error('Duplicate project report: ' + projectId);
+    seen.add(projectId);
+    const finance = report.finance;
+    const highRisk = Number(report.riskSummary && report.riskSummary.highOrCriticalOpen) || 0;
+    const openIssues = Number(report.issueSummary && report.issueSummary.open) || 0;
+    const overdueMilestones = Number(report.scheduleAlerts && report.scheduleAlerts.overdueMilestoneCount) || 0;
+    const delayedActivities = Number(report.scheduleAlerts && report.scheduleAlerts.delayedActivityCount) || 0;
+    const overBudget = Boolean(finance && finance.overBudget);
+    const overCommitment = Boolean(finance && finance.overCommitment);
+    const alertCount = highRisk + openIssues + overdueMilestones + delayedActivities +
+      Number(overBudget) + Number(overCommitment);
+    return {
+      projectId,
+      projectName: String(report.projectName || ''),
+      alertCount,
+      highOrCriticalOpenRisks: highRisk,
+      openIssues,
+      overdueMilestones,
+      delayedActivities,
+      overBudget,
+      overCommitment,
+      hasFinancialData: Boolean(finance)
+    };
+  });
+  return {
+    projectCount: projects.length,
+    projectsWithAlerts: projects.filter(project => project.alertCount > 0).length,
+    highOrCriticalOpenRisks: projects.reduce((sum, project) => sum + project.highOrCriticalOpenRisks, 0),
+    openIssues: projects.reduce((sum, project) => sum + project.openIssues, 0),
+    overdueMilestones: projects.reduce((sum, project) => sum + project.overdueMilestones, 0),
+    delayedActivities: projects.reduce((sum, project) => sum + project.delayedActivities, 0),
+    projectsOverBudget: projects.filter(project => project.overBudget).length,
+    projectsOverCommitted: projects.filter(project => project.overCommitment).length,
+    projects
+  };
+}
+
+module.exports = { buildPmsProjectControlsReport, buildPmsPortfolioControlsSummary };
