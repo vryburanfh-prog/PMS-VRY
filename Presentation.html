@@ -724,7 +724,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
   } else {
     document.getElementById('ws-tab-content').innerHTML = `
       <div class="p-4 rounded bg-indigo-50/60 border border-indigo-100 text-xs text-slate-700">
-        <strong>${tabName}</strong> workspace is scoped exclusively to <strong>${proj.Project_ID} (${proj.Project_Name})</strong>.
+        <strong>${escapeHtmlSafe_(tabName)}</strong> workspace is scoped exclusively to <strong>${escapeHtmlSafe_(proj.Project_ID)} (${escapeHtmlSafe_(proj.Project_Name)})</strong>.
         Full interactive tools for this module will be activated in the upcoming implementation phases.
       </div>
     `;
