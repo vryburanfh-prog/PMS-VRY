@@ -126,7 +126,8 @@ function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
   if (!idColumn) return;
   const idIndex = headers.indexOf(idColumn);
   if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from ' + tabName);
-  const candidateIds = records.map(function(record) { return String(record[idColumn] || '').trim(); }).filter(Boolean);
+  const candidateIds = records.map(function(record) { return String(record[idColumn] || '').trim(); });
+  if (candidateIds.some(function(id) { return !id; })) throw new Error('Primary-key value is required for insert into ' + tabName + ' (' + idColumn + ').');
   if (!candidateIds.length) return;
   const candidateSet = new Set();
   candidateIds.forEach(function(id) {
