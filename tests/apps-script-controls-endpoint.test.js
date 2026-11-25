@@ -178,6 +178,8 @@ test('portfolio watchlist opens a permission-aware project controls drill-down',
   assert.match(indexSource, /Restricted/);
   assert.match(indexSource, /Counts reflect records visible to your account/);
   assert.match(indexSource, /escapeHtmlSafe_\(project\.Project_Name/);
+  assert.match(indexSource, /activeProjectControlsDrilldownId_ !== pid/);
+  assert.match(indexSource, /activeProjectControlsDrilldownId_ = null/);
 });
 
 test('legacy portfolio KPI response hides module metrics without view permission', () => {
