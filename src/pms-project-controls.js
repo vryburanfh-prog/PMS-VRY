@@ -24,6 +24,13 @@ function date(value) {
   }
   return raw;
 }
+function dayDifference(later, earlier) {
+  if (!later || !earlier) return null;
+  return Math.round((Date.parse(later + 'T00:00:00Z') - Date.parse(earlier + 'T00:00:00Z')) / 86400000);
+}
+function isComplete(value) {
+  return ['completed', 'complete', 'closed', 'achieved'].includes(String(value || '').trim().toLowerCase());
+}
 function weightedProgress(rows, field) {
   const weighted = rows.reduce((sum, row) => sum + number(row.Activity_Weight, 'Activity_Weight', 0), 0);
   if (weighted <= 0) return { available: false, value: null, reason: 'No positive Activity_Weight values are available' };
@@ -110,10 +117,32 @@ function buildPmsProjectControlsReport(input) {
       baselineFinish: date(saved && saved.Baseline_Finish_Date),
       currentBaselineStart: date(row.Baseline_Start_Date),
       currentBaselineFinish: date(row.Baseline_Finish_Date),
+      forecastStart: date(row.Forecast_Start_Date),
+      forecastFinish: date(row.Forecast_Finish_Date),
+      actualStart: date(row.Actual_Start_Date),
+      actualFinish: date(row.Actual_Finish_Date),
       baselineRevision: baseline ? Number(baseline.Revision_Number) || null : null,
-      hasSnapshotMatch: Boolean(saved)
+      hasSnapshotMatch: Boolean(saved),
+      finishVarianceDays: dayDifference(date(row.Actual_Finish_Date) || date(row.Forecast_Finish_Date), date(saved && saved.Baseline_Finish_Date) || date(row.Baseline_Finish_Date)),
+      overdueAtStatusDate: !isComplete(row.Status) && Boolean(date(row.Forecast_Finish_Date)) && date(row.Forecast_Finish_Date) < statusDate
     };
   });
+
+  const milestoneRows = (input.milestones || []).filter(row => String(row.Project_ID || '').trim() === projectId);
+  const milestones = milestoneRows.map(row => {
+    const forecastDate = date(row.Forecast_Date || row.Target_Date || row.Due_Date);
+    const completed = isComplete(row.Milestone_Status);
+    return {
+      id: String(row.Milestone_ID || ''),
+      name: String(row.Milestone_Name || ''),
+      status: String(row.Milestone_Status || ''),
+      forecastDate,
+      overdueAtStatusDate: !completed && Boolean(forecastDate) && forecastDate < statusDate
+    };
+  });
+  const delayedActivities = baselineComparison.filter(row => row.overdueAtStatusDate ||
+    (row.finishVarianceDays != null && row.finishVarianceDays > 0));
+  const delayedMilestones = milestones.filter(row => row.overdueAtStatusDate);
 
   const financialRows = (input.financialItems || []).filter(row => String(row.Project_ID || '').trim() === projectId);
   const finance = financialRows.length ? financialRows.reduce((sum, row) => ({
@@ -125,6 +154,10 @@ function buildPmsProjectControlsReport(input) {
     finance.uncommittedBudget = finance.budget - finance.committed;
     finance.remainingBudgetAfterActual = finance.budget - finance.actualSpend;
     finance.budgetUtilizationPercent = finance.budget > 0 ? finance.actualSpend / finance.budget * 100 : null;
+    finance.overBudget = finance.actualSpend > finance.budget;
+    finance.overCommitment = finance.committed > finance.budget;
+    finance.uncommittedBudgetNegative = finance.uncommittedBudget < 0;
+    finance.remainingBudgetNegative = finance.remainingBudgetAfterActual < 0;
     finance.currency = null; // Financial_Monitoring rows do not expose a verified currency field here.
   }
 
@@ -132,6 +165,10 @@ function buildPmsProjectControlsReport(input) {
   if (!baseline) warnings.push('No approved Project_Baselines snapshot was found');
   else if (baselineComparison.some(row => !row.hasSnapshotMatch)) warnings.push('Some active activities are absent from the latest approved baseline snapshot');
   if (!finance) warnings.push('No Financial_Monitoring rows are available');
+  if (delayedActivities.length) warnings.push(delayedActivities.length + ' activities are forecast late or have slipped beyond baseline finish');
+  if (delayedMilestones.length) warnings.push(delayedMilestones.length + ' milestones are overdue at the report status date');
+  if (finance && finance.overBudget) warnings.push('Actual spending exceeds the recorded project budget');
+  if (finance && finance.overCommitment) warnings.push('Committed amounts exceed the recorded project budget');
   warnings.push('EVM PV and EV are not inferred from progress percentages or budget categories; provide approved time-phased valuation data before calculating SPI/CPI.');
   return {
     projectId, projectName: String(project.Project_Name || ''),
@@ -139,7 +176,10 @@ function buildPmsProjectControlsReport(input) {
     schedule: { durationInWorkingDays: cpm.projectDuration, criticalActivities: cpm.criticalActivities, activities: cpm.activities },
     progress: { planned, actual, variancePercentagePoints: planned.available && actual.available ? actual.value - planned.value : null },
     baseline: baseline ? { id: baseline.Baseline_ID, revision: Number(baseline.Revision_Number) || null, name: baseline.Baseline_Name || '', approvedDate: date(baseline.Approved_Date) } : null,
-    baselineComparison, finance, warnings
+    baselineComparison,
+    scheduleAlerts: { delayedActivityCount: delayedActivities.length, overdueMilestoneCount: delayedMilestones.length, delayedActivities, overdueMilestones: delayedMilestones },
+    milestones,
+    finance, warnings
   };
 }
 
