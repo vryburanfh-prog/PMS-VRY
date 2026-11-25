@@ -756,6 +756,9 @@ function assertRecordProjectOwnership_(existing, requestedProjectId, recordLabel
 
 function apiCreateProject(payload) {
   const ctx = assertPermission_('Projects', 'create', null);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   payload = payload || {};
 
   const projectName = String(payload.Project_Name || '').trim();
@@ -827,6 +830,9 @@ function apiCreateProject(payload) {
 
   writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
   return { success: true, project: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1338,6 +1344,9 @@ function apiGetGanttAndBaselines(projectId) {
  */
 function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   const ctx = assertPermission_('WBS_Schedule', 'approve', projectId);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
 
   const pid = String(projectId).trim();
@@ -1376,6 +1385,9 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
   return { success: true, baseline: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
