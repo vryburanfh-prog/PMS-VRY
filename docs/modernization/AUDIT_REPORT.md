@@ -98,3 +98,25 @@ The code has useful foundations: a server-side role permission ceiling, project 
 - API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
 
 This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
+
+## Supplemental Phase 1 source review (2026-11-25)
+
+### S1 — P2: Multi-step create operations can leave partial records
+**Evidence:** `apiCreateUser` inserts the Users row before creating password credentials, syncing project assignments, and writing audit logs. `apiCreateProject` inserts the project row, then creates an assignment row and continues with follow-up work. These are separate spreadsheet writes and no rollback/compensation flow was visible in the reviewed portions.
+**Impact:** A later failure can leave a user/project partially provisioned (for example, a user without expected credential/assignment rows, or a project without its creator assignment).
+**Recommendation:** Treat multi-sheet create workflows as sagas: validate all inputs first, write each step with clear status, compensate or provide a repair routine for failures, and ensure audit events capture partial completion. Add fault-injection tests at each write boundary. Do not claim Sheets multi-sheet writes are transactional.
+**Status:** Source-level observation; failure reproduction and exact affected steps need runtime validation.
+
+### S2 — P2: Audit and cache consistency for direct row mutations
+**Evidence:** Some project-control and financial deletion paths directly call `sheet.deleteRow(...)` then audit separately. The targeted code paths did not show a common lock/cache invalidation helper at those call sites.
+**Impact:** Concurrent mutation risk and potentially stale cached data; audit may be absent if the audit write fails after deletion.
+**Recommendation:** Inventory all direct spreadsheet mutations. Centralize row deletion/update in helpers that lock, invalidate the correct caches, and return the deleted snapshot. Add audit-failure recovery/alerts.
+**Status:** Needs complete mutation-path inventory and tests; not yet proven to cause user-visible corruption.
+
+### S3 — API inventory reconciliation (static)
+A regex inventory of `Code.gs` found 66 `api*` function declarations. The Security.gs private dashboard allowlist also contains 66 names. The comparison reported `apiGetPublishedClientDeckByToken` as a Code.gs API declaration outside the private allowlist, and `apiLoginWithGoogleCredential` as an allowlist entry not declared in Code.gs. Inspection indicates these are expected special cases: published deck retrieval is a token-based public endpoint, while Google credential login is implemented in the security/auth file. This count check is a useful automated consistency test, but it is not proof of endpoint authorization: classify public endpoints separately, include all source files in inventory, and test all calls directly.
+
+### S4 — P1 investigation: Duplicate-ID race needs explicit unique enforcement
+The ID generator scans existing records and calculates max+1. `insertRecord_()` serializes append operations but does not appear to enforce uniqueness of the entity ID column. A collision can therefore be inserted if two requests calculate the same identifier before the append lock. Proposed fix remains a single lock-protected allocate+insert or equivalent counter with uniqueness validation and concurrency test.
+
+**Recommended order:** Implement and test ID allocation first; next add multi-step create recovery/compensation; then centralize direct delete/update mutations and cache invalidation; proceed with broader auth, XSS, import/export, and restore testing.
