@@ -43,7 +43,18 @@ test('public client deck endpoint remains token-gated and outside private dispat
   assert.ok(!allowlist.includes(name), 'public token endpoint must not be part of private dispatcher allowlist');
   const body = extractTopLevelFunction(code, name);
   assert.match(body, /cleanToken/);
-  assert.match(body, /\\^\\[a-f0-9\\]\\{32\\}\\/i);
+  assert.ok(body.includes('^[a-f0-9]{32}
+  assert.match(body, /token/i);
+});
+
+test('dispatcher authenticates private RPC calls and wrappers protect direct calls', () => {
+  assert.match(security, /function apiDispatch\\s*\\(/);
+  assert.match(security, /if\\s*\\(!ctx\\s*\\|\\|\\s*!ctx\\.authenticated\\)/);
+  assert.match(security, /function installApiAuthenticationGuards_\\s*\\(/);
+  assert.match(security, /PMS_API_ALLOWLIST_\\.forEach/);
+  assert.match(security, /wrapped\\s*=\\s*function\\s*\\(\\)\\s*\\{\\s*const ctx\\s*=\\s*getCurrentUserContext_\\(\\)/);
+});
+), 'token must be validated as a 32-character hexadecimal value');
   assert.match(body, /token/i);
 });
 
