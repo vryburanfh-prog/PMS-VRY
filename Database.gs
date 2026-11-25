@@ -108,6 +108,41 @@ function getTableRecords_(tabName) {
   return records;
 }
 
+// Primary-key columns for records created through the database insert helpers.
+// Duplicate IDs are rejected while the Script Lock is held, preventing concurrent
+// max+1 generators from silently inserting the same key.
+const PRIMARY_KEY_COLUMNS_BY_TAB_ = {
+  Users: 'User_ID', Auth_Credentials: 'Credential_ID', Auth_Sessions: 'Session_ID', Projects: 'Project_ID', Project_Assignments: 'Assignment_ID', Audit_Logs: 'Audit_ID', Role_Permissions: 'Permission_ID',
+  Main_WBS: 'Main_WBS_ID', Sub_WBS: 'Sub_WBS_ID', Activities_Schedule: 'Activity_ID',
+  Schedule_Dependencies: 'Dependency_ID', Project_Baselines: 'Baseline_ID',
+  Progress_Updates: 'Log_ID', Milestones: 'Milestone_ID', Deliverables: 'Deliverable_ID',
+  Permits: 'Permit_ID', Risks: 'Risk_ID', Issues: 'Issue_ID', Repository_Links: 'Repository_ID',
+  Weekly_Reports: 'Report_ID', Team_Workload: 'Assignment_ID', Approvals: 'Approval_ID',
+  Procurement_Logistics: 'Procurement_ID', Financial_Monitoring: 'Financial_ID', Escalations: 'Escalation_ID', PMO_Snapshots: 'Snapshot_ID', Client_Presentations: 'Deck_ID'
+};
+
+function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
+  const idColumn = PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
+  if (!idColumn) return;
+  const idIndex = headers.indexOf(idColumn);
+  if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from ' + tabName);
+  const candidateIds = records.map(function(record) { return String(record[idColumn] || '').trim(); });
+  if (candidateIds.some(function(id) { return !id; })) throw new Error('Primary-key value is required for insert into ' + tabName + ' (' + idColumn + ').');
+  if (!candidateIds.length) return;
+  const candidateSet = new Set();
+  candidateIds.forEach(function(id) {
+    if (candidateSet.has(id)) throw new Error('Duplicate ' + idColumn + ' in insert batch: ' + id);
+    candidateSet.add(id);
+  });
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const existing = sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues();
+  existing.forEach(function(row) {
+    const id = String(row[0] || '').trim();
+    if (id && candidateSet.has(id)) throw new Error('Record ID already exists in ' + tabName + ': ' + id + '. Retry the operation.');
+  });
+}
+
 function insertRecord_(tabName, recordObj) {
   // Serialize row appends so simultaneous requests cannot race on the target row.
   const lock = LockService.getScriptLock();
@@ -123,6 +158,7 @@ function insertRecord_(tabName, recordObj) {
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
     if (!headers.some(Boolean)) throw new Error('Database table has an empty header row: ' + tabName);
 
+    assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, [recordObj || {}]);
     const newRow = headers.map(header => recordObj && recordObj[header] !== undefined ? recordObj[header] : '');
     sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([newRow]);
     invalidateTableCache_(tabName);
@@ -146,6 +182,7 @@ function insertRecords_(tabName, records) {
     const lastCol = sheet.getLastColumn();
     if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
     const headers = sheet.getRange(1,1,1,lastCol).getValues()[0].map(h => String(h).trim());
+    assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, list);
     const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
     return rows.length;
@@ -225,7 +262,7 @@ function deleteRecordsByIds_(tabName, idColumn, recordIds) {
 
 
 /** Physically removes one record by ID under a script lock. */
-function deleteRecordById_(tabName, idColumn, recordId) {
+function deleteRecordById_(tabName, idColumn, recordId, expectedScope) {
   const lock = LockService.getScriptLock();
   const ownsLock = !lock.hasLock();
   if (ownsLock) lock.waitLock(10000);
@@ -243,6 +280,14 @@ function deleteRecordById_(tabName, idColumn, recordId) {
       if (String(values[r][idIndex]).trim() === String(recordId).trim()) {
         const previous = {};
         headers.forEach((h, c) => previous[h] = values[r][c]);
+        if (expectedScope) {
+          const scopeField = String(expectedScope.field || '').trim();
+          const expectedValue = String(expectedScope.value || '').trim();
+          const actualValue = String(previous[scopeField] || '').trim();
+          if (!scopeField || actualValue !== expectedValue) {
+            throw new Error('Record does not belong to the expected scope.');
+          }
+        }
         sheet.deleteRow(r + 1);
         // Compact fully empty rows below the header after a physical deletion.
         // A row is considered blank only when every cell has neither a value nor a formula.
