@@ -135,7 +135,7 @@ Focused escaping for the registry loading and empty-state labels is in draft PR 
 
 ## 3.8 CI regression runner status
 
-Draft PR #7 adds a Node 20 GitHub Actions workflow to run source-level checks. Its initial run completed successfully: **1 baseline test passed, 0 failed, 6 skipped**. The skipped tests are feature-specific checks waiting for the corresponding remediation code to merge into `main`; they are not counted as validated fixes. Once those remediation PRs merge, the tests activate on subsequent runs.
+Draft PR #7 adds a Node 20 GitHub Actions workflow to run source-level checks. The test-only branch run completed successfully: **1 baseline test passed, 0 failed, 6 skipped** (pending remediation branches). A temporary integrated-validation PR #11 combined all pending code fixes and ran the same suite with **7 passed, 0 failed, 0 skipped**. PR #11 was closed unmerged after validation; its CI result verifies static source assertions only, not Apps Script runtime behavior.
 
 ## 3.9 Backup/restore and destructive-operation verification
 
