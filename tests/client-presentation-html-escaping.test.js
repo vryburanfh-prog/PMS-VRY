@@ -20,3 +20,7 @@ test('client presentation slide preview escapes AI-generated text', () => {
   assert.ok(body.includes('escapeHtmlSafe_(s.title || \'\')'), 'slide title escaped');
   assert.ok(body.includes('escapeHtmlSafe_(s.headlineTakeaway)'), 'slide takeaway escaped');
 });
+test('workspace stub escapes project and module labels', () => {
+  assert.ok(html.includes('<strong>${escapeHtmlSafe_(tabName)}</strong>'), 'module label escaped');
+  assert.ok(html.includes('<strong>${escapeHtmlSafe_(proj.Project_ID)} (${escapeHtmlSafe_(proj.Project_Name)})</strong>'), 'project identifiers and names escaped');
+});
