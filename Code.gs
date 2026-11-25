@@ -179,6 +179,9 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
 
 function apiCreateUser(userPayload) {
   const ctx = assertPermission_('Users_Admin', 'create', null);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   userPayload = userPayload || {};
 
   const email = String(userPayload.email || '').trim().toLowerCase();
@@ -245,6 +248,9 @@ function apiCreateUser(userPayload) {
   writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
 
   return { success: true, user: newUser, assignedProjectIds: assignedProjectIds };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiUpdateUser(userId, payload) {
