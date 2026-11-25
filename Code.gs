@@ -1013,6 +1013,9 @@ function assertScheduleActivityPermission_(projectId, action, existingActivity) 
 }
 
 function apiSaveMainWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Main_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Main WBS record');
@@ -1077,12 +1080,19 @@ function apiSaveMainWbs(payload) {
   }
 
   return { success: true, mainWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Sub WBS task under a parent Main WBS.
  */
 function apiSaveSubWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Sub_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Sub WBS record');
@@ -1154,6 +1164,10 @@ function apiSaveSubWbs(payload) {
   }
 
   return { success: true, subWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiSaveProjectWbsDepth(projectId, depth) {
@@ -1198,6 +1212,9 @@ function wouldCreateDependencyCycle_(projectId, predecessorId, successorId) {
 }
 
 function apiSaveActivity(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
@@ -1317,6 +1334,10 @@ function apiSaveActivity(payload) {
   }
 
   return { success: true, activity: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
