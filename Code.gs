@@ -973,6 +973,9 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
 
 /** Permanently delete a WBS record only when no dependent records remain. */
 function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'delete');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -995,6 +998,10 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
+  } finally {
+    lock.releaseLock();
+  }
+
   } finally {
     lock.releaseLock();
   }
@@ -3802,14 +3809,10 @@ function apiGetDigestTriggerStatus(activeProjectId) {
       projectId: cfg.projectId
     },
     activeTriggerCount: matching.length,
-    history: getPhase17History_(ctx, visibleIds)
-  };
-}
-
-/**
- * Creates, updates, or removes the time-driven trigger for scheduled PMO digests.
- */
-function apiSaveDigestTriggerConfig(payload, activeProjectId) {
+    history: getPhase17History_(ctx,function apiSaveDigestTriggerConfig(payload, activeProjectId) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   var pid = activeProjectId ? String(activeProjectId).trim() : '';
   var ctx = assertPermission_('Projects', 'view', pid || null);
   if (!isPhase17Admin_(ctx)) {
@@ -3868,6 +3871,11 @@ function apiSaveDigestTriggerConfig(payload, activeProjectId) {
   }
 
   return apiGetDigestTriggerStatus(pid);
+
+  } finally {
+    lock.releaseLock();
+  }
+}  return apiGetDigestTriggerStatus(pid);
 }
 
 /**
