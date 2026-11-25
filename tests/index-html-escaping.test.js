@@ -58,6 +58,11 @@ test('index inline JSON handlers serialize safely and print fields are escaped',
   assert.ok(indexHtml.includes('onclick="resolveEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})"'));
   assert.ok(indexHtml.includes('onclick="escalateWorkItem_(${escapeHtmlSafe_(JSON.stringify(it))})"'));
   assert.ok(indexHtml.includes('safeJsArg_(userId)'));
+  assert.ok(indexHtml.includes('onclick="openProcurementAndFinancialsModule(${safeJsArg_(activeSub)})"'));
+  assert.ok(indexHtml.includes('onclick="openEditUserModal_(${safeJsArg_(uid)})"'));
+  assert.ok(indexHtml.includes('onclick="handleToggleUserStatus(${safeJsArg_(uid)}, false)"'));
+  assert.ok(indexHtml.includes('function neutralizeCsvFormula_'));
+  assert.ok(indexHtml.includes('headers.map(escapeCsvCell_)'));
   for (const field of ['escapeHtmlSafe_(r.Accomplishments || \'-\')','escapeHtmlSafe_(r.Remarks || \'-\')','escapeHtmlSafe_(l.Log_ID || \'\')','escapeHtmlSafe_(l.Submitted_By || \'\')']) assert.ok(indexHtml.includes('${' + field + '}'), field + ' must be escaped');
 });
 
