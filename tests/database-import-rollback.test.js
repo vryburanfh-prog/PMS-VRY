@@ -71,3 +71,13 @@ test('rollback failure reports manual reconciliation warning and backup URL', ()
   assert.throws(() => state.context.applyDatabaseImportPlanWithRollback_(state.plan, 'backup-id', 'backup-url'), /Rollback was incomplete.*manually reconcile.*Backup URL: backup-url/);
   assert.deepEqual(state.destA.rows, [['A-old-1'],['A-old-2']]);
 });
+
+test('API reports completed import with warning when audit logging fails', () => {
+  const apiStart = code.indexOf('function apiImportDatabaseFromGoogleSheet(');
+  const apiEnd = code.indexOf('\nfunction apiGetProjectModuleReportData(', apiStart);
+  assert.ok(apiStart >= 0 && apiEnd > apiStart, 'import API source boundaries found');
+  const apiSource = code.slice(apiStart, apiEnd);
+  assert.match(apiSource, /catch \(auditError\)/);
+  assert.match(apiSource, /auditWarning = 'Import completed, but audit logging failed:/);
+  assert.match(apiSource, /return \{ success: true, updated: updated, backupUrl: backup\.getUrl\(\), backupId: backup\.getId\(\), warning: auditWarning \}/);
+});
