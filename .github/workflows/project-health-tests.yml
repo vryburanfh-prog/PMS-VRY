@@ -5,8 +5,10 @@ on:
     paths:
       - 'src/project-health.js'
       - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-health.test.js'
-      - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-project-controls.test.js tests/pms-portfolio-dashboard.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-health-tests.yml'
   push:
     branches:
@@ -15,8 +17,10 @@ on:
     paths:
       - 'src/project-health.js'
       - 'src/pms-project-controls.js'
+      - 'src/pms-portfolio-dashboard.js'
       - 'tests/project-health.test.js'
       - 'tests/pms-project-controls.test.js'
+      - 'tests/pms-portfolio-dashboard.test.js'
       - '.github/workflows/project-health-tests.yml'
 
 permissions:
