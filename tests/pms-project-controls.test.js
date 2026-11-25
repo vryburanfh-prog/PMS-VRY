@@ -94,6 +94,41 @@ test('does not flag completed milestones as overdue', () => {
   assert.equal(report.scheduleAlerts.overdueMilestoneCount, 0);
 });
 
+
+test('summarizes open risks, high/critical exposure and unresolved issues', () => {
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-02-01', activities,
+    risks: [
+      { Project_ID: 'P-1', Risk_ID: 'R-1', Risk_Rating: '15 - Critical', Current_Status: 'Open' },
+      { Project_ID: 'P-1', Risk_ID: 'R-2', Risk_Rating: '10 - High', Current_Status: 'Mitigating' },
+      { Project_ID: 'P-1', Risk_ID: 'R-3', Risk_Rating: '20 - Critical', Current_Status: 'Closed' },
+      { Project_ID: 'P-2', Risk_ID: 'R-4', Risk_Rating: '25 - Critical', Current_Status: 'Open' }
+    ],
+    issues: [
+      { Project_ID: 'P-1', Issue_ID: 'I-1', Issue_Status: 'Open' },
+      { Project_ID: 'P-1', Issue_ID: 'I-2', Issue_Status: 'Resolved' },
+      { Project_ID: 'P-2', Issue_ID: 'I-3', Issue_Status: 'Open' }
+    ]
+  });
+  assert.equal(report.riskSummary.total, 3);
+  assert.equal(report.riskSummary.open, 2);
+  assert.equal(report.riskSummary.highOrCriticalOpen, 2);
+  assert.equal(report.issueSummary.total, 2);
+  assert.equal(report.issueSummary.open, 1);
+  assert.ok(report.warnings.some(x => x.includes('high/critical risks')));
+  assert.ok(report.warnings.some(x => x.includes('open issues')));
+});
+
+test('excludes archived risks and issues from management summaries', () => {
+  const report = buildPmsProjectControlsReport({
+    project, statusDate: '2026-02-01', activities,
+    risks: [{ Project_ID: 'P-1', Risk_ID: 'R-1', Risk_Rating: '15 - Critical', Current_Status: 'Open', Is_Archived: 'TRUE' }],
+    issues: [{ Project_ID: 'P-1', Issue_ID: 'I-1', Issue_Status: 'Open', Is_Archived: 'TRUE' }]
+  });
+  assert.equal(report.riskSummary.total, 0);
+  assert.equal(report.issueSummary.total, 0);
+});
+
 test('validates status date and malformed baseline JSON', () => {
   assert.throws(() => buildPmsProjectControlsReport({ project, statusDate: '02/01/2026', activities }), /YYYY-MM-DD/);
   assert.throws(() => buildPmsProjectControlsReport({
