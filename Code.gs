@@ -1604,6 +1604,9 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
   const cfg = CONTROLS_REGISTRY_CONFIG[registryKey];
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
   if (!projectId) throw new Error('Project_ID is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
 
   const pid = String(projectId).trim();
   const rawId = String(payload[cfg.idCol] || '').trim();
@@ -1644,6 +1647,9 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
     insertRecord_(cfg.tab, cleanRecord);
     writeAuditLog_(ctx, 'CREATE_' + cfg.module.toUpperCase(), cfg.module, recordId, null, cleanRecord, 'Created ' + registryKey + ' record');
     return { success: true, record: cleanRecord };
+  }
+  } finally {
+    lock.releaseLock();
   }
 }
 
