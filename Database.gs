@@ -159,6 +159,18 @@ function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
   });
 }
 
+/**
+ * Store user-entered strings as literal spreadsheet text, not formulas.
+ * Numeric strings are preserved so numeric fields keep their semantics.
+ */
+function sanitizeSpreadsheetCellValue_(value) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.replace(/^\\s+/, '');
+  const numeric = /^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i.test(trimmed);
+  const formulaLike = /^[=+@]/.test(trimmed) || (trimmed.charAt(0) === '-' && !numeric);
+  return formulaLike ? "'" + value : value;
+}
+
 function insertRecord_(tabName, recordObj) {
   // Serialize row appends so simultaneous requests cannot race on the target row.
   const lock = LockService.getScriptLock();
@@ -175,7 +187,7 @@ function insertRecord_(tabName, recordObj) {
     if (!headers.some(Boolean)) throw new Error('Database table has an empty header row: ' + tabName);
 
     assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, [recordObj || {}]);
-    const newRow = headers.map(header => recordObj && recordObj[header] !== undefined ? recordObj[header] : '');
+    const newRow = headers.map(header => sanitizeSpreadsheetCellValue_(recordObj && recordObj[header] !== undefined ? recordObj[header] : ''));
     sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([newRow]);
     invalidateTableCache_(tabName);
     return recordObj;
@@ -199,7 +211,7 @@ function insertRecords_(tabName, records) {
     if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
     const headers = sheet.getRange(1,1,1,lastCol).getValues()[0].map(h => String(h).trim());
     assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, list);
-    const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
+    const rows = list.map(record => headers.map(header => sanitizeSpreadsheetCellValue_(record[header] !== undefined ? record[header] : '')));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
     invalidateTableCache_(tabName);
     return rows.length;
@@ -226,7 +238,7 @@ function updateRecordById_(tabName, idColumn, recordId, updatesObj) {
         previous[header] = values[r][c];
         const next = updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, header) ? updatesObj[header] : values[r][c];
         updated[header] = next;
-        if (updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, header)) changed.push({ index:c, value:next });
+        if (updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, header)) changed.push({ index:c, value:sanitizeSpreadsheetCellValue_(next) });
       });
       // Write contiguous changed-column runs only; preserve formulas and avoid one RPC per cell.
       changed.sort((a,b) => a.index-b.index);
@@ -458,7 +470,7 @@ function batchUpdateRecordsById_(tabName, idColumn, updatesList) {
       const changedColumns = [];
       Object.keys(patch).forEach(header => {
         const colIndex = headers.indexOf(header);
-        if (colIndex >= 0) changedColumns.push({ index: colIndex, value: patch[header] });
+        if (colIndex >= 0) changedColumns.push({ index: colIndex, value: sanitizeSpreadsheetCellValue_(patch[header]) });
       });
       changedColumns.sort((a, b) => a.index - b.index);
       if (!changedColumns.length) continue;
