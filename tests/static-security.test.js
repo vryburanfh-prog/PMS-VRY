@@ -55,7 +55,7 @@ test('single and bulk insert helpers validate mapped primary keys', { skip: !pkF
 
 test('primary-key mapping includes core generated-ID tables', { skip: !pkFixPresent && 'Pending primary-key enforcement remediation PR' }, () => {
   const mapping = section(db, 'const PRIMARY_KEY_COLUMNS_BY_TAB_', 'function assertUniquePrimaryKeyForInsert_');
-  for (const table of ['Users', 'Auth_Credentials', 'Auth_Sessions', 'Projects', 'Audit_Logs', 'Role_Permissions', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring', 'Escalations', 'PMO_Snapshots']) {
+  for (const table of ['Users', 'Auth_Credentials', 'Auth_Sessions', 'Projects', 'Audit_Logs', 'Role_Permissions', 'Main_WBS', 'Sub_WBS', 'Activities_Schedule', 'Schedule_Dependencies', 'Milestones', 'Permits', 'Risks', 'Issues', 'Approvals', 'Procurement_Logistics', 'Financial_Monitoring', 'Escalations', 'PMO_Snapshots', 'Client_Presentations']) {
     assert.match(mapping, new RegExp(table + ':'));
   }
 });
@@ -99,4 +99,11 @@ test('Phase 18 escalation and Phase 19 snapshot use locked insert/update helpers
   assert.ok(esc.includes("insertRecord_('Escalations', record)"));
   assert.ok(esc.includes("updateRecordById_('Escalations', 'Escalation_ID'"));
   assert.ok(snap.includes("insertRecord_('PMO_Snapshots', record)"));
+});
+
+
+test('client deck generation inserts through locked helper with Deck_ID key', { skip: !(code.includes('insertRecord_(CLIENT_DECKS_SHEET_') && db.includes("Client_Presentations: 'Deck_ID'")) && 'Pending client-deck helper remediation PR' }, () => {
+  const body = section(code, 'function apiGenerateClientPresentation', 'function generateAiSlideDeckWithGemini_');
+  assert.ok(body.includes('insertRecord_(CLIENT_DECKS_SHEET_'));
+  assert.ok(body.includes('Deck_ID: deckId'));
 });
