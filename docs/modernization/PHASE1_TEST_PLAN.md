@@ -119,6 +119,16 @@ A source scan identified 66 `api*` functions in `Code.gs`. Fifty-six directly co
 
 This is a static scan and manual call-path review, not proof that the server guards work. The API list must be rechecked against the deployed code and direct-call tests must verify unauthorized roles, project-scope mismatches, and public-token behavior. Some guard methods are helpers and therefore the static direct-string count undercounts guarded endpoints.
 
+## 3.7 HTML interpolation and XSS regression cases
+
+| ID | Test | Expected result | Status |
+|---|---|---|---|
+| UI-01 | Render the registry loading message with a label containing HTML markup | Label is rendered as escaped text, not interpreted markup | Not run |
+| UI-02 | Render registry empty-state message with a label containing HTML markup | Label is escaped in the generated HTML | Not run |
+| UI-03 | Review all dynamic `innerHTML` and template-string rendering paths for untrusted data | Every user/database-derived value uses context-appropriate escaping or DOM text APIs; findings tracked | Not run |
+
+Focused escaping for the registry loading and empty-state labels is in draft PR #8. The broader `innerHTML` taint audit is not complete; static counts alone are not a vulnerability verdict or proof of safety.
+
 ## 4. Execution order
 
 1. **Baseline and smoke tests:** backups, login, navigation, read-only module checks.
