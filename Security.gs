@@ -487,11 +487,25 @@ function apiLoginWithPassword(username, password) {
   }
   const state = updateCredentialLoginState_(cred.Credential_ID, observedHash, true);
   if (!state.updated) return { success:false, error:state.locked ? 'Account temporarily locked. Contact an Administrator.' : 'Password changed during login. Please try again.' };
-  const token = authRandomToken_();
-  const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
-  writeAuditLog_({email:'username:'+name,fullName:user.Full_Name,user:{email:'username:'+name,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'PASSWORD'}, 'Password login');
-  return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name, role:normalizeRoleName_(user.Role_Name || user.Role_ID)} };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const currentCredential = findRecordRowById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID);
+    const currentUser = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', user.User_ID);
+    if (!currentCredential || String(currentCredential.Password_Hash || '') !== observedHash || !isTruthySheetFlag_(currentCredential.Is_Active)) {
+      return { success:false, error:'Password changed during login. Please try again.' };
+    }
+    if (!currentUser || !isTruthySheetFlag_(currentUser.Is_Active) || normalizeRoleName_(currentUser.Role_Name || currentUser.Role_ID) === 'Administrator') {
+      return { success:false, error:'This account is inactive or not eligible for password login.' };
+    }
+    const token = authRandomToken_();
+    const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
+    insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:currentUser.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+    return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:currentUser.Full_Name, role:normalizeRoleName_(currentUser.Role_Name || currentUser.Role_ID)} };
+  } finally {
+    lock.releaseLock();
+  }
+
 }
 function apiLoginWithGoogleCredential(idToken) {
   ensureHybridAuthTables_();
