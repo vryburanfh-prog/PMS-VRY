@@ -378,36 +378,40 @@ function apiAdminDeleteUser(userId, confirmationText) {
 }
 function apiToggleUserStatus(userId, setActive, reason) {
   const ctx = assertPermission_('Users_Admin', 'edit', null);
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('User ID is required.');
 
-  if (!userId) {
-    throw new Error('User ID is required.');
+  // Serialize status changes with password reset/login session creation so a
+  // concurrent activation/deactivation cannot leave sessions with stale access.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const targetUser = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
+    if (!targetUser) throw new Error('User not found.');
+    if (id === String(ctx.user.userId || '').trim() && !setActive) {
+      throw new Error('You cannot deactivate your own active Administrator account.');
+    }
+    if (setActive && normalizeRoleName_(targetUser.Role_Name || targetUser.Role_ID) === 'Administrator') {
+      addTrustedAdminEmail_(targetUser.Email);
+    }
+    const result = updateRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', id, {
+      Is_Active: setActive ? 'TRUE' : 'FALSE',
+      Updated_At: getNowTimestamp_()
+    });
+    if (!setActive) revokeUserAuthSessions_(id);
+    writeAuditLog_(
+      ctx,
+      setActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
+      'Users_Admin',
+      id,
+      result.previous,
+      result.updated,
+      reason || (setActive ? 'Reactivated user account' : 'Deactivated/removed user access')
+    );
+    return { success: true, user: result.updated };
+  } finally {
+    lock.releaseLock();
   }
-
-  if (String(userId).trim() === String(ctx.user.userId).trim() && !setActive) {
-    throw new Error('You cannot deactivate your own active Administrator account.');
-  }
-
-  const targetUser = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
-  if (!targetUser) throw new Error('User not found.');
-  if (setActive && normalizeRoleName_(targetUser.Role_Name || targetUser.Role_ID) === 'Administrator') addTrustedAdminEmail_(targetUser.Email);
-  const activeFlagStr = setActive ? 'TRUE' : 'FALSE';
-  const result = updateRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', userId, {
-    Is_Active: activeFlagStr,
-    Updated_At: getNowTimestamp_()
-  });
-
-  if (!setActive) revokeUserAuthSessions_(userId);
-  writeAuditLog_(
-    ctx,
-    setActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
-    'Users_Admin',
-    userId,
-    result.previous,
-    result.updated,
-    reason || (setActive ? 'Reactivated user account' : 'Deactivated/removed user access')
-  );
-
-  return { success: true, user: result.updated };
 }
 
 /**
