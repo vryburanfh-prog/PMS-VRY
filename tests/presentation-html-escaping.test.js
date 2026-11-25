@@ -42,3 +42,8 @@ test('remaining direct dynamic fields in HTML are escaped', () => {
   ];
   for (const expression of required) assert.ok(presentation.includes('${' + expression + '}'), expression + ' must be escaped');
 });
+
+test('registry key and dynamic KPI class are escaped in HTML text and attributes', () => {
+  assert.ok(presentation.includes('${escapeHtmlSafe_(st.key)}'));
+  assert.ok(presentation.includes('${escapeHtmlSafe_(c.color)}'));
+});
