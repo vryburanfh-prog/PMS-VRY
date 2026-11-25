@@ -98,3 +98,151 @@ The code has useful foundations: a server-side role permission ceiling, project 
 - API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
 
 This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
+
+## Supplemental Phase 1 source review (2026-11-25)
+
+### S1 — P2: Multi-step create operations can leave partial records
+**Evidence:** `apiCreateUser` inserts the Users row before creating password credentials, syncing project assignments, and writing audit logs. `apiCreateProject` inserts the project row, then creates an assignment row and continues with follow-up work. These are separate spreadsheet writes and no rollback/compensation flow was visible in the reviewed portions.
+**Impact:** A later failure can leave a user/project partially provisioned (for example, a user without expected credential/assignment rows, or a project without its creator assignment).
+**Recommendation:** Treat multi-sheet create workflows as sagas: validate all inputs first, write each step with clear status, compensate or provide a repair routine for failures, and ensure audit events capture partial completion. Add fault-injection tests at each write boundary. Do not claim Sheets multi-sheet writes are transactional.
+**Status:** Source-level observation; failure reproduction and exact affected steps need runtime validation.
+
+### S2 — P2: Audit and cache consistency for direct row mutations
+**Evidence:** Some project-control and financial deletion paths directly call `sheet.deleteRow(...)` then audit separately. The targeted code paths did not show a common lock/cache invalidation helper at those call sites.
+**Impact:** Concurrent mutation risk and potentially stale cached data; audit may be absent if the audit write fails after deletion.
+**Recommendation:** Inventory all direct spreadsheet mutations. Centralize row deletion/update in helpers that lock, invalidate the correct caches, and return the deleted snapshot. Add audit-failure recovery/alerts.
+**Status:** Needs complete mutation-path inventory and tests; not yet proven to cause user-visible corruption.
+
+### S3 — API inventory reconciliation (static)
+A regex inventory of `Code.gs` found 66 `api*` function declarations. The Security.gs private dashboard allowlist also contains 66 names. The comparison reported `apiGetPublishedClientDeckByToken` as a Code.gs API declaration outside the private allowlist, and `apiLoginWithGoogleCredential` as an allowlist entry not declared in Code.gs. Inspection indicates these are expected special cases: published deck retrieval is a token-based public endpoint, while Google credential login is implemented in the security/auth file. This count check is a useful automated consistency test, but it is not proof of endpoint authorization: classify public endpoints separately, include all source files in inventory, and test all calls directly.
+
+### S4 — P1 investigation: Duplicate-ID race needs explicit unique enforcement
+The ID generator scans existing records and calculates max+1. `insertRecord_()` serializes append operations but does not appear to enforce uniqueness of the entity ID column. A collision can therefore be inserted if two requests calculate the same identifier before the append lock. Proposed fix remains a single lock-protected allocate+insert or equivalent counter with uniqueness validation and concurrency test.
+
+**Recommended order:** Implement and test ID allocation first; next add multi-step create recovery/compensation; then centralize direct delete/update mutations and cache invalidation; proceed with broader auth, XSS, import/export, and restore testing.
+
+### S5 — Frontend rendering surface inventory (static counts)
+A regex scan of the current `main` versions of `index.html` and `Presentation.html` counted 128 and 124 assignments to `.innerHTML`, respectively. It also counted 262 and 227 calls to `escapeHtmlSafe_()` in those files. The helper escapes HTML metacharacters, and a `safeJsArg_()` helper serializes then HTML-escapes string arguments. These counts show that escaping utilities are used, but **do not prove** the UI is XSS-safe: context-specific sinks, inline JavaScript/event attributes, URLs, template literals, and unsafe string composition require manual taint tracing and hostile-input runtime tests.
+
+### S6 — P1/P2 review: Published client deck contains raw source metrics
+**Evidence:** `apiGenerateClientPresentation` constructs `fullDeckPayload` with both generated slides and `rawMetrics: factPacket`, stores the entire payload in the client-deck sheet, and `apiGetPublishedClientDeckByToken` returns the stored `Deck_JSON` to anyone with the 32-hex share token while the deck is published. The token is UUID-derived (128-bit random format) and archive status is checked, which are positive controls. However, `factPacket` can include raw permit, deliverable, milestone, risk, and issue records depending on scope; these may include internal fields not meant for external clients.
+**Impact:** Bearer-link holders can retrieve more underlying data than the curated slide text, especially raw risk/issue/permit records. The link is not authenticated and no expiry field was observed in the inspected path.
+**Recommendation:** Store a minimized, client-approved payload only; remove `rawMetrics` from public response/storage or strip sensitive columns/fields by module; add a data classification/field allowlist and explicit publication review; add token revocation/expiry policy as appropriate. Test with internal-only field payloads to ensure public deck responses omit them.
+**Status:** Confirmed public response includes the rawMetrics property in source; exact sensitive field exposure depends on source records and selected presentation scope, so validate against test data before assigning final severity.
+
+### S7 — P1 investigation: Spreadsheet import may accept formula-bearing strings
+**Evidence:** `apiImportDatabaseFromGoogleSheet` reads source cell values with `getValues()` and writes those values into destination cells with `setValues()`. Header checks and a pre-import full backup are present, but the inspected path did not show explicit formula/text sanitization or row-level schema validation before copying values.
+**Impact:** Source values that are formula-like strings may be interpreted by Sheets when written to destination, depending on cell value and import content. Imports can also carry invalid relationships or unexpected values despite matching headers.
+**Recommendation:** Validate row data against schemas; ensure text beginning with formula operators is stored as literal text (or rejected); test formula injection in a disposable copy; validate key uniqueness and foreign-key/project relationships; retain backup and recovery verification.
+**Status:** Potential risk, not reproduced; import formula behavior requires runtime testing in Google Sheets.
+
+
+## Remediation tracking (source review update)
+
+| Finding | Remediation branch / PR | Source-level status | Runtime status |
+|---|---|---|---|
+| S6 public client deck may expose raw source metrics | `pms-modernization/phase1-public-deck-data-minimization`, draft PR #4 | New payload omits `rawMetrics`; public endpoint strips it from legacy snapshots; renderer has no reference to it | Not tested in Apps Script; live published links not checked |
+| S7 formula-like imported strings may be interpreted as formulas | `pms-modernization/phase1-import-formula-safety`, draft PR #5 | Import rows sanitize strings beginning with `=`, `+`, `-`, or `@` (including leading whitespace) before destination writes | Not tested against live Google Sheets formula behavior |
+
+The Phase 1 test plan draft (PR #2) now includes focused regression cases IMP-08/09 and DECK-07/08/09. These code changes remain review-only: neither PR has been merged or deployed. They are source-level mitigations, not evidence of runtime validation. Formula sanitization intentionally changes formula-like imported text to literal text and should be checked against expected import semantics in a disposable test spreadsheet.
+
+
+### S8 — P1 investigation/remediation: duplicate generated IDs under concurrency
+**Evidence:** `generateNextId_` scans records for max numeric suffix and returns the next value; generated IDs are often created before the insertion helper acquires its append lock. The insertion helpers previously serialized writes but did not check whether the supplied primary key already existed.
+**Remediation branch / PR:** `pms-modernization/phase1-id-uniqueness-enforcement`, draft PR #6.
+**Source-level change:** Primary-key duplicate checks were added to single and bulk insert helpers for mapped operational and authentication tables, including Audit_Logs, Auth_Credentials, Auth_Sessions, and Role_Permissions. Checks run while the Script Lock is held, before append; duplicate IDs in a bulk batch are also rejected. Missing mapped primary-key headers and missing primary-key values fail closed.
+**Limitations:** This prevents duplicate keys from being silently inserted but does not make max+1 generation and insertion one atomic allocation operation, nor retry a collision. A concurrent create that loses the race may return an error and require a retry. Runtime concurrency testing and consideration of a lock-protected allocator/counter remain necessary.
+**Status:** Source-only mitigation; runtime test not run.
+
+
+### S9 — API authorization inventory: static scan reconciliation
+**Evidence:** A fresh static scan of `Code.gs` identified 66 API functions. Fifty-six directly contain a recognized permission/admin assertion string. The remaining ten were manually reviewed for helper-based guard paths or intentional public behavior: session context, bootstrap, project register, WBS archive/delete/save/depth, project reference names, and published client deck token retrieval.
+**Review notes:** The ten endpoints were not found to be unguarded merely because the static scanner did not find direct guard strings. The inspected source shows authentication/page-access/project-assignment/privileged-WBS helper checks for nine endpoints; the client deck share-token endpoint is intentionally public and checks token shape plus published status. The public payload data-minimization remediation is tracked in draft PR #4.
+**Status:** Source-level call-path review only. Endpoint direct-call tests and deployed-code reconciliation remain outstanding. Test plan PR #2 now records the inventory and test cases.
+
+
+### S10 — P2 defense-in-depth: unescaped registry labels in HTML templates
+**Evidence:** Both `index.html` and `Presentation.html` interpolated registry module labels into loading and empty-state HTML templates without explicit escaping. The labels are normally controlled by registry configuration, reducing likelihood, but explicit escaping is warranted.
+**Remediation:** Draft PR #8 applies `escapeHtmlSafe_` to both dynamic label interpolations in both HTML files.
+**Status:** Source-only focused remediation. Runtime/browser tests and full dynamic HTML taint tracing remain outstanding; other innerHTML paths are not yet fully audited.
+
+
+### S11 — P1 improvement: automated static security regression checks
+**Remediation:** Draft PR #7 adds a Node 20 GitHub Actions workflow and source-level tests for the focused Phase 1 fixes. Tests for code fixes not yet merged into `main` skip with explicit pending-remediation messages; they will activate when the corresponding code is merged.
+**CI evidence:** PR #7’s latest test-only CI run succeeded (1 baseline test passed, 0 failed, 9 feature tests skipped until remediation merges). A separate temporary integrated-validation PR #11 combined the pending source fixes and ran the same test suite: **7 passed, 0 failed, 0 skipped**. PR #11 was closed unmerged after collecting the CI result. This validates static source assertions only, not runtime Apps Script or Sheets behavior.
+**Status:** CI workflow and runner are functional; fix-specific checks remain pending until their implementation PRs merge.
+
+
+### S12 — P2 investigation: multi-step mutations and audit-log failure boundaries
+**Evidence:** `apiCreateProject` inserts the project and then the creator's project-assignment record; `apiCreateUser` inserts a user, may update the trusted-admin list, may create password credentials, synchronizes project assignments, and then writes an audit log. These multi-step mutations are separate helper calls without a visible transaction/compensation boundary. The audit writer generates an `Audit_ID` and inserts the audit record separately. Similar workflows require endpoint-by-endpoint review.
+**Impact:** If a later write or audit-log write fails, an earlier business mutation may already be committed, while the caller receives an error or the operation may be incompletely represented in the audit trail. This is a data-integrity and accountability risk; failure scenarios have not been reproduced.
+**Recommendation:** Add fault-injection tests for each step; define required mutation/audit guarantees; use a lock around logical multi-record operations where safe; design explicit compensating rollback or status/reconciliation records instead of assuming Sheets supports transactions. Add Audit_Logs to primary-key uniqueness checks (implemented in draft PR #6).
+**Status:** Investigation; runtime fault-injection and recovery design pending.
+
+
+## Current modernization PR tracker (review-only)
+
+| PR | Workstream | Status | Validation summary |
+|---|---|---|---|
+| #2 | Phase 1 test plan | Open draft | Updated with import/deck/ID/UI/API authorization/CI regression test cases; runtime cases not run |
+| #3 | Audit findings and remediation tracker | Open draft | Source-level evidence and remediation links |
+| #4 | Public client deck data minimization | Open draft | Static source checks; no runtime share-link test |
+| #5 | Spreadsheet import formula safety | Open draft | Static sanitizer-order check; runtime Sheets behavior unverified |
+| #6 | Primary-key duplicate rejection | Open draft | Static insert-helper guard checks; concurrency runtime tests not run; mapped Auth_Credentials/Auth_Sessions/Audit_Logs included |
+| #7 | Static security CI | Open draft | GitHub Actions run succeeded; 1 baseline test passed, 6 fix-specific tests skipped until implementation PRs merge |
+| #8 | Registry label HTML escaping | Open draft | Static interpolation review only; broader XSS taint audit remains |
+| #9 | Phase 2 project controls design | Open draft | Design/documentation only; current source findings documented |
+| #10 | Backup/recovery runbook | Open draft | Source-based guidance; runtime recovery and failure-injection tests not run |
+| #11 | Temporary integrated validation | Closed unmerged | CI passed 12/12 static regression tests with all Phase 1 source fixes combined, including locked deletes, escalation scope, Phase 18/19/client-deck helper refactors, and atomic login failures; closed after validation |
+| #12 | Locked delete-helper consistency | Open draft | Source inspection; deletion helper tests not run in Apps Script |
+| #13 | Escalation project ownership guard | Open draft | Source-level ownership check; runtime authorization test pending |
+| #14 | Phase 18/19 mutation helper integrity | Open draft (stacked on #13) | Static helper callsite check; runtime concurrency/audit tests pending |
+| #15 | Locked client-presentation insert | Open draft | Static helper callsite check; runtime concurrent generation test pending |
+| #16 | Atomic password-login failure counting | Open draft | Static lock/read/write check; concurrent authentication test pending |
+
+
+
+### S13 — P1 operational readiness: backup/recovery procedure not runtime-verified
+**Evidence:** Source includes full spreadsheet backup-copy endpoint, import header checks and pre-import backup, and Start Fresh allowlist/backup. Import replaces matching tabs and skips missing source tabs; the multi-tab write loop has no rollback boundary. No dedicated atomic restore endpoint is present in the inspected source.
+**Remediation:** Draft PR #10 documents pre-change backup verification, isolated recovery, import/reset safeguards, post-change reconciliation, and evidence retention. Draft PR #2 now includes BAK-01 through BAK-07.
+**Status:** Runbook documentation exists on a draft branch; backup/restore and failure-injection tests have not been executed.
+
+
+### S14 — P2 data integrity: five deletion APIs bypass the locked delete helper
+**Evidence:** Direct `deleteRow(existing._rowIndex)` calls were found in Project Controls registry, Weekly Reports, Team Workload, Procurement, and Financial Monitoring deletion endpoints. These paths read a row index before deletion and delete directly without the shared Script Lock/ID re-lookup helper.
+**Remediation:** Draft PR #12 routes those five endpoints through `deleteRecordById_`, which performs stable-ID lookup under Script Lock and existing cleanup/cache-invalidation behavior. The registry delete audit snapshot is cleaned of the internal row index.
+**Limitations:** The business deletion and subsequent audit-log insert remain separate operations; no transaction/compensation is implemented. Runtime concurrency/fault-injection tests are pending.
+
+
+### S15 — P1 investigation: escalation upsert lacked project-ownership validation
+**Evidence:** `apiUpsertEscalationItem` checked the privileged-management role and edit permission for the requested `targetPid`, then located an existing escalation by `Escalation_ID`. The inspected path did not compare the stored record's `Project_ID` with the requested project/portfolio scope before updating the row, allowing a privileged user authorized for one project to potentially edit an escalation belonging to another project by ID.
+**Remediation:** Draft PR #13 compares the existing escalation's stored project ID with the requested project or `PORTFOLIO` scope and rejects mismatches before update. Test plan PR #2 adds SEC-16 through SEC-18.
+**Status:** Source-level fix; runtime direct-call tests and project-scope authorization confirmation remain outstanding. Severity is provisional until verified in an isolated environment.
+
+
+### S16 — P2 integrity: Phase 18 escalation and Phase 19 snapshot writes bypass common helpers
+**Evidence:** `apiUpsertEscalationItem` directly updates cells by row index or appends rows; `apiCapturePmoSnapshot` appends directly. These paths do not use the shared Script-Lock insert/update helpers. Escalation update audit snapshots were also incomplete in the inspected path.
+**Remediation:** Draft PR #14 uses `insertRecord_` and `updateRecordById_` for escalation upsert and `insertRecord_` for PMO snapshots; update audit entries use returned previous/updated values. Draft PR #6 adds primary-key mappings for Escalations and PMO_Snapshots so duplicate/missing IDs are checked once that guard is merged.
+**Limitations:** Runtime concurrency and fault-injection tests are pending; business mutation and audit writes remain separate operations.
+
+
+### S17 — P2 integrity: client presentation append bypasses shared insert helper
+**Evidence:** `apiGenerateClientPresentation` appended published deck records directly with `appendRow`, without the shared Script Lock/primary-key duplicate check.
+**Remediation:** Draft PR #15 uses `insertRecord_` for the presentation row. Draft PR #6 adds `Client_Presentations: Deck_ID` to the primary-key map.
+**Status:** Source-level change; runtime concurrent deck-generation test pending.
+
+
+### S18 — P1 security/integrity investigation: password-login failure count can race
+**Evidence:** `apiLoginWithPassword` reads `Failed_Attempts` from cached/table records, increments the count in the request, then calls the locked update helper. The read and increment were outside the lock, so concurrent failures could overwrite one another's count and potentially delay the lockout threshold.
+**Remediation:** Draft PR #16 moves credential read, count increment, lockout decision, and write into `recordPasswordLoginFailure_` under Script Lock. Draft PR #7 includes a static regression check; test plan PR #2 adds AUTH-19/20/21.
+**Status:** Source-level change; concurrent authentication/runtime tests not run.
+
+### S19 — P2 project-scope integrity: delete ownership check can race with row scope change
+**Evidence:** Scoped delete APIs validate a record's Project_ID (or Assigned_Project_ID for workload) before calling the shared delete helper. The helper re-reads by stable ID under Script Lock but originally did not repeat the project-scope check. A concurrent scope change between the preflight check and the locked delete could leave a stale authorization decision. This is a source-level race; it has not been reproduced at runtime.
+**Remediation:** Draft PR #18 (stacked on #12) adds an optional expected-scope argument to the locked delete helper and passes the expected project scope from all scoped delete APIs, including WBS. The helper compares the stored scope to the expected value while holding the lock before deletion. PR #7 adds a static regression assertion and PR #2 adds DEL-04.
+**Status:** Static integrated validation passed 13/13 checks; isolated concurrent/fault-injection test is pending. This is not a runtime reproduction or proof of absence of other races.
+
+### S20 — P2 data integrity: progress log and schedule roll-up are multi-step writes
+**Evidence:** `apiSaveProgressLog` inserts/updates Progress_Updates and writes audit history before optionally updating the linked Activity and recalculating the project progress roll-up. These steps are not transactional; failure after the log write can leave a saved log without schedule application, and failure after Activity update can leave stale roll-up values. A retry of a new submission without stable Log_ID can create a duplicate. Source-level sequence; no fault injection performed.
+**Remediation:** Draft PR #2 adds MUT-24 fault-injection/reconciliation test; draft PR #10 adds operational recovery steps to inspect existing Log_ID, Activity, roll-up, and use authorized review/recalculation paths rather than blind retry.
+**Status:** Documented risk and recovery procedure; runtime failure injection and idempotency/compensation design remain pending.
