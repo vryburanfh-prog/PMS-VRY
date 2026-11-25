@@ -150,7 +150,7 @@ function buildPmsProjectControlsReport(input) {
   const risks = riskRows.map(row => {
     const status = String(row.Current_Status || row.Status || 'Open').trim();
     const rating = String(row.Risk_Rating || '').trim();
-    const scoreMatch = rating.match(/^\\s*(\\d+(?:\\.\\d+)?)/);
+    const scoreMatch = rating.match(/^\s*(\d+(?:\.\d+)?)/);
     const score = scoreMatch ? Number(scoreMatch[1]) : null;
     const band = /critical/i.test(rating) || (score != null && score >= 15) ? 'critical'
       : /high/i.test(rating) || (score != null && score >= 10) ? 'high'
