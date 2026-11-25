@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
 const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
@@ -21,6 +22,40 @@ function extractFunction(name) {
     }
   }
   throw new Error('Unterminated function: ' + name);
+}
+
+
+function runProjectControlsEndpoint(options) {
+  const opts = options || {};
+  const fn = extractFunction('apiGetProjectControlsInputs');
+  const reads = [];
+  const tabs = {
+    PROJECTS: 'Projects', ACTIVITIES: 'Activities', DEPENDENCIES: 'Dependencies',
+    BASELINES: 'Baselines', MILESTONES: 'Milestones', RISKS: 'Risks',
+    ISSUES: 'Issues', FINANCIAL: 'Financial'
+  };
+  const datasets = opts.datasets || {};
+  const context = {
+    DB_CONFIG: { TABS: tabs },
+    assertPermission_: function (moduleName, action, projectId) {
+      if (opts.denyProject) throw new Error('Permission denied');
+      assert.equal(moduleName, 'Projects');
+      assert.equal(action, 'view');
+      assert.equal(projectId, opts.expectedProjectId || 'P-1');
+      return opts.context || { isAdmin: false, permissions: {} };
+    },
+    findRecordRowById_: function (tab, key, id) {
+      assert.equal(tab, 'Projects');
+      assert.equal(key, 'Project_ID');
+      return (datasets.Projects || []).find(row => String(row.Project_ID) === String(id)) || null;
+    },
+    isTruthySheetFlag_: function (value) {
+      return value === true || ['true', 'yes', '1'].includes(String(value || '').toLowerCase());
+    },
+    getTableRecords_: function (tab) { reads.push(tab); return datasets[tab] || []; },
+    Utilities: { formatDate: () => '2026-11-25' }
+  };
+  return { result: vm.runInNewContext('(' + fn + ')', context)(opts.projectId || 'P-1'), reads };
 }
 
 test('project-controls endpoint is syntactically valid and read-only', () => {
@@ -43,6 +78,53 @@ test('project-controls endpoint independently gates every module dataset', () =>
   assert.match(fn, /key !== '_rowIndex'/);
 });
 
+
+
+test('runtime: project endpoint scopes every returned dataset and strips internal row metadata', () => {
+  const rows = { Projects: [{ Project_ID: 'P-1', Project_Name: 'Alpha', Is_Archived: false }] };
+  for (const tab of ['Activities','Dependencies','Baselines','Milestones','Risks','Issues','Financial']) {
+    rows[tab] = [
+      { Project_ID: 'P-1', Record_ID: tab + '-1', Is_Archived: false, _rowIndex: 9 },
+      { Project_ID: 'P-2', Record_ID: tab + '-2', Is_Archived: false, _rowIndex: 10 }
+    ];
+  }
+  const { result } = runProjectControlsEndpoint({ datasets: rows });
+  assert.equal(result.success, true);
+  for (const key of ['activities','dependencies','baselines','milestones','risks','issues','financialItems']) {
+    assert.equal(result[key].length, 1, key + ' must be project scoped');
+    assert.equal(result[key][0]._rowIndex, undefined);
+  }
+});
+
+test('runtime: denied module permissions return null without reading that module', () => {
+  const rows = { Projects: [{ Project_ID: 'P-1', Project_Name: 'Alpha' }], Activities: [{ Project_ID: 'P-1' }] };
+  const { result, reads } = runProjectControlsEndpoint({ datasets: rows, context: { isAdmin: false, permissions: { WBS_Schedule: { view: true } } } });
+  assert.deepEqual(result.access, { schedule: true, milestones: false, risks: false, issues: false, financialMonitoring: false });
+  assert.equal(result.activities.length, 1);
+  for (const key of ['milestones','risks','issues','financialItems']) assert.equal(result[key], null);
+  assert.ok(!reads.includes('Milestones') && !reads.includes('Risks') && !reads.includes('Issues') && !reads.includes('Financial'));
+});
+
+test('runtime: archived rows and archived projects are excluded', () => {
+  const rows = {
+    Projects: [{ Project_ID: 'P-1', Project_Name: 'Alpha', Is_Archived: false }],
+    Activities: [{ Project_ID: 'P-1', Is_Archived: false }, { Project_ID: 'P-1', Is_Archived: true }],
+    Milestones: [{ Project_ID: 'P-1', Is_Archived: true }]
+  };
+  const { result } = runProjectControlsEndpoint({ datasets: rows, context: { isAdmin: true, permissions: {} } });
+  assert.equal(result.activities.length, 1);
+  assert.equal(result.milestones.length, 0);
+  assert.throws(() => runProjectControlsEndpoint({
+    datasets: { Projects: [{ Project_ID: 'P-1', Is_Archived: true }] },
+    context: { isAdmin: true, permissions: {} }
+  }), /Project not found or archived/);
+});
+
+test('runtime: rejects blank IDs and stops before any module reads when project access is denied', () => {
+  assert.throws(() => runProjectControlsEndpoint({ projectId: '   ' }), /Project_ID is required/);
+  const rows = { Projects: [{ Project_ID: 'P-1', Is_Archived: false }] };
+  assert.throws(() => runProjectControlsEndpoint({ datasets: rows, denyProject: true }), /Permission denied/);
+});
 
 test('portfolio controls endpoint derives projects from the authorized portfolio API', () => {
   const fn = extractFunction('apiGetPortfolioControlsSummary');
