@@ -1092,10 +1092,13 @@ function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
     return { available: false, reason: 'Latest baseline snapshot has no activities array' };
   }
   const saved = {};
-  snapshot.activities.forEach(function (row) {
+  for (let i = 0; i < snapshot.activities.length; i += 1) {
+    const row = snapshot.activities[i] || {};
     const id = String(row.Activity_ID || '').trim();
-    if (id) saved[id] = row;
-  });
+    if (!id) return { available: false, reason: 'Latest baseline snapshot contains an activity without Activity_ID' };
+    if (saved[id]) return { available: false, reason: 'Latest baseline snapshot contains duplicate Activity_ID values' };
+    saved[id] = row;
+  }
   const active = (activities || []).filter(function (row) {
     return String(row.Project_ID || '').trim() === String(projectId) &&
       !isTruthySheetFlag_(row.Is_Archived);
@@ -1118,6 +1121,9 @@ function buildAppsScriptBaselineSummary_(activities, baselines, projectId) {
     activeActivityCount: active.length,
     matchedActivityCount: matched,
     missingActivityCount: missing,
+    snapshotOnlyActivityCount: Object.keys(saved).filter(function (id) {
+      return !active.some(function (row) { return String(row.Activity_ID || '').trim() === id; });
+    }).length,
     changedBaselineStartCount: changedStart,
     changedBaselineFinishCount: changedFinish
   };
