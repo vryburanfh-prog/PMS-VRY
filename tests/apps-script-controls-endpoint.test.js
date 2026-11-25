@@ -49,11 +49,11 @@ test('portfolio controls endpoint derives projects from the authorized portfolio
   assert.doesNotThrow(() => new Function(fn));
   assert.match(fn, /apiGetPortfolioData\(filters \|\| \{\}\)/);
   assert.match(fn, /ids\.has\(id\)/);
-  assert.match(fn, /canView\('Risks'\)/);
-  assert.match(fn, /canView\('Issues'\)/);
-  assert.match(fn, /canView\('Milestones'\)/);
-  assert.match(fn, /canView\('WBS_Schedule'\)/);
-  assert.match(fn, /canView\('Financial_Monitoring'\)/);
+  assert.match(fn, /readScoped\(DB_CONFIG\.TABS\.RISKS, 'Risks'/);
+  assert.match(fn, /readScoped\(DB_CONFIG\.TABS\.ISSUES, 'Issues'/);
+  assert.match(fn, /readScoped\(DB_CONFIG\.TABS\.MILESTONES, 'Milestones'/);
+  assert.match(fn, /readScoped\(DB_CONFIG\.TABS\.ACTIVITIES, 'WBS_Schedule'/);
+  assert.match(fn, /readScoped\(DB_CONFIG\.TABS\.FINANCIAL, 'Financial_Monitoring'/);
   assert.doesNotMatch(fn, /insertRecord_|updateRecordById_|deleteRecordById_|writeAuditLog_/);
   assert.doesNotMatch(fn, /canViewRisks|canViewIssues/);
 });
