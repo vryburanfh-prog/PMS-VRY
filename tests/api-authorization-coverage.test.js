@@ -43,7 +43,7 @@ test('public client deck endpoint remains token-gated and outside private dispat
   assert.ok(!allowlist.includes(name), 'public token endpoint must not be part of private dispatcher allowlist');
   const body = extractTopLevelFunction(code, name);
   assert.match(body, /cleanToken/);
-  assert.ok(body.includes('^[a-f0-9]{32}
+  assert.ok(body.includes('^[a-f0-9]{32}$'), 'token must be validated as a 32-character hexadecimal value');
   assert.match(body, /token/i);
 });
 
