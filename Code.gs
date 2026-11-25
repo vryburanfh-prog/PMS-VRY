@@ -5077,8 +5077,7 @@ function apiGenerateClientPresentation(config) {
   const aiDeck = generateAiSlideDeckWithGemini_(factPacket, audienceTone, customPrompt);
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
-  const sh = ensureClientPresentationsSheet_();
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') + '-' + Math.floor(1000 + Math.random() * 9000);
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
@@ -5096,7 +5095,11 @@ function apiGenerateClientPresentation(config) {
     rawMetrics: factPacket
   };
 
-  sh.appendRow([
+  const writeLock = LockService.getScriptLock();
+  writeLock.waitLock(15000);
+  try {
+    const sh = ensureClientPresentationsSheet_();
+    sh.appendRow([
     deckId,
     pid,
     deckTitle,
@@ -5110,7 +5113,10 @@ function apiGenerateClientPresentation(config) {
     nowIso,
     nowIso,
     'PUBLISHED'
-  ]);
+    ]);
+  } finally {
+    writeLock.releaseLock();
+  }
 
   return {
     success: true,
@@ -5331,7 +5337,7 @@ function apiStartFreshDatabase(confirmationText) {
     });
 
     // Backup must succeed before the first destructive operation.
-    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
     var backup = DriveApp.getFileById(getMasterSpreadsheetId_()).makeCopy('PMO_PRE_START_FRESH_BACKUP_' + stamp);
     var cleared = [];
     var totalRows = 0;
