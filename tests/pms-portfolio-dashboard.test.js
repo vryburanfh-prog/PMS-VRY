@@ -116,3 +116,23 @@ test('treats missing metric coverage as incomplete rather than monitor', () => {
   assert.equal(priority.level, 'incomplete');
 });
 
+test('provides executive priority totals and per-module coverage counts', () => {
+  const model = buildPmsPortfolioDashboardModel(portfolio, [{
+    projectId: 'P-1',
+    riskSummary: { highOrCriticalOpen: 1 },
+    issueSummary: { open: 2 },
+    scheduleAlerts: { overdueMilestoneCount: 0, delayedActivityCount: 0 },
+    finance: { overBudget: false, overCommitment: false },
+    availability: { schedule: true, milestones: true, risks: true, issues: true, financialMonitoring: true },
+    warnings: []
+  }]);
+  assert.equal(model.managementSummary.totalVisibleProjects, 2);
+  assert.equal(model.managementSummary.projectsWithDetailedControls, 1);
+  assert.equal(model.managementSummary.projectsWithoutDetailedControls, 1);
+  assert.equal(model.managementSummary.priorityCounts.urgent, 1);
+  assert.equal(model.managementSummary.priorityCounts.incomplete, 1);
+  assert.equal(model.managementSummary.moduleCoverage.risks.available, 1);
+  assert.equal(model.managementSummary.moduleCoverage.risks.unavailable, 1);
+  assert.equal(model.managementSummary.moduleCoverage.financialMonitoring.available, 1);
+});
+
