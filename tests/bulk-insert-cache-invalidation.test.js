@@ -37,6 +37,7 @@ function runInsert({failWrite = false} = {}) {
   const context = {
     LockService: {getScriptLock: () => lock},
     getMasterSpreadsheet_: () => ({getSheetByName: () => sheet}),
+    assertUniquePrimaryKeyForInsert_: () => {},
     invalidateTableCache_: name => invalidations.push(name)
   };
   vm.createContext(context);
