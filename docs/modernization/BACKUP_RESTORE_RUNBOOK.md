@@ -122,3 +122,16 @@ The workflow creates the Projects row, creates a creator Project_Assignments row
 - Retain a verified pre-test backup and reconcile row counts/IDs before and after each injected failure.
 - Document whether each failure is recoverable through supported APIs or requires maintainer intervention. Do not represent compensating recovery as atomic rollback.
 - A future implementation should define explicit operation status/idempotency keys or a compensation strategy before attempting automated rollback across sheets.
+
+### 10.4 Progress log / linked activity partial writes (`apiSaveProgressLog`)
+
+The progress-log endpoint writes the Progress_Updates record and audit entry before it optionally updates the linked Activity and recalculates the project roll-up. These operations are not transactional. A reported failure after the log write may leave a saved log with no corresponding schedule update, or an updated Activity whose project roll-up has not completed. Retrying a new log request without the existing `Log_ID` can create a duplicate.
+
+1. Stop retrying the request until state is reconciled. Record the project, Activity_ID, log date, submitter, request time, and error in the restricted incident record.
+2. Inspect Progress_Updates for the matching Log_ID or log details and inspect the linked Activity's progress/quantity/status and project roll-up values.
+3. Determine whether the request was a team-member submission (which should not apply directly to the live schedule) or an authorized reviewer/privileged update with apply-to-schedule behavior.
+4. If the log exists, use its stable Log_ID for authorized edits/review; do not create another log to repeat the same submission. If schedule changes are needed, apply through the authorized progress approval/edit workflow and verify roll-up.
+5. If the Activity was updated but the roll-up did not complete, use the authorized progress-recalculation operation and compare WBS/project values. Preserve the original log and audit evidence.
+6. Verify Progress_Updates, Activity, Main/Sub WBS, and Project progress values reconcile before closing the incident. Escalate inconsistent approval or attribution data to the maintainer rather than editing live sheet rows directly.
+
+Run MUT-24 only in a disposable test spreadsheet with a verified backup. Confirm each failure boundary and retry/idempotency behavior before proposing automated compensation.
