@@ -226,10 +226,39 @@ function apiCreateUser(userPayload) {
       Department_Or_Team: deptVal, Role_Name: canonicalRole, Role_ID: canonicalRole,
       Is_Active: 'TRUE', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_()
     };
-    insertRecord_(DB_CONFIG.TABS.USERS, newUser);
-    if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
-    if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
-    const assignedProjectIds = syncUserProjectAssignments_(newUser, requestedAssignments, ctx);
+    let assignedProjectIds = [];
+    try {
+      insertRecord_(DB_CONFIG.TABS.USERS, newUser);
+      if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
+      if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
+      assignedProjectIds = syncUserProjectAssignments_(newUser, requestedAssignments, ctx);
+    } catch (creationError) {
+      // Compensate for partial writes across Sheets tables. Cleanup attempts are
+      // individually guarded so one failure does not prevent other reversals.
+      const cleanupErrors = [];
+      try {
+        const assignments = getTableRecords_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS) || [];
+        const assignmentIds = assignments.filter(function (r) {
+          return String(r.User_ID || '').trim() === newUser.User_ID ||
+            (email && String(r.User_Email || '').trim().toLowerCase() === email);
+        }).map(function (r) { return r.Assignment_ID; });
+        deleteRecordsByIds_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', assignmentIds);
+      } catch (cleanupError) { cleanupErrors.push('assignment cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try {
+        const credentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+        const credentialIds = credentials.filter(function (r) { return String(r.User_ID || '').trim() === newUser.User_ID; }).map(function (r) { return r.Credential_ID; });
+        deleteRecordsByIds_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialIds);
+      } catch (cleanupError) { cleanupErrors.push('credential cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try {
+        if (canonicalRole === 'Administrator') removeTrustedAdminEmail_(email);
+      } catch (cleanupError) { cleanupErrors.push('trusted-admin cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try { deleteRecordsByIds_(DB_CONFIG.TABS.USERS, 'User_ID', [newUser.User_ID]); }
+      catch (cleanupError) { cleanupErrors.push('user cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      if (cleanupErrors.length) {
+        throw new Error('User creation failed: ' + String(creationError && creationError.message || creationError) + '. Compensating cleanup also had errors: ' + cleanupErrors.join('; '));
+      }
+      throw creationError;
+    }
     let auditWarning = '';
     try {
       writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
