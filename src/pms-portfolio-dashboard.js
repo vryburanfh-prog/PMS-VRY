@@ -78,13 +78,34 @@ function buildPmsPortfolioDashboardModel(portfolioData, projectControlReports) {
       warnings: report && Array.isArray(report.warnings) ? report.warnings.slice() : []
     };
   });
+  const prioritizedProjects = sortProjectsByExceptionPriority(projects);
+  const priorityCounts = prioritizedProjects.reduce((counts, project) => {
+    counts[project.exceptionPriority.level] = (counts[project.exceptionPriority.level] || 0) + 1;
+    return counts;
+  }, { urgent: 0, high: 0, attention: 0, monitor: 0, incomplete: 0, unavailable: 0 });
+  const coverageCounts = ['schedule', 'milestones', 'risks', 'issues', 'financialMonitoring']
+    .reduce((counts, moduleName) => {
+      counts[moduleName] = {
+        available: projects.filter(project => project.controls && project.controls.availability[moduleName] === true).length,
+        unavailable: projects.filter(project => !project.controls || project.controls.availability[moduleName] === false).length
+      };
+      return counts;
+    }, {});
+  const managementSummary = {
+    totalVisibleProjects: projects.length,
+    projectsWithDetailedControls: projects.filter(project => Boolean(project.controls)).length,
+    projectsWithoutDetailedControls: projects.filter(project => !project.controls).length,
+    priorityCounts,
+    moduleCoverage: coverageCounts
+  };
   return {
     success: true,
     source: 'authorized-apiGetPortfolioData',
     portfolioKpis: portfolioData.kpis || {},
     projectControls: controls,
+    managementSummary,
     projects,
-    prioritizedProjects: sortProjectsByExceptionPriority(projects)
+    prioritizedProjects
   };
 }
 
