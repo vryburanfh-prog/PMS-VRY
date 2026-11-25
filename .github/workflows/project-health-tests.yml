@@ -1,0 +1,36 @@
+name: Project Health Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/project-health.js'
+      - 'tests/project-health.test.js'
+      - '.github/workflows/project-health-tests.yml'
+  push:
+    branches:
+      - main
+      - 'pms-modernization/**'
+    paths:
+      - 'src/project-health.js'
+      - 'tests/project-health.test.js'
+      - '.github/workflows/project-health-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-health-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  health-classification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run project health tests
+        run: node --test tests/project-health.test.js
