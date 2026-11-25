@@ -2259,6 +2259,9 @@ function apiGetTeamWorkloadData(projectId) {
  */
 function apiSaveTeamWorkloadAssignment(projectId, payload) {
   if (!projectId) throw new Error('Project_ID is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const pid = String(projectId).trim();
 
   const rawId = String(payload.Assignment_ID || '').trim();
@@ -2312,6 +2315,9 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
   }
 
   return { success: true, assignment: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
