@@ -32,5 +32,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run project health tests
-        run: node --test tests/project-health.test.js
+      - name: Run project health and controls tests
+        run: node --test tests/project-health.test.js tests/project-controls.test.js tests/project-controls-adapter.test.js
