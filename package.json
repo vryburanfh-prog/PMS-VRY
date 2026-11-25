@@ -1,0 +1,7 @@
+{
+  "name": "pms-vry-static-security-checks",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/static-security.test.js"
+  }
+}
