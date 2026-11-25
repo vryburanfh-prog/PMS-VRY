@@ -55,6 +55,10 @@ function runProjectControlsEndpoint(options) {
     getTableRecords_: function (tab) { reads.push(tab); return datasets[tab] || []; },
     Utilities: { formatDate: () => '2026-11-25' }
   };
+  context.buildAppsScriptCpmSummary_ = vm.runInNewContext(
+    '(' + extractFunction('buildAppsScriptCpmSummary_') + ')',
+    { isTruthySheetFlag_: context.isTruthySheetFlag_ }
+  );
   return { result: vm.runInNewContext('(' + fn + ')', context)(opts.projectId || 'P-1'), reads };
 }
 
