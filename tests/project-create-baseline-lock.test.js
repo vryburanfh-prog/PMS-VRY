@@ -25,7 +25,7 @@ test('project creation locks ID uniqueness, project insert, assignment ID and as
 });
 
 test('baseline creation locks revision calculation, snapshot, insert, and audit', () => {
-  const fn = extract('apiCreateProjectBaseline', 'apiRecalculateProjectProgress');
+  const fn = extract('apiCreateProjectBaseline', 'apiRecalculateWeightedProgress');
   const lock = fn.indexOf('lock.waitLock(15000)');
   const revisions = fn.indexOf('existingBaselines.reduce');
   const baselineId = fn.indexOf("generateNextId_(DB_CONFIG.TABS.BASELINES");
