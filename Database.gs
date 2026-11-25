@@ -118,7 +118,7 @@ const PRIMARY_KEY_COLUMNS_BY_TAB_ = {
   Progress_Updates: 'Log_ID', Milestones: 'Milestone_ID', Deliverables: 'Deliverable_ID',
   Permits: 'Permit_ID', Risks: 'Risk_ID', Issues: 'Issue_ID', Repository_Links: 'Repository_ID',
   Weekly_Reports: 'Report_ID', Team_Workload: 'Assignment_ID', Approvals: 'Approval_ID',
-  Procurement_Logistics: 'Procurement_ID', Financial_Monitoring: 'Financial_ID', Escalations: 'Escalation_ID', PMO_Snapshots: 'Snapshot_ID'
+  Procurement_Logistics: 'Procurement_ID', Financial_Monitoring: 'Financial_ID', Escalations: 'Escalation_ID', PMO_Snapshots: 'Snapshot_ID', Client_Presentations: 'Deck_ID'
 };
 
 function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
