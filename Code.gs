@@ -914,8 +914,10 @@ function apiGetPortfolioControlsSummary(filters) {
     const criticalRisks = pRisks ? pRisks.filter(function (row) {
       const status = String(row.Current_Status || row.Status || '').trim().toLowerCase();
       const rating = String(row.Risk_Rating || '').trim().toUpperCase();
+      const scoreMatch = rating.match(/^\\s*(\\d+(?:\\.\\d+)?)/);
+      const score = scoreMatch ? Number(scoreMatch[1]) : null;
       return !['closed', 'resolved', 'accepted'].includes(status) &&
-        (rating.indexOf('CRITICAL') !== -1 || rating.indexOf('HIGH') !== -1 || Number(rating) >= 15);
+        (rating.indexOf('CRITICAL') !== -1 || rating.indexOf('HIGH') !== -1 || (score !== null && score >= 10));
     }).length : null;
     const openIssues = pIssues ? pIssues.filter(function (row) {
       return !['closed', 'resolved'].includes(String(row.Issue_Status || row.Status || '').trim().toLowerCase());
