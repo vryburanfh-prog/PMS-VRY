@@ -1,0 +1,28 @@
+name: Lock-Protected ID Allocator Tests
+on:
+  pull_request:
+    paths:
+      - 'Database.gs'
+      - 'tests/lock-protected-id-allocator.test.js'
+      - '.github/workflows/lock-protected-id-allocator-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Database.gs'
+      - 'tests/lock-protected-id-allocator.test.js'
+      - '.github/workflows/lock-protected-id-allocator-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: lock-protected-id-allocator-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lock-protected-id-allocator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/lock-protected-id-allocator.test.js
