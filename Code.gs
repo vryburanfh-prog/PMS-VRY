@@ -150,11 +150,6 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
     if (desired.indexOf(pid) === -1) assignmentUpdates.push({ id:a.Assignment_ID, updates:{ Assignment_Status:'Inactive', Is_Active:'FALSE', Last_Updated:now } });
   });
   const newAssignments = [];
-  let maxAssignmentNumber = 0;
-  sheetRows.forEach(function (a) {
-    const match = String(a.Assignment_ID || '').match(/^ASG-(\d+)$/);
-    if (match) maxAssignmentNumber = Math.max(maxAssignmentNumber, Number(match[1]));
-  });
   desired.forEach(function (pid) {
     if (activeByProject[pid]) {
       assignmentUpdates.push({ id:activeByProject[pid].Assignment_ID, updates:{
@@ -162,9 +157,8 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
         Assignment_Status:'Active', Is_Active:'TRUE', Last_Updated:now
       }});
     } else {
-      maxAssignmentNumber++;
       newAssignments.push({
-        Assignment_ID:'ASG-' + String(maxAssignmentNumber).padStart(4,'0'),
+          Assignment_ID:generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4),
         User_ID:userId, User_Email:email, Project_ID:pid,
         Project_Role:role, Assigned_Role:role, Assignment_Status:'Active',
         Is_Active:'TRUE', Assigned_By:actorCtx && actorCtx.user ? actorCtx.user.email : '',
