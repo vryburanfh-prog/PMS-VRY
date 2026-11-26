@@ -29,3 +29,11 @@ for(const name of names){
   assert.match(body,/finally\s*\{[\s\S]*?lock\.releaseLock\(\);?\s*\}/,'guaranteed lock release');
  });
 }
+
+test('escalation creation uses the lock-protected allocator instead of timestamp-random IDs',()=>{
+ const body=bodyFor('apiUpsertEscalationItem');
+ const wait=body.indexOf('lock.waitLock(15000)');
+ const idGeneration=body.indexOf("generateNextId_(resolvePhase18TabName_(), 'Escalation_ID', 'ESC', 5)");
+ assert.ok(idGeneration>wait,'ID allocation occurs while the script lock is held');
+ assert.doesNotMatch(body,/Math\\.random\\s*\\(/,'random ID generation removed');
+});
