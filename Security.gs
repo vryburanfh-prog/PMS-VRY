@@ -189,7 +189,7 @@ function seedDefaultPermissions_() {
   try {
   const sheet = getMasterSpreadsheet_().getSheetByName(DB_CONFIG.TABS.ROLE_PERMISSIONS);
   if (!sheet) throw new Error('Sheet not found: ' + DB_CONFIG.TABS.ROLE_PERMISSIONS);
-  const existingRows = getCachedTableRecords_(DB_CONFIG.TABS.ROLE_PERMISSIONS) || [];
+  const existingRows = getTableRecords_(DB_CONFIG.TABS.ROLE_PERMISSIONS) || []; // Fresh read under the seed lock.
   const existingKeys = {};
   existingRows.forEach(function (row) {
     const role = normalizeRoleName_(row.Role_Name);
