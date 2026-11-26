@@ -24,8 +24,8 @@ Create and authorize OAuth locally. Prefer an account with access only to the te
 2. Ensure the copied project is associated with a Google Cloud project as needed.
 3. Enable the Apps Script API.
 4. Configure API execution in the manifest and deploy as an API executable.
-5. Add `phase1RuntimeIntegrationTestSuite(expectedSpreadsheetId)` to the isolated test project. It must verify the target spreadsheet ID, run tests only against that copy, return a structured result with status `PASS`, and throw or return non-PASS on any failure.
-6. Run the test entrypoint locally once and verify it targets the copy before configuring GitHub credentials.
+5. Copy `docs/modernization/apps-script-runtime-test-harness-template.gs` into the isolated test project (not production). It checks allocator uniqueness/monotonicity, reconciliation against a synthetic high ID, and duplicate insert rejection.
+6. Run the test entrypoint locally once and verify it targets the test copy before configuring GitHub credentials.
 
 ## Run
 1. Open the repository Actions tab.
