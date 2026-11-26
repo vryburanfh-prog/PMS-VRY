@@ -321,22 +321,46 @@ function deleteRecordById_(tabName, idColumn, recordId) {
   }
 }
 
+/**
+ * Allocate a monotonic record ID under the Apps Script global lock.
+ * The persisted counter prevents two callers from receiving the same ID even
+ * when neither has inserted its record yet. Reconcile with the live sheet each
+ * time so imports/manual edits that advance the sequence are respected.
+ */
 function generateNextId_(tabName, idColumn, prefix, padLength) {
-  const records = getTableRecords_(tabName);
-  let maxNum = 0;
-  const regex = new RegExp('^' + prefix + '-(\\d+)$');
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(15000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
+    if (!sheet) throw new Error('Database table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf(idColumn);
+    if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from ' + tabName);
 
-  records.forEach(rec => {
-    const val = String(rec[idColumn] || '').trim();
-    const match = val.match(regex);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxNum) maxNum = num;
+    let maxNum = 0;
+    const marker = String(prefix) + '-';
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().forEach(function(row) {
+        const value = String(row[0] || '').trim();
+        if (!value.startsWith(marker)) return;
+        const suffix = value.slice(marker.length);
+        if (/^\\d+$/.test(suffix)) maxNum = Math.max(maxNum, parseInt(suffix, 10) || 0);
+      });
     }
-  });
 
-  const nextNum = String(maxNum + 1).padStart(padLength || 3, '0');
-  return prefix + '-' + nextNum;
+    const propertyKey = 'ID_ALLOCATOR_V1:' + encodeURIComponent(tabName) + ':' + encodeURIComponent(idColumn) + ':' + encodeURIComponent(prefix);
+    const properties = PropertiesService.getScriptProperties();
+    const stored = parseInt(properties.getProperty(propertyKey) || '0', 10);
+    const nextNum = Math.max(maxNum, Number.isFinite(stored) ? stored : 0) + 1;
+    properties.setProperty(propertyKey, String(nextNum));
+    return String(prefix) + '-' + String(nextNum).padStart(padLength || 3, '0');
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
 
 function getNowTimestamp_() {
