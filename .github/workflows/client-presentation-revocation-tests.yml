@@ -1,0 +1,30 @@
+name: Client Presentation Revocation Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'Presentation.html'
+      - 'tests/client-presentation-revocation.test.js'
+      - '.github/workflows/client-presentation-revocation-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'Presentation.html'
+      - 'tests/client-presentation-revocation.test.js'
+      - '.github/workflows/client-presentation-revocation-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: client-presentation-revocation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  client-presentation-revocation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/client-presentation-revocation.test.js
