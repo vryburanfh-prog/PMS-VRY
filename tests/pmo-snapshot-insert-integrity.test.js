@@ -11,7 +11,7 @@ test('snapshot IDs use the monotonic allocator', () => {
   assert.match(api, /Snapshot_ID:\s*generateNextId_\(resolvePhase19TabName_\(\), 'Snapshot_ID', 'SNP', 5\)/);
   assert.doesNotMatch(api, /Snapshot_ID:\s*'SNP-'[\s\S]*Utilities\.getUuid\(\)/);
 });
-test('snapshot append is guarded by ScriptLock and invalidates its table cache', () => {
+test('snapshot duplicate-checked insert is guarded by ScriptLock', () => {
   const lock = api.indexOf('lock.waitLock(15000)');
   const insert = api.indexOf('insertRecord_(resolvePhase19TabName_(), record)');
   const release = api.indexOf('lock.releaseLock()');
