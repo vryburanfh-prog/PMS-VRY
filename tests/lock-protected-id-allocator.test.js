@@ -84,7 +84,7 @@ test('all ID allocator call sites are covered by the primary-key registry', () =
   for (const match of primaryBlock.matchAll(/([A-Za-z_]+):\s*'([A-Za-z_]+)'/g)) primaryKeys[match[1]] = match[2];
 
   const tabsStart = databaseSource.indexOf('TABS: {');
-  const tabsEnd = databaseSource.indexOf('\n  }\n};', tabsStart);
+  const tabsEnd = databaseSource.indexOf('\n};', tabsStart);
   assert.ok(tabsStart >= 0 && tabsEnd > tabsStart, 'database table map boundaries exist');
   const tableNames = {};
   for (const match of databaseSource.slice(tabsStart, tabsEnd).matchAll(/([A-Z_]+):\s*'([^']+)'/g)) tableNames[match[1]] = match[2];
