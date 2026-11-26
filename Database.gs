@@ -121,6 +121,22 @@ const PRIMARY_KEY_COLUMNS_BY_TAB_ = {
   Procurement_Logistics: 'Procurement_ID', Financial_Monitoring: 'Financial_ID', Escalations: 'Escalation_ID', PMO_Snapshots: 'Snapshot_ID', Client_Presentations: 'Deck_ID'
 };
 
+
+/** Validate imported primary-key values before replacing destination rows. */
+function validateImportedPrimaryKeys_(tabName, headers, rows) {
+  const idColumn = PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
+  if (!idColumn) return;
+  const idIndex = headers.indexOf(idColumn);
+  if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from import tab ' + tabName + '.');
+  const seen = new Set();
+  (Array.isArray(rows) ? rows : []).forEach(function(row, rowIndex) {
+    const id = String(row[idIndex] == null ? '' : row[idIndex]).trim();
+    if (!id) throw new Error('Missing ' + idColumn + ' in import tab ' + tabName + ' at source row ' + (rowIndex + 2) + '.');
+    if (seen.has(id)) throw new Error('Duplicate ' + idColumn + ' in import tab ' + tabName + ': ' + id + '.');
+    seen.add(id);
+  });
+}
+
 function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
   const idColumn = PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
   if (!idColumn) return;
@@ -185,6 +201,7 @@ function insertRecords_(tabName, records) {
     assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, list);
     const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
+    invalidateTableCache_(tabName);
     return rows.length;
   } finally { if (ownsLock) lock.releaseLock(); }
 }

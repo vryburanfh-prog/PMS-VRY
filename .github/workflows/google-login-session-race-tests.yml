@@ -1,0 +1,28 @@
+name: Google Login Session Race Tests
+on:
+  pull_request:
+    paths:
+      - 'Security.gs'
+      - 'tests/google-login-session-race.test.js'
+      - '.github/workflows/google-login-session-race-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Security.gs'
+      - 'tests/google-login-session-race.test.js'
+      - '.github/workflows/google-login-session-race-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: google-login-session-race-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  google-login-session-race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/google-login-session-race.test.js
