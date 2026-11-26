@@ -180,17 +180,15 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
 function apiCreateUser(userPayload) {
   const ctx = assertPermission_('Users_Admin', 'create', null);
   userPayload = userPayload || {};
-
   const email = String(userPayload.email || '').trim().toLowerCase();
   const fullName = String(userPayload.fullName || '').trim();
   const roleName = String(userPayload.roleName || '').trim();
   const deptVal = String(userPayload.department || '').trim();
   const posVal = String(userPayload.position || '').trim();
-
   const username = String(userPayload.username || '').trim().toLowerCase();
   const initialPassword = String(userPayload.initialPassword || '');
   const wantsPasswordLogin = Boolean(username || initialPassword);
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid Google email address.');
+  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error('Enter a valid Google email address.');
   if (!email && !wantsPasswordLogin) throw new Error('Provide a Google email or create a username/password login.');
   if (wantsPasswordLogin && (!username || !initialPassword)) throw new Error('Both username and temporary password are required for password login.');
   if (wantsPasswordLogin && canonicalRoleIsAdmin_(roleName)) throw new Error('Administrators must use trusted Google account authentication only.');
@@ -200,55 +198,84 @@ function apiCreateUser(userPayload) {
   if (!ctx.isAdmin && /^(admin|administrator)$/i.test(roleName)) throw new Error('Only an Administrator can create an Administrator account.');
   const canonicalRole = normalizeRoleName_(roleName);
   if (REQUIRED_SYSTEM_ROLES.indexOf(canonicalRole) === -1) throw new Error('The selected role is not one of the supported system roles.');
+  if ((!email && !wantsPasswordLogin) || !fullName || !roleName) throw new Error('Google email or password-login credentials, Full Name, and Role are required.');
 
-  if ((!email && !wantsPasswordLogin) || !fullName || !roleName) {
-    throw new Error('Google email or password-login credentials, Full Name, and Role are required.');
+  // Serialize duplicate checks, ID generation, and the multi-table creation sequence.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    if (wantsPasswordLogin) {
+      ensureHybridAuthTables_();
+      const existingCredentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+      if (existingCredentials.some(r => String(r.Username || '').trim().toLowerCase() === username)) throw new Error('Username is already registered.');
+    }
+    const existingUsers = getTableRecords_(DB_CONFIG.TABS.USERS) || [];
+    if (email && existingUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) throw new Error('A user with email "' + email + '" already exists.');
+
+    const requestedAssignments = Array.isArray(userPayload.assignedProjectIds) ? userPayload.assignedProjectIds : [];
+    const knownProjectIds = {};
+    (getTableRecords_(DB_CONFIG.TABS.PROJECTS) || []).forEach(function (p) { knownProjectIds[String(p.Project_ID || '').trim()] = true; });
+    requestedAssignments.forEach(function (id) {
+      const pid = String(id || '').trim();
+      if (pid && !knownProjectIds[pid]) throw new Error('Cannot assign user to unknown Project_ID: ' + pid);
+    });
+
+    const newUser = {
+      User_ID: generateNextId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3),
+      Email: email, Full_Name: fullName, Position: posVal, Department: deptVal,
+      Department_Or_Team: deptVal, Role_Name: canonicalRole, Role_ID: canonicalRole,
+      Is_Active: 'TRUE', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_()
+    };
+    let assignedProjectIds = [];
+    try {
+      insertRecord_(DB_CONFIG.TABS.USERS, newUser);
+      if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
+      if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
+      assignedProjectIds = syncUserProjectAssignments_(newUser, requestedAssignments, ctx);
+    } catch (creationError) {
+      // Compensate for partial writes across Sheets tables. Cleanup attempts are
+      // individually guarded so one failure does not prevent other reversals.
+      const cleanupErrors = [];
+      try {
+        const assignments = getTableRecords_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS) || [];
+        const assignmentIds = assignments.filter(function (r) {
+          return String(r.User_ID || '').trim() === newUser.User_ID ||
+            (email && String(r.User_Email || '').trim().toLowerCase() === email);
+        }).map(function (r) { return r.Assignment_ID; });
+        deleteRecordsByIds_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', assignmentIds);
+      } catch (cleanupError) { cleanupErrors.push('assignment cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try {
+        const credentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+        const credentialIds = credentials.filter(function (r) { return String(r.User_ID || '').trim() === newUser.User_ID; }).map(function (r) { return r.Credential_ID; });
+        deleteRecordsByIds_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credentialIds);
+      } catch (cleanupError) { cleanupErrors.push('credential cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try {
+        if (canonicalRole === 'Administrator') removeTrustedAdminEmail_(email);
+      } catch (cleanupError) { cleanupErrors.push('trusted-admin cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      try { deleteRecordsByIds_(DB_CONFIG.TABS.USERS, 'User_ID', [newUser.User_ID]); }
+      catch (cleanupError) { cleanupErrors.push('user cleanup: ' + String(cleanupError && cleanupError.message || cleanupError)); }
+      if (cleanupErrors.length) {
+        throw new Error('User creation failed: ' + String(creationError && creationError.message || creationError) + '. Compensating cleanup also had errors: ' + cleanupErrors.join('; '));
+      }
+      throw creationError;
+    }
+    let auditWarning = '';
+    try {
+      writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
+    } catch (auditError) {
+      auditWarning = 'User was created successfully, but audit logging failed: ' + String(auditError && auditError.message || auditError);
+    }
+    return { success: true, user: newUser, assignedProjectIds: assignedProjectIds, warning: auditWarning };
+  } finally {
+    lock.releaseLock();
   }
-
-  if (wantsPasswordLogin) {
-    ensureHybridAuthTables_();
-    const existingCredentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-    if (existingCredentials.some(r => String(r.Username || '').trim().toLowerCase() === username)) throw new Error('Username is already registered.');
-  }
-  const existingUsers = getTableRecords_(DB_CONFIG.TABS.USERS);
-  if (email && existingUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) {
-    throw new Error('A user with email "' + email + '" already exists.');
-  }
-  // Validate project references before creating the user row so an invalid
-  // assignment cannot leave a partially-created account behind.
-  const requestedAssignments = Array.isArray(userPayload.assignedProjectIds) ? userPayload.assignedProjectIds : [];
-  const knownProjectIds = {};
-  (getTableRecords_(DB_CONFIG.TABS.PROJECTS) || []).forEach(function (p) { knownProjectIds[String(p.Project_ID || '').trim()] = true; });
-  requestedAssignments.forEach(function (id) {
-    const pid = String(id || '').trim();
-    if (pid && !knownProjectIds[pid]) throw new Error('Cannot assign user to unknown Project_ID: ' + pid);
-  });
-
-  const newUser = {
-    User_ID: generateNextId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3),
-    Email: email,
-    Full_Name: fullName,
-    Position: posVal,
-    Department: deptVal,
-    Department_Or_Team: deptVal,
-    Role_Name: canonicalRole,
-    Role_ID: canonicalRole,
-    Is_Active: 'TRUE',
-    Created_At: getNowTimestamp_(),
-    Updated_At: getNowTimestamp_()
-  };
-
-  insertRecord_(DB_CONFIG.TABS.USERS, newUser);
-  if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
-  if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
-  const assignedProjectIds = syncUserProjectAssignments_(newUser, userPayload.assignedProjectIds || [], ctx);
-  writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
-
-  return { success: true, user: newUser, assignedProjectIds: assignedProjectIds };
 }
 
 function apiUpdateUser(userId, payload) {
   const ctx = assertAdministrator_();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   ensureHybridAuthTables_();
   if (!userId) throw new Error('User_ID is required.');
   payload = payload || {};
@@ -296,24 +323,33 @@ function apiUpdateUser(userId, payload) {
   const assigned = syncUserProjectAssignments_(result.updated, payload.assignedProjectIds !== undefined ? payload.assignedProjectIds : getUserAssignedProjectIds_(userId, email), ctx);
   writeAuditLog_(ctx, 'UPDATE_USER', 'Users_Admin', userId, result.previous, result.updated, 'Updated user profile and project assignments');
   return { success: true, user: result.updated, assignedProjectIds: assigned };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiAdminResetPassword(userId, newPassword) {
   const ctx = assertAdministrator_();
-  const user = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
-  if (!user) throw new Error('User not found.');
-  if (normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') throw new Error('Administrator accounts must use Google authentication.');
   if (String(newPassword || '').length < 12) throw new Error('Password must be at least 12 characters.');
-  const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  const credential = creds.find(r => String(r.User_ID) === String(userId));
-  if (!credential) throw new Error('This user does not have a password login.');
-  const salt = authRandomToken_();
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credential.Credential_ID, {
-    Password_Salt: salt, Password_Hash: hashPassword_(newPassword, salt), Failed_Attempts: 0, Locked_Until: '', Updated_At: getNowTimestamp_()
-  });
-  revokeUserAuthSessions_(userId);
-  writeAuditLog_(ctx, 'RESET_PASSWORD', 'Users_Admin', userId, null, { Password_Reset: true }, 'Administrator reset password');
-  return { success: true };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const user = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
+    if (!user) throw new Error('User not found.');
+    if (normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') throw new Error('Administrator accounts must use Google authentication.');
+    const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+    const credential = creds.find(r => String(r.User_ID) === String(userId));
+    if (!credential) throw new Error('This user does not have a password login.');
+    const salt = authRandomToken_();
+    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', credential.Credential_ID, {
+      Password_Salt: salt, Password_Hash: hashPassword_(newPassword, salt), Failed_Attempts: 0, Locked_Until: '', Updated_At: getNowTimestamp_()
+    });
+    revokeUserAuthSessions_(userId);
+    writeAuditLog_(ctx, 'RESET_PASSWORD', 'Users_Admin', userId, null, { Password_Reset: true }, 'Administrator reset password');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -328,23 +364,24 @@ function apiAdminDeleteUser(userId, confirmationText) {
   if (!id) throw new Error('User_ID is required.');
   if (String(confirmationText || '').trim() !== id) throw new Error('Deletion was not confirmed. Enter the exact User ID.');
 
-  const target = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
-  if (!target) throw new Error('User not found. Refresh the user list and try again.');
-  const actorId = String(ctx.user && ctx.user.userId || '').trim();
-  if (actorId && actorId === id) throw new Error('You cannot delete your own Administrator account.');
-
-  const targetRole = normalizeRoleName_(target.Role_Name || target.Role_ID);
-  if (targetRole === 'Administrator') {
-    const activeAdmins = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).filter(function (u) {
-      return normalizeRoleName_(u.Role_Name || u.Role_ID) === 'Administrator' && isTruthySheetFlag_(u.Is_Active) && isTrustedAdministratorEmail_(u.Email);
-    });
-    if (activeAdmins.length <= 1) throw new Error('The last active Administrator cannot be deleted. Add and verify another trusted Administrator first.');
-  }
-
-  const oldProfile = Object.assign({}, target);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
+    // Re-read target and administrator count while locked to avoid concurrent last-admin deletions.
+    const target = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
+    if (!target) throw new Error('User not found. Refresh the user list and try again.');
+    const actorId = String(ctx.user && ctx.user.userId || '').trim();
+    if (actorId && actorId === id) throw new Error('You cannot delete your own Administrator account.');
+
+    const targetRole = normalizeRoleName_(target.Role_Name || target.Role_ID);
+    if (targetRole === 'Administrator') {
+      const activeAdmins = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).filter(function (u) {
+        return normalizeRoleName_(u.Role_Name || u.Role_ID) === 'Administrator' && isTruthySheetFlag_(u.Is_Active) && isTrustedAdministratorEmail_(u.Email);
+      });
+      if (activeAdmins.length <= 1) throw new Error('The last active Administrator cannot be deleted. Add and verify another trusted Administrator first.');
+    }
+
+    const oldProfile = Object.assign({}, target);
     // Audit before removing the profile; the audit history is retained.
     writeAuditLog_(ctx, 'DELETE_USER', 'Users_Admin', id, oldProfile, null,
       'Administrator permanently deleted user account and related access records');
@@ -364,45 +401,47 @@ function apiAdminDeleteUser(userId, confirmationText) {
 
     deleteRecordsByIds_(DB_CONFIG.TABS.USERS, 'User_ID', [id]);
     if (targetRole === 'Administrator') removeTrustedAdminEmail_(target.Email);
+    return { success: true, deletedUserId: id, retainedAuditHistory: true };
   } finally {
     lock.releaseLock();
   }
-
-  return { success: true, deletedUserId: id, retainedAuditHistory: true };
 }
-
 function apiToggleUserStatus(userId, setActive, reason) {
   const ctx = assertPermission_('Users_Admin', 'edit', null);
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('User ID is required.');
 
-  if (!userId) {
-    throw new Error('User ID is required.');
+  // Serialize status changes with password reset/login session creation so a
+  // concurrent activation/deactivation cannot leave sessions with stale access.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const targetUser = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', id);
+    if (!targetUser) throw new Error('User not found.');
+    if (id === String(ctx.user.userId || '').trim() && !setActive) {
+      throw new Error('You cannot deactivate your own active Administrator account.');
+    }
+    if (setActive && normalizeRoleName_(targetUser.Role_Name || targetUser.Role_ID) === 'Administrator') {
+      addTrustedAdminEmail_(targetUser.Email);
+    }
+    const result = updateRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', id, {
+      Is_Active: setActive ? 'TRUE' : 'FALSE',
+      Updated_At: getNowTimestamp_()
+    });
+    if (!setActive) revokeUserAuthSessions_(id);
+    writeAuditLog_(
+      ctx,
+      setActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
+      'Users_Admin',
+      id,
+      result.previous,
+      result.updated,
+      reason || (setActive ? 'Reactivated user account' : 'Deactivated/removed user access')
+    );
+    return { success: true, user: result.updated };
+  } finally {
+    lock.releaseLock();
   }
-
-  if (String(userId).trim() === String(ctx.user.userId).trim() && !setActive) {
-    throw new Error('You cannot deactivate your own active Administrator account.');
-  }
-
-  const targetUser = findRecordRowById_(DB_CONFIG.TABS.USERS, 'User_ID', userId);
-  if (!targetUser) throw new Error('User not found.');
-  if (setActive && normalizeRoleName_(targetUser.Role_Name || targetUser.Role_ID) === 'Administrator') addTrustedAdminEmail_(targetUser.Email);
-  const activeFlagStr = setActive ? 'TRUE' : 'FALSE';
-  const result = updateRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', userId, {
-    Is_Active: activeFlagStr,
-    Updated_At: getNowTimestamp_()
-  });
-
-  if (!setActive) revokeUserAuthSessions_(userId);
-  writeAuditLog_(
-    ctx,
-    setActive ? 'ACTIVATE_USER' : 'DEACTIVATE_USER',
-    'Users_Admin',
-    userId,
-    result.previous,
-    result.updated,
-    reason || (setActive ? 'Reactivated user account' : 'Deactivated/removed user access')
-  );
-
-  return { success: true, user: result.updated };
 }
 
 /**
@@ -737,6 +776,9 @@ function assertRecordProjectOwnership_(existing, requestedProjectId, recordLabel
 
 function apiCreateProject(payload) {
   const ctx = assertPermission_('Projects', 'create', null);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   payload = payload || {};
 
   const projectName = String(payload.Project_Name || '').trim();
@@ -808,12 +850,18 @@ function apiCreateProject(payload) {
 
   writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
   return { success: true, project: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Updates an existing project and logs previous/updated values in Audit_Logs.
  */
 function apiUpdateProject(projectId, updates, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   updates = updates || {};
   if (!projectId) throw new Error('Project_ID is required.');
@@ -836,12 +884,19 @@ function apiUpdateProject(projectId, updates, reason) {
   writeAuditLog_(ctx, 'UPDATE_PROJECT', 'Projects', projectId, result.previous, result.updated, reason || 'Updated project details');
 
   return { success: true, project: result.updated };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Archives or restores a project (soft-delete protection).
  */
 function apiArchiveProject(projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('Projects', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -862,6 +917,10 @@ function apiArchiveProject(projectId, archiveFlag, reason) {
   );
 
   return { success: true, project: result.updated };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -912,6 +971,9 @@ function assertPrivilegedWbsRole_(projectId, action) {
 
 /** Archive or restore a Main WBS, Sub WBS, or Activity. */
 function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'edit');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -923,10 +985,17 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
   const result = updateRecordById_(cfg[0], cfg[1], recordId, { Is_Archived: flag });
   writeAuditLog_(ctx, archiveFlag ? 'ARCHIVE_WBS_RECORD' : 'RESTORE_WBS_RECORD', 'WBS_Structure', recordId, result.previous, result.updated, reason || (archiveFlag ? 'Archived WBS record' : 'Restored WBS record'));
   return { success: true, recordType: type, recordId: String(recordId), isArchived: Boolean(archiveFlag) };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** Permanently delete a WBS record only when no dependent records remain. */
 function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'delete');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -949,8 +1018,10 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
+  } finally {
+    lock.releaseLock();
+  }
 }
-
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
   if (!ctx || !ctx.authenticated) throw new Error((ctx && ctx.error) || 'Authentication required.');
@@ -967,6 +1038,9 @@ function assertScheduleActivityPermission_(projectId, action, existingActivity) 
 }
 
 function apiSaveMainWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Main_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Main WBS record');
@@ -1031,12 +1105,19 @@ function apiSaveMainWbs(payload) {
   }
 
   return { success: true, mainWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Sub WBS task under a parent Main WBS.
  */
 function apiSaveSubWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Sub_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Sub WBS record');
@@ -1108,6 +1189,10 @@ function apiSaveSubWbs(payload) {
   }
 
   return { success: true, subWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiSaveProjectWbsDepth(projectId, depth) {
@@ -1152,6 +1237,9 @@ function wouldCreateDependencyCycle_(projectId, predecessorId, successorId) {
 }
 
 function apiSaveActivity(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
@@ -1271,6 +1359,10 @@ function apiSaveActivity(payload) {
   }
 
   return { success: true, activity: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1319,6 +1411,9 @@ function apiGetGanttAndBaselines(projectId) {
  */
 function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   const ctx = assertPermission_('WBS_Schedule', 'approve', projectId);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
 
   const pid = String(projectId).trim();
@@ -1357,12 +1452,18 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
   return { success: true, baseline: record };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Triggers the weighted progress roll-up engine for a project and logs it.
  */
 function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('WBS_Schedule', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -1378,6 +1479,10 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
   writeAuditLog_(ctx, 'RECALCULATE_PROGRESS', 'WBS_Schedule', pid, null, summary, 'Weighted progress roll-up executed');
 
   return { success: true, summary: summary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1385,6 +1490,9 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
  * then automatically rolls up weighted progress.
  */
 function apiQuickUpdateGanttActivity(activityId, updates) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', activityId);
   if (!existing) throw new Error('Activity not found: ' + activityId);
 
@@ -1422,6 +1530,10 @@ function apiQuickUpdateGanttActivity(activityId, updates) {
 
   writeAuditLog_(ctx, 'GANTT_UPDATE_ACTIVITY', 'WBS_Schedule', activityId, res.previous, res.updated, 'Updated via Interactive Gantt Chart');
   return { success: true, activity: res.updated, rollSummary: rollSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -1572,6 +1684,10 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
   if (!projectId) throw new Error('Project_ID is required.');
 
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+
   const pid = String(projectId).trim();
   const rawId = String(payload[cfg.idCol] || '').trim();
   const existing = rawId ? findRecordRowById_(cfg.tab, cfg.idCol, rawId) : null;
@@ -1612,6 +1728,9 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
     writeAuditLog_(ctx, 'CREATE_' + cfg.module.toUpperCase(), cfg.module, recordId, null, cleanRecord, 'Created ' + registryKey + ' record');
     return { success: true, record: cleanRecord };
   }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1623,21 +1742,27 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
   if (!cfg) throw new Error('Unknown registry module: ' + registryKey);
   if (!projectId || !recordId) throw new Error('Project_ID and Record ID are required.');
 
-  const pid = String(projectId).trim();
-  const ctx = assertPermission_(cfg.module, 'delete', pid);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const pid = String(projectId).trim();
+    const ctx = assertPermission_(cfg.module, 'delete', pid);
 
-  const existing = findRecordRowById_(cfg.tab, cfg.idCol, recordId);
-  if (!existing) throw new Error('Record not found: ' + recordId);
-  if (String(existing.Project_ID || '').trim() !== pid) {
-    throw new Error('Record does not belong to the active project.');
+    const existing = findRecordRowById_(cfg.tab, cfg.idCol, recordId);
+    if (!existing) throw new Error('Record not found: ' + recordId);
+    if (String(existing.Project_ID || '').trim() !== pid) {
+      throw new Error('Record does not belong to the active project.');
+    }
+
+    const ss = getMasterSpreadsheet_();
+    const sheet = ss.getSheetByName(cfg.tab);
+    sheet.deleteRow(existing._rowIndex);
+
+    writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
+    return { success: true };
+  } finally {
+    lock.releaseLock();
   }
-
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(cfg.tab);
-  sheet.deleteRow(existing._rowIndex);
-
-  writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
-  return { success: true };
 }
 
 // ============================================================================
@@ -1749,6 +1874,9 @@ function apiGetProgressAndWeeklyReports(projectId) {
  * and recalculates project weighted progress.
  */
 function apiSaveProgressLog(projectId, payload, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -1876,6 +2004,10 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
   }
 
   return { success: true, log: record, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1883,6 +2015,9 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
  * Optionally applies approved progress to the linked Activity and recalculates project roll-up.
  */
 function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !logId) throw new Error('Project_ID and Log_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Progress', 'approve', pid);
@@ -1935,12 +2070,19 @@ function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
   }
 
   return { success: true, log: updatedClean, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Weekly Project Report in Weekly_Reports.
  */
 function apiSaveWeeklyReport(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2014,12 +2156,19 @@ function apiSaveWeeklyReport(projectId, payload) {
   }
 
   return { success: true, report: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Weekly Project Report (requires Weekly_Reports delete permission) and logs to Audit_Logs.
  */
 function apiDeleteWeeklyReport(projectId, reportId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !reportId) throw new Error('Project_ID and Report_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Weekly_Reports', 'delete', pid);
@@ -2039,6 +2188,10 @@ function apiDeleteWeeklyReport(projectId, reportId) {
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2219,6 +2372,9 @@ function apiGetTeamWorkloadData(projectId) {
  * Creates or updates a Team_Workload assignment row and writes an Audit_Logs entry.
  */
 function apiSaveTeamWorkloadAssignment(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2273,6 +2429,10 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
   }
 
   return { success: true, assignment: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2280,6 +2440,9 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
  * and writes an Audit_Logs entry.
  */
 function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !assignmentId) throw new Error('Project_ID and Assignment_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Team_Workload', 'delete', pid);
@@ -2299,6 +2462,10 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2455,6 +2622,9 @@ function apiGetProcurementFinancialData(projectId) {
  * Creates or updates a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiSaveProcurementItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2504,12 +2674,19 @@ function apiSaveProcurementItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiDeleteProcurementItem(projectId, procurementId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !procurementId) throw new Error('Project_ID and Procurement_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Procurement', 'delete', pid);
@@ -2529,12 +2706,19 @@ function apiDeleteProcurementItem(projectId, procurementId) {
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiSaveFinancialItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2579,12 +2763,19 @@ function apiSaveFinancialItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiDeleteFinancialItem(projectId, financialId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !financialId) throw new Error('Project_ID and Financial_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Financials', 'delete', pid);
@@ -2604,6 +2795,10 @@ function apiDeleteFinancialItem(projectId, financialId) {
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -3474,12 +3669,15 @@ function apiBuildUnifiedPmoDigest(activeProjectId, options) {
  * and logs a governance audit event.
  */
 function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const pid = activeProjectId ? String(activeProjectId).trim() : '';
   assertPrivilegedManagementRole_(pid || null);
   const ctx = assertPermission_('Projects', 'view', pid || null);
 
   const toList = String(recipientEmail || '')
-    .split(/[,;\s]+/)
+      .split(/[,;\s]+/)
     .map(s => s.trim())
     .filter(Boolean);
 
@@ -3524,12 +3722,11 @@ function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, acti
     recipients: toList,
     subject: subj
   };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
-
-// ============================================================================
-// PHASE 17: AUTOMATED TIME-DRIVEN DIGEST TRIGGERS & RUN HISTORY
-// ============================================================================
-
 var PHASE17_TRIGGER_HANDLER_ = 'runScheduledPmoDigestTrigger';
 var PHASE17_PROP_KEY_ = 'PHASE17_DIGEST_SCHEDULE_CONFIG';
 
@@ -3618,7 +3815,6 @@ function apiGetDigestTriggerStatus(activeProjectId) {
   });
 
   var cfg = readPhase17Config_();
-
   return {
     success: true,
     isAdmin: isAdmin,
@@ -3638,69 +3834,72 @@ function apiGetDigestTriggerStatus(activeProjectId) {
  * Creates, updates, or removes the time-driven trigger for scheduled PMO digests.
  */
 function apiSaveDigestTriggerConfig(payload, activeProjectId) {
-  var pid = activeProjectId ? String(activeProjectId).trim() : '';
-  var ctx = assertPermission_('Projects', 'view', pid || null);
-  if (!isPhase17Admin_(ctx)) {
-    throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
-  }
-
-  var p = payload || {};
-  var enabled = Boolean(p.enabled);
-  var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
-  var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
-  var recipients = String(p.recipients || '').trim();
-  var targetPid = String(p.projectId || '').trim();
-
-  if (enabled && !recipients) {
-    throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
-  }
-
-  var nextCfg = {
-    enabled: enabled,
-    frequency: frequency,
-    hourOfDay: hourOfDay,
-    recipients: recipients,
-    projectId: targetPid
-  };
-
-  PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
-
-  // Clear existing triggers for this handler before recreating
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
-      ScriptApp.deleteTrigger(t);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var pid = activeProjectId ? String(activeProjectId).trim() : '';
+    var ctx = assertPermission_('Projects', 'view', pid || null);
+    if (!isPhase17Admin_(ctx)) {
+      throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
     }
-  });
 
-  if (enabled) {
-    var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
-    if (frequency === 'DAILY') {
-      builder.everyDays(1).atHour(hourOfDay);
-    } else {
-      builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+    var p = payload || {};
+    var enabled = Boolean(p.enabled);
+    var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
+    var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
+    var recipients = String(p.recipients || '').trim();
+    var targetPid = String(p.projectId || '').trim();
+
+    if (enabled && !recipients) {
+      throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
     }
-    builder.create();
-  }
 
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
-      'PMO_Digest_Trigger',
-      targetPid || 'PORTFOLIO',
-      null,
-      { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
-      enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
-    );
-  }
+    var nextCfg = {
+      enabled: enabled,
+      frequency: frequency,
+      hourOfDay: hourOfDay,
+      recipients: recipients,
+      projectId: targetPid
+    };
 
-  return apiGetDigestTriggerStatus(pid);
+    PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
+
+    // Replace existing triggers for this handler while holding the script lock.
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+
+    if (enabled) {
+      var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
+      if (frequency === 'DAILY') {
+        builder.everyDays(1).atHour(hourOfDay);
+      } else {
+        builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+      }
+      builder.create();
+    }
+
+    if (typeof writeAuditLog_ === 'function') {
+      writeAuditLog_(
+        ctx,
+        enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
+        'PMO_Digest_Trigger',
+        targetPid || 'PORTFOLIO',
+        null,
+        { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
+        enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
+      );
+    }
+
+    return apiGetDigestTriggerStatus(pid);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-/**
- * Executed automatically by Apps Script time-driven trigger.
- */
 function runScheduledPmoDigestTrigger(e) {
   // This public trigger handler is callable by Apps Script time-driven
   // triggers, but must not become an unauthenticated browser/API endpoint.
@@ -3715,44 +3914,31 @@ function runScheduledPmoDigestTrigger(e) {
 }
 
 function runScheduledPmoDigestTrigger_() {
-  var cfg = readPhase17Config_();
-  if (!cfg.enabled || !cfg.recipients) return;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var cfg = readPhase17Config_();
+    if (!cfg.enabled || !cfg.recipients) return;
 
-  var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
-    ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
-    : { digestText: 'Scheduled PMO Digest' };
+    var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
+      ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
+      : { digestText: 'Scheduled PMO Digest' };
 
-  var toList = cfg.recipients
-    .split(/[,;\s]+/)
-    .map(function(s) { return s.trim(); })
-    .filter(Boolean);
+    var toList = cfg.recipients
+      .split(/[,;\s]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(Boolean);
 
-  if (!toList.length) return;
+    if (!toList.length) return;
 
-  var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
-
-  if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
-    MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
+    if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
+      MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
-
-// ============================================================================
-// PHASE 18: EXCEPTION & ESCALATION WORKFLOW RULES
-// ============================================================================
-
-var PHASE18_HEADERS_ = [
-  'Escalation_ID',
-  'Project_ID',
-  'Source_Type',
-  'Severity',
-  'Title',
-  'Owner_Email',
-  'Status',
-  'Notes',
-  'Created_By',
-  'Created_At',
-  'Updated_At'
-];
 
 function resolvePhase18TabName_() {
   var tabs = (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.TABS) ? DB_CONFIG.TABS : {};
@@ -3873,6 +4059,9 @@ function apiGetEscalationsData(activeProjectId) {
  * Creates or updates an exception escalation row.
  */
 function apiUpsertEscalationItem(payload, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   var p = payload || {};
   var targetPid = String(p.Project_ID || activeProjectId || '').trim();
   assertPrivilegedManagementRole_(targetPid || null);
@@ -3951,6 +4140,10 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   }
 
   return apiGetEscalationsData(activeProjectId);
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -4136,7 +4329,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
-    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900),
+    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Utilities.getUuid().replace(/-/g, ''),
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
     Captured_By: actor,
@@ -4155,21 +4348,35 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     var key = String(h).trim();
     return record[key] !== undefined ? record[key] : '';
   });
-  sheet.appendRow(rowValues);
-
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      'CAPTURE_SNAPSHOT',
-      'PMO_Snapshots',
-      record.Project_ID,
-      null,
-      record,
-      'Captured PMO snapshot ' + record.Snapshot_ID + ' (' + record.Label + ')'
-    );
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    sheet.appendRow(rowValues);
+    if (typeof invalidateTableCache_ === 'function') invalidateTableCache_(resolvePhase19TabName_());
+  } finally {
+    lock.releaseLock();
   }
 
-  return apiGetSnapshotsAndTemplatesData(activeProjectId);
+  var auditWarning = null;
+  if (typeof writeAuditLog_ === 'function') {
+    try {
+      writeAuditLog_(
+        ctx,
+        'CAPTURE_SNAPSHOT',
+        'PMO_Snapshots',
+        record.Project_ID,
+        null,
+        record,
+        'Captured PMO snapshot ' + record.Snapshot_ID + ' (' + record.Label + ')'
+      );
+    } catch (auditError) {
+      auditWarning = 'Snapshot was saved, but audit logging failed: ' + auditError.message;
+    }
+  }
+
+  var response = apiGetSnapshotsAndTemplatesData(activeProjectId);
+  if (auditWarning) response.warning = auditWarning;
+  return response;
 }
 
 // ============================================================================
@@ -4766,6 +4973,34 @@ function apiGetPresentationScopeOptions(projectId) {
 /**
  * Gathers scoped project data, calls Gemini to structure slides, and stores a token snapshot.
  */
+function apiArchiveClientPresentation(deckId, activeProjectId) {
+  const deckKey = String(deckId || '').trim();
+  const pid = String(activeProjectId || '').trim();
+  if (!deckKey || !pid) throw new Error('Presentation and project IDs are required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    assertPrivilegedManagementRole_(pid);
+    const ctx = assertPermission_('Projects', 'edit', pid);
+    const sh = ensureClientPresentationsSheet_();
+    const records = readSheetObjectsSafe_(CLIENT_DECKS_SHEET_);
+    const deck = records.find(d => String(d.Deck_ID) === deckKey && String(d.Project_ID) === pid);
+    if (!deck) throw new Error('Presentation not found in this project.');
+    if (String(deck.Status || 'PUBLISHED') === 'ARCHIVED') return { success: true, archived: true, alreadyArchived: true };
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const statusCol = headers.indexOf('Status') + 1;
+    const updatedCol = headers.indexOf('Updated_At') + 1;
+    if (!statusCol || !updatedCol) throw new Error('Client presentation sheet schema is incomplete.');
+    sh.getRange(deck._rowIndex, statusCol).setValue('ARCHIVED');
+    sh.getRange(deck._rowIndex, updatedCol).setValue(new Date().toISOString());
+    if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'ARCHIVE_CLIENT_PRESENTATION', 'Client_Presentations', deckKey, null, { projectId: pid }, 'Archived client presentation and revoked its public token');
+    return { success: true, archived: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
 function apiGenerateClientPresentation(config) {
   const cfg = config || {};
   const pid = String(cfg.projectId || '').trim();
@@ -4886,8 +5121,7 @@ function apiGenerateClientPresentation(config) {
   const aiDeck = generateAiSlideDeckWithGemini_(factPacket, audienceTone, customPrompt);
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
-  const sh = ensureClientPresentationsSheet_();
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') + '-' + Math.floor(1000 + Math.random() * 9000);
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
@@ -4905,7 +5139,11 @@ function apiGenerateClientPresentation(config) {
     rawMetrics: factPacket
   };
 
-  sh.appendRow([
+  const writeLock = LockService.getScriptLock();
+  writeLock.waitLock(15000);
+  try {
+    const sh = ensureClientPresentationsSheet_();
+    sh.appendRow([
     deckId,
     pid,
     deckTitle,
@@ -4919,7 +5157,10 @@ function apiGenerateClientPresentation(config) {
     nowIso,
     nowIso,
     'PUBLISHED'
-  ]);
+    ]);
+  } finally {
+    writeLock.releaseLock();
+  }
 
   return {
     success: true,
@@ -5140,7 +5381,7 @@ function apiStartFreshDatabase(confirmationText) {
     });
 
     // Backup must succeed before the first destructive operation.
-    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
     var backup = DriveApp.getFileById(getMasterSpreadsheetId_()).makeCopy('PMO_PRE_START_FRESH_BACKUP_' + stamp);
     var cleared = [];
     var totalRows = 0;
@@ -5175,7 +5416,7 @@ function apiStartFreshDatabase(confirmationText) {
 function apiCreateDatabaseBackupCopy() {
   var ctx = assertDatabaseTransferAdmin_();
   var source = DriveApp.getFileById(getMasterSpreadsheetId_());
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var copy = source.makeCopy('PMO_DATABASE_BACKUP_' + stamp);
   if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'DATABASE_EXPORT', 'Database', getMasterSpreadsheetId_(), null, { backupId: copy.getId() }, 'Created full Google Sheets database backup');
   return { success: true, id: copy.getId(), name: copy.getName(), url: copy.getUrl() };
@@ -5184,7 +5425,7 @@ function apiCreateDatabaseBackupCopy() {
 function apiCreateDatabaseTemplateCopy() {
   assertDatabaseTransferAdmin_();
   var source = getMasterSpreadsheet_();
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var template = SpreadsheetApp.create('PMO_DATABASE_TEMPLATE_' + stamp);
   var first = template.getSheets()[0];
   var usedFirst = false;

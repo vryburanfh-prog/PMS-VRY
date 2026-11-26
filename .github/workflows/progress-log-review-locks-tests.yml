@@ -1,0 +1,28 @@
+name: Progress Log Review Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/progress-log-review-locks.test.js'
+      - '.github/workflows/progress-log-review-locks-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/progress-log-review-locks.test.js'
+      - '.github/workflows/progress-log-review-locks-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: progress-log-review-locks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  progress-log-locks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/progress-log-review-locks.test.js
