@@ -973,6 +973,9 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
 
 /** Permanently delete a WBS record only when no dependent records remain. */
 function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'delete');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -995,8 +998,10 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
+  } finally {
+    lock.releaseLock();
+  }
 }
-
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
   if (!ctx || !ctx.authenticated) throw new Error((ctx && ctx.error) || 'Authentication required.');
@@ -3644,12 +3649,15 @@ function apiBuildUnifiedPmoDigest(activeProjectId, options) {
  * and logs a governance audit event.
  */
 function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const pid = activeProjectId ? String(activeProjectId).trim() : '';
   assertPrivilegedManagementRole_(pid || null);
   const ctx = assertPermission_('Projects', 'view', pid || null);
 
   const toList = String(recipientEmail || '')
-    .split(/[,;\s]+/)
+      .split(/[,;\s]+/)
     .map(s => s.trim())
     .filter(Boolean);
 
@@ -3694,12 +3702,11 @@ function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, acti
     recipients: toList,
     subject: subj
   };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
-
-// ============================================================================
-// PHASE 17: AUTOMATED TIME-DRIVEN DIGEST TRIGGERS & RUN HISTORY
-// ============================================================================
-
 var PHASE17_TRIGGER_HANDLER_ = 'runScheduledPmoDigestTrigger';
 var PHASE17_PROP_KEY_ = 'PHASE17_DIGEST_SCHEDULE_CONFIG';
 
@@ -3788,7 +3795,6 @@ function apiGetDigestTriggerStatus(activeProjectId) {
   });
 
   var cfg = readPhase17Config_();
-
   return {
     success: true,
     isAdmin: isAdmin,
@@ -3808,69 +3814,72 @@ function apiGetDigestTriggerStatus(activeProjectId) {
  * Creates, updates, or removes the time-driven trigger for scheduled PMO digests.
  */
 function apiSaveDigestTriggerConfig(payload, activeProjectId) {
-  var pid = activeProjectId ? String(activeProjectId).trim() : '';
-  var ctx = assertPermission_('Projects', 'view', pid || null);
-  if (!isPhase17Admin_(ctx)) {
-    throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
-  }
-
-  var p = payload || {};
-  var enabled = Boolean(p.enabled);
-  var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
-  var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
-  var recipients = String(p.recipients || '').trim();
-  var targetPid = String(p.projectId || '').trim();
-
-  if (enabled && !recipients) {
-    throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
-  }
-
-  var nextCfg = {
-    enabled: enabled,
-    frequency: frequency,
-    hourOfDay: hourOfDay,
-    recipients: recipients,
-    projectId: targetPid
-  };
-
-  PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
-
-  // Clear existing triggers for this handler before recreating
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
-      ScriptApp.deleteTrigger(t);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var pid = activeProjectId ? String(activeProjectId).trim() : '';
+    var ctx = assertPermission_('Projects', 'view', pid || null);
+    if (!isPhase17Admin_(ctx)) {
+      throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
     }
-  });
 
-  if (enabled) {
-    var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
-    if (frequency === 'DAILY') {
-      builder.everyDays(1).atHour(hourOfDay);
-    } else {
-      builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+    var p = payload || {};
+    var enabled = Boolean(p.enabled);
+    var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
+    var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
+    var recipients = String(p.recipients || '').trim();
+    var targetPid = String(p.projectId || '').trim();
+
+    if (enabled && !recipients) {
+      throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
     }
-    builder.create();
-  }
 
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
-      'PMO_Digest_Trigger',
-      targetPid || 'PORTFOLIO',
-      null,
-      { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
-      enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
-    );
-  }
+    var nextCfg = {
+      enabled: enabled,
+      frequency: frequency,
+      hourOfDay: hourOfDay,
+      recipients: recipients,
+      projectId: targetPid
+    };
 
-  return apiGetDigestTriggerStatus(pid);
+    PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
+
+    // Replace existing triggers for this handler while holding the script lock.
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+
+    if (enabled) {
+      var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
+      if (frequency === 'DAILY') {
+        builder.everyDays(1).atHour(hourOfDay);
+      } else {
+        builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+      }
+      builder.create();
+    }
+
+    if (typeof writeAuditLog_ === 'function') {
+      writeAuditLog_(
+        ctx,
+        enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
+        'PMO_Digest_Trigger',
+        targetPid || 'PORTFOLIO',
+        null,
+        { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
+        enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
+      );
+    }
+
+    return apiGetDigestTriggerStatus(pid);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-/**
- * Executed automatically by Apps Script time-driven trigger.
- */
 function runScheduledPmoDigestTrigger(e) {
   // This public trigger handler is callable by Apps Script time-driven
   // triggers, but must not become an unauthenticated browser/API endpoint.
@@ -3885,44 +3894,31 @@ function runScheduledPmoDigestTrigger(e) {
 }
 
 function runScheduledPmoDigestTrigger_() {
-  var cfg = readPhase17Config_();
-  if (!cfg.enabled || !cfg.recipients) return;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var cfg = readPhase17Config_();
+    if (!cfg.enabled || !cfg.recipients) return;
 
-  var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
-    ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
-    : { digestText: 'Scheduled PMO Digest' };
+    var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
+      ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
+      : { digestText: 'Scheduled PMO Digest' };
 
-  var toList = cfg.recipients
-    .split(/[,;\s]+/)
-    .map(function(s) { return s.trim(); })
-    .filter(Boolean);
+    var toList = cfg.recipients
+      .split(/[,;\s]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(Boolean);
 
-  if (!toList.length) return;
+    if (!toList.length) return;
 
-  var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
-
-  if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
-    MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
+    if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
+      MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
-
-// ============================================================================
-// PHASE 18: EXCEPTION & ESCALATION WORKFLOW RULES
-// ============================================================================
-
-var PHASE18_HEADERS_ = [
-  'Escalation_ID',
-  'Project_ID',
-  'Source_Type',
-  'Severity',
-  'Title',
-  'Owner_Email',
-  'Status',
-  'Notes',
-  'Created_By',
-  'Created_At',
-  'Updated_At'
-];
 
 function resolvePhase18TabName_() {
   var tabs = (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.TABS) ? DB_CONFIG.TABS : {};
