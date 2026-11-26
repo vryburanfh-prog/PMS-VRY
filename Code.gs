@@ -4329,7 +4329,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
-    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Utilities.getUuid().replace(/-/g, ''),
+    Snapshot_ID: generateNextId_(resolvePhase19TabName_(), 'Snapshot_ID', 'SNP', 5),
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
     Captured_By: actor,
@@ -5121,7 +5121,7 @@ function apiGenerateClientPresentation(config) {
   const aiDeck = generateAiSlideDeckWithGemini_(factPacket, audienceTone, customPrompt);
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') + '-' + Math.floor(1000 + Math.random() * 9000);
+  const deckId = generateNextId_(CLIENT_DECKS_SHEET_, 'Deck_ID', 'DECK', 5);
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
