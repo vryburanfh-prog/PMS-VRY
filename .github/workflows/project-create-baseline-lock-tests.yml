@@ -1,0 +1,28 @@
+name: Project Creation and Baseline Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/project-create-baseline-lock.test.js'
+      - '.github/workflows/project-create-baseline-lock-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/project-create-baseline-lock.test.js'
+      - '.github/workflows/project-create-baseline-lock-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: project-create-baseline-lock-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  project-create-baseline-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/project-create-baseline-lock.test.js

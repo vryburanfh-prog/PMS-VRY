@@ -1,0 +1,32 @@
+name: Database Import Rollback Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/database-import-rollback.test.js'
+      - '.github/workflows/database-import-rollback-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/database-import-rollback.test.js'
+      - '.github/workflows/database-import-rollback-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-import-rollback-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-import-rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/database-import-rollback.test.js

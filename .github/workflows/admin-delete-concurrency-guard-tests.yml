@@ -1,0 +1,28 @@
+name: Admin Delete Concurrency Guard Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/admin-delete-concurrency-guard.test.js'
+      - '.github/workflows/admin-delete-concurrency-guard-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/admin-delete-concurrency-guard.test.js'
+      - '.github/workflows/admin-delete-concurrency-guard-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: admin-delete-concurrency-guard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  admin-delete-concurrency-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/admin-delete-concurrency-guard.test.js

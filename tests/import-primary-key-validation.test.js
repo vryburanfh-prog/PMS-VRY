@@ -35,6 +35,6 @@ test('import validation runs during plan-building before backup and writes', () 
   const validate = body.indexOf('validateImportedPrimaryKeys_(tabName, srcHeaders, importRows)');
   const backup = body.indexOf('makeCopy(');
   const clear = body.indexOf('clearContent()');
-  const write = body.indexOf('setValues(item.rows)');
-  assert.ok(validate >= 0 && backup > validate && clear > validate && write > validate, 'primary-key validation precedes backup and writes');
+  const apply = body.indexOf('applyDatabaseImportPlanWithRollback_(plan, backup.getId(), backup.getUrl())');
+  assert.ok(validate >= 0 && backup > validate && apply > backup, 'primary-key validation precedes backup and import application');
 });
