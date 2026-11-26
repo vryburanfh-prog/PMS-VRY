@@ -20,20 +20,39 @@ concurrency:
 
 jobs:
   runtime-tests:
-    if: ${{ secrets.GAS_TEST_SCRIPT_ID != '' && secrets.GAS_TEST_SPREADSHEET_ID != '' && secrets.GAS_CLASPRC_JSON != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check required secrets
+        id: secrets-check
+        env:
+          SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
+          SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+          CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
+        run: |
+          if [ -z "$SCRIPT_ID" ] || [ -z "$SPREADSHEET_ID" ] || [ -z "$CLASPRC" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Blocked: configure GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, and GAS_CLASPRC_JSON. No Google API call was attempted."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Blocked setup notice
+        if: steps.secrets-check.outputs.configured != 'true'
+        run: echo "Integration setup is incomplete; this is NOT a test pass."
+
       - uses: actions/checkout@v4
+        if: steps.secrets-check.outputs.configured == 'true'
 
       - uses: actions/setup-node@v4
+        if: steps.secrets-check.outputs.configured == 'true'
         with:
           node-version: 22
 
       - name: Configure test-only clasp target
+        if: steps.secrets-check.outputs.configured == 'true'
         env:
           SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
-          SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
           CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
         run: |
           printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
@@ -42,6 +61,7 @@ jobs:
           npm install --global @google/clasp
 
       - name: Run isolated Apps Script suite
+        if: steps.secrets-check.outputs.configured == 'true'
         env:
           TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
           TEST_FUNCTION: ${{ inputs.test_suite }}
@@ -50,6 +70,7 @@ jobs:
           clasp run-function "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
 
       - name: Validate suite result is PASS
+        if: steps.secrets-check.outputs.configured == 'true'
         run: |
           node -e '
             const fs = require("fs");
@@ -63,21 +84,10 @@ jobs:
           '
 
       - name: Upload runtime result
-        if: always()
+        if: always() && steps.secrets-check.outputs.configured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: apps-script-runtime-test-result
           path: gas-runtime-result.json
           if-no-files-found: ignore
           retention-days: 7
-
-  missing-secrets-notice:
-    if: ${{ secrets.GAS_TEST_SCRIPT_ID == '' || secrets.GAS_TEST_SPREADSHEET_ID == '' || secrets.GAS_CLASPRC_JSON == '' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Report blocked setup
-        run: |
-          echo "::notice::Integration run blocked: configure GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, and GAS_CLASPRC_JSON repository secrets."
-          echo "No Apps Script call was made. This blocked run is not a passing test."
