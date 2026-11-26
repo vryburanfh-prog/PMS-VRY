@@ -4954,11 +4954,11 @@ function apiArchiveClientPresentation(deckId, activeProjectId) {
   const deckKey = String(deckId || '').trim();
   const pid = String(activeProjectId || '').trim();
   if (!deckKey || !pid) throw new Error('Presentation and project IDs are required.');
-  assertPrivilegedManagementRole_(pid);
-  const ctx = assertPermission_('Projects', 'edit', pid);
   const lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
+    assertPrivilegedManagementRole_(pid);
+    const ctx = assertPermission_('Projects', 'edit', pid);
     const sh = ensureClientPresentationsSheet_();
     const records = readSheetObjectsSafe_(CLIENT_DECKS_SHEET_);
     const deck = records.find(d => String(d.Deck_ID) === deckKey && String(d.Project_ID) === pid);
