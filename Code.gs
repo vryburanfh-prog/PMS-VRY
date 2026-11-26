@@ -4116,11 +4116,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
       }
     });
   } else {
-    var newRowValues = headers.map(function(h) {
-      var key = String(h).trim();
-      return record[key] !== undefined ? record[key] : '';
-    });
-    sheet.appendRow(newRowValues);
+    insertRecord_(resolvePhase18TabName_(), record);
   }
 
   if (typeof writeAuditLog_ === 'function') {
