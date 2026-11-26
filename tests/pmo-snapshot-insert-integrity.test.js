@@ -7,8 +7,9 @@ const start = source.indexOf('function apiCapturePmoSnapshot(');
 const end = source.indexOf('\nfunction parsePhase20DateSafe_(', start);
 assert.ok(start >= 0 && end > start, 'snapshot API source boundaries found');
 const api = source.slice(start, end);
-test('snapshot IDs use UUID entropy beyond timestamp', () => {
-  assert.match(api, /Snapshot_ID: 'SNP-'[\s\S]*Utilities\.getUuid\(\)\.replace\(\/-\/g, ''\)/);
+test('snapshot IDs use the monotonic allocator', () => {
+  assert.match(api, /Snapshot_ID:\\s*generateNextId_\\(resolvePhase19TabName_\\(\\), 'Snapshot_ID', 'SNP', 5\\)/);
+  assert.doesNotMatch(api, /Snapshot_ID:\\s*'SNP-'[\\s\\S]*Utilities\\.getUuid\\(\\)/);
 });
 test('snapshot append is guarded by ScriptLock and invalidates its table cache', () => {
   const lock = api.indexOf('lock.waitLock(15000)');
