@@ -49,6 +49,15 @@ test('dynamic project, registry, WBS, progress and report strings are HTML escap
   ];
   for (const fragment of checks) assert.ok(html.includes(fragment), fragment + ' must be escaped');
 });
+test('permission module labels and user IDs use safe HTML/JavaScript escaping', () => {
+  assert.ok(html.includes('<td class="py-2 px-3 font-medium">\${escapeHtmlSafe_(mod)}</td>'));
+  assert.ok(html.includes('const safeUid = safeJsArg_(uid);'));
+  assert.ok(html.includes('onclick="handleToggleUserStatus(\${safeUid}, false)"'));
+  assert.ok(html.includes('onclick="handleToggleUserStatus(\${safeUid}, true)"'));
+  assert.ok(html.includes('onclick="openEditUserModal_(\${safeUid})"'));
+  assert.ok(!html.includes("onclick=\\"handleToggleUserStatus('\${safeUid}"));
+});
+
 test('audit-log and weekly-progress HTML strings are escaped before insertion', () => {
   assert.ok(html.includes("escapeHtmlSafe_(l.Log_ID || '')"));
   assert.ok(html.includes("escapeHtmlSafe_(l.Log_Date || '-')"));
