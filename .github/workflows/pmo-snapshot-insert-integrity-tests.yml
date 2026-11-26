@@ -15,10 +15,10 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pmo-snapshot-insert-integrity-${{ github.workflow }}-${{ github.ref }}
+  group: pmo-snapshot-integrity-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  pmo-snapshot-insert-integrity:
+  pmo-snapshot-integrity:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
