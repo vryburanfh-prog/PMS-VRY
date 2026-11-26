@@ -973,6 +973,9 @@ function apiSetWbsRecordArchived(recordType, recordId, projectId, archiveFlag, r
 
 /** Permanently delete a WBS record only when no dependent records remain. */
 function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPrivilegedWbsRole_(projectId, 'delete');
   const types = { main: [DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'], sub: [DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'], activity: [DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'] };
   const type = String(recordType || '').toLowerCase();
@@ -995,8 +998,10 @@ function apiDeleteWbsRecord(recordType, recordId, projectId, reason) {
   const previous = deleteRecordById_(cfg[0], cfg[1], recordId);
   writeAuditLog_(ctx, 'DELETE_WBS_RECORD', 'WBS_Structure', recordId, previous, null, reason || 'Deleted WBS record');
   return { success: true, recordType: type, recordId: String(recordId) };
+  } finally {
+    lock.releaseLock();
+  }
 }
-
 function assertScheduleActivityPermission_(projectId, action, existingActivity) {
   const ctx = getCurrentUserContext_();
   if (!ctx || !ctx.authenticated) throw new Error((ctx && ctx.error) || 'Authentication required.');
@@ -1013,6 +1018,9 @@ function assertScheduleActivityPermission_(projectId, action, existingActivity) 
 }
 
 function apiSaveMainWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Main_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Main WBS record');
@@ -1077,12 +1085,19 @@ function apiSaveMainWbs(payload) {
   }
 
   return { success: true, mainWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Sub WBS task under a parent Main WBS.
  */
 function apiSaveSubWbs(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Sub_WBS_ID ? findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Sub WBS record');
@@ -1154,6 +1169,10 @@ function apiSaveSubWbs(payload) {
   }
 
   return { success: true, subWbs: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function apiSaveProjectWbsDepth(projectId, depth) {
@@ -1198,6 +1217,9 @@ function wouldCreateDependencyCycle_(projectId, predecessorId, successorId) {
 }
 
 function apiSaveActivity(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
   const isUpdate = Boolean(existing);
   if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
@@ -1317,6 +1339,10 @@ function apiSaveActivity(payload) {
   }
 
   return { success: true, activity: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1415,6 +1441,9 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
  * Triggers the weighted progress roll-up engine for a project and logs it.
  */
 function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const ctx = assertPermission_('WBS_Schedule', 'edit', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
 
@@ -1430,6 +1459,10 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
   writeAuditLog_(ctx, 'RECALCULATE_PROGRESS', 'WBS_Schedule', pid, null, summary, 'Weighted progress roll-up executed');
 
   return { success: true, summary: summary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1437,6 +1470,9 @@ function apiRecalculateWeightedProgress(projectId, newProgressMethod) {
  * then automatically rolls up weighted progress.
  */
 function apiQuickUpdateGanttActivity(activityId, updates) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const existing = findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', activityId);
   if (!existing) throw new Error('Activity not found: ' + activityId);
 
@@ -1474,6 +1510,10 @@ function apiQuickUpdateGanttActivity(activityId, updates) {
 
   writeAuditLog_(ctx, 'GANTT_UPDATE_ACTIVITY', 'WBS_Schedule', activityId, res.previous, res.updated, 'Updated via Interactive Gantt Chart');
   return { success: true, activity: res.updated, rollSummary: rollSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -1814,6 +1854,9 @@ function apiGetProgressAndWeeklyReports(projectId) {
  * and recalculates project weighted progress.
  */
 function apiSaveProgressLog(projectId, payload, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -1941,6 +1984,10 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
   }
 
   return { success: true, log: record, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -1948,6 +1995,9 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
  * Optionally applies approved progress to the linked Activity and recalculates project roll-up.
  */
 function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !logId) throw new Error('Project_ID and Log_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Progress', 'approve', pid);
@@ -2000,12 +2050,19 @@ function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
   }
 
   return { success: true, log: updatedClean, rollupSummary: rollupSummary };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Weekly Project Report in Weekly_Reports.
  */
 function apiSaveWeeklyReport(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2079,12 +2136,19 @@ function apiSaveWeeklyReport(projectId, payload) {
   }
 
   return { success: true, report: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Weekly Project Report (requires Weekly_Reports delete permission) and logs to Audit_Logs.
  */
 function apiDeleteWeeklyReport(projectId, reportId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !reportId) throw new Error('Project_ID and Report_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Weekly_Reports', 'delete', pid);
@@ -2104,6 +2168,10 @@ function apiDeleteWeeklyReport(projectId, reportId) {
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2284,6 +2352,9 @@ function apiGetTeamWorkloadData(projectId) {
  * Creates or updates a Team_Workload assignment row and writes an Audit_Logs entry.
  */
 function apiSaveTeamWorkloadAssignment(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2338,6 +2409,10 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
   }
 
   return { success: true, assignment: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -2345,6 +2420,9 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
  * and writes an Audit_Logs entry.
  */
 function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !assignmentId) throw new Error('Project_ID and Assignment_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Team_Workload', 'delete', pid);
@@ -2364,6 +2442,10 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -2520,6 +2602,9 @@ function apiGetProcurementFinancialData(projectId) {
  * Creates or updates a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiSaveProcurementItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2569,12 +2654,19 @@ function apiSaveProcurementItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Procurement & Logistics record and writes an Audit_Logs entry.
  */
 function apiDeleteProcurementItem(projectId, procurementId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !procurementId) throw new Error('Project_ID and Procurement_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Procurement', 'delete', pid);
@@ -2594,12 +2686,19 @@ function apiDeleteProcurementItem(projectId, procurementId) {
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Creates or updates a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiSaveFinancialItem(projectId, payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
 
@@ -2644,12 +2743,19 @@ function apiSaveFinancialItem(projectId, payload) {
   }
 
   return { success: true, item: record };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
  * Deletes a Financial Monitoring record and writes an Audit_Logs entry.
  */
 function apiDeleteFinancialItem(projectId, financialId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   if (!projectId || !financialId) throw new Error('Project_ID and Financial_ID are required.');
   const pid = String(projectId).trim();
   const ctx = assertPermission_('Financials', 'delete', pid);
@@ -2669,6 +2775,10 @@ function apiDeleteFinancialItem(projectId, financialId) {
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -3539,12 +3649,15 @@ function apiBuildUnifiedPmoDigest(activeProjectId, options) {
  * and logs a governance audit event.
  */
 function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const pid = activeProjectId ? String(activeProjectId).trim() : '';
   assertPrivilegedManagementRole_(pid || null);
   const ctx = assertPermission_('Projects', 'view', pid || null);
 
   const toList = String(recipientEmail || '')
-    .split(/[,;\s]+/)
+      .split(/[,;\s]+/)
     .map(s => s.trim())
     .filter(Boolean);
 
@@ -3589,12 +3702,11 @@ function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, acti
     recipients: toList,
     subject: subj
   };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
-
-// ============================================================================
-// PHASE 17: AUTOMATED TIME-DRIVEN DIGEST TRIGGERS & RUN HISTORY
-// ============================================================================
-
 var PHASE17_TRIGGER_HANDLER_ = 'runScheduledPmoDigestTrigger';
 var PHASE17_PROP_KEY_ = 'PHASE17_DIGEST_SCHEDULE_CONFIG';
 
@@ -3683,7 +3795,6 @@ function apiGetDigestTriggerStatus(activeProjectId) {
   });
 
   var cfg = readPhase17Config_();
-
   return {
     success: true,
     isAdmin: isAdmin,
@@ -3703,69 +3814,72 @@ function apiGetDigestTriggerStatus(activeProjectId) {
  * Creates, updates, or removes the time-driven trigger for scheduled PMO digests.
  */
 function apiSaveDigestTriggerConfig(payload, activeProjectId) {
-  var pid = activeProjectId ? String(activeProjectId).trim() : '';
-  var ctx = assertPermission_('Projects', 'view', pid || null);
-  if (!isPhase17Admin_(ctx)) {
-    throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
-  }
-
-  var p = payload || {};
-  var enabled = Boolean(p.enabled);
-  var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
-  var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
-  var recipients = String(p.recipients || '').trim();
-  var targetPid = String(p.projectId || '').trim();
-
-  if (enabled && !recipients) {
-    throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
-  }
-
-  var nextCfg = {
-    enabled: enabled,
-    frequency: frequency,
-    hourOfDay: hourOfDay,
-    recipients: recipients,
-    projectId: targetPid
-  };
-
-  PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
-
-  // Clear existing triggers for this handler before recreating
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
-      ScriptApp.deleteTrigger(t);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var pid = activeProjectId ? String(activeProjectId).trim() : '';
+    var ctx = assertPermission_('Projects', 'view', pid || null);
+    if (!isPhase17Admin_(ctx)) {
+      throw new Error('Permission Denied: Only Administrators can configure scheduled digest triggers.');
     }
-  });
 
-  if (enabled) {
-    var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
-    if (frequency === 'DAILY') {
-      builder.everyDays(1).atHour(hourOfDay);
-    } else {
-      builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+    var p = payload || {};
+    var enabled = Boolean(p.enabled);
+    var frequency = p.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY';
+    var hourOfDay = Math.max(0, Math.min(23, Number(p.hourOfDay) || 8));
+    var recipients = String(p.recipients || '').trim();
+    var targetPid = String(p.projectId || '').trim();
+
+    if (enabled && !recipients) {
+      throw new Error('Please enter at least one recipient email before enabling the scheduled trigger.');
     }
-    builder.create();
-  }
 
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
-      'PMO_Digest_Trigger',
-      targetPid || 'PORTFOLIO',
-      null,
-      { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
-      enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
-    );
-  }
+    var nextCfg = {
+      enabled: enabled,
+      frequency: frequency,
+      hourOfDay: hourOfDay,
+      recipients: recipients,
+      projectId: targetPid
+    };
 
-  return apiGetDigestTriggerStatus(pid);
+    PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
+
+    // Replace existing triggers for this handler while holding the script lock.
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+
+    if (enabled) {
+      var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
+      if (frequency === 'DAILY') {
+        builder.everyDays(1).atHour(hourOfDay);
+      } else {
+        builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+      }
+      builder.create();
+    }
+
+    if (typeof writeAuditLog_ === 'function') {
+      writeAuditLog_(
+        ctx,
+        enabled ? 'ENABLE_DIGEST_TRIGGER' : 'DISABLE_DIGEST_TRIGGER',
+        'PMO_Digest_Trigger',
+        targetPid || 'PORTFOLIO',
+        null,
+        { enabled: enabled, frequency: frequency, hourOfDay: hourOfDay, recipients: recipients },
+        enabled ? 'Configured automated PMO digest trigger' : 'Disabled automated PMO digest trigger'
+      );
+    }
+
+    return apiGetDigestTriggerStatus(pid);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-/**
- * Executed automatically by Apps Script time-driven trigger.
- */
 function runScheduledPmoDigestTrigger(e) {
   // This public trigger handler is callable by Apps Script time-driven
   // triggers, but must not become an unauthenticated browser/API endpoint.
@@ -3780,44 +3894,31 @@ function runScheduledPmoDigestTrigger(e) {
 }
 
 function runScheduledPmoDigestTrigger_() {
-  var cfg = readPhase17Config_();
-  if (!cfg.enabled || !cfg.recipients) return;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var cfg = readPhase17Config_();
+    if (!cfg.enabled || !cfg.recipients) return;
 
-  var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
-    ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
-    : { digestText: 'Scheduled PMO Digest' };
+    var digestRes = (typeof apiBuildUnifiedPmoDigest === 'function')
+      ? apiBuildUnifiedPmoDigest(cfg.projectId || '', {})
+      : { digestText: 'Scheduled PMO Digest' };
 
-  var toList = cfg.recipients
-    .split(/[,;\s]+/)
-    .map(function(s) { return s.trim(); })
-    .filter(Boolean);
+    var toList = cfg.recipients
+      .split(/[,;\s]+/)
+      .map(function(s) { return s.trim(); })
+      .filter(Boolean);
 
-  if (!toList.length) return;
+    if (!toList.length) return;
 
-  var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
-
-  if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
-    MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    var subj = 'Scheduled PMO Health Digest (' + cfg.frequency + ')' + (cfg.projectId ? ' — ' + cfg.projectId : '');
+    if (typeof MailApp !== 'undefined' && typeof MailApp.sendEmail === 'function') {
+      MailApp.sendEmail(toList.join(','), subj, digestRes.digestText || '');
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
-
-// ============================================================================
-// PHASE 18: EXCEPTION & ESCALATION WORKFLOW RULES
-// ============================================================================
-
-var PHASE18_HEADERS_ = [
-  'Escalation_ID',
-  'Project_ID',
-  'Source_Type',
-  'Severity',
-  'Title',
-  'Owner_Email',
-  'Status',
-  'Notes',
-  'Created_By',
-  'Created_At',
-  'Updated_At'
-];
 
 function resolvePhase18TabName_() {
   var tabs = (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.TABS) ? DB_CONFIG.TABS : {};
@@ -3938,6 +4039,9 @@ function apiGetEscalationsData(activeProjectId) {
  * Creates or updates an exception escalation row.
  */
 function apiUpsertEscalationItem(payload, activeProjectId) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   var p = payload || {};
   var targetPid = String(p.Project_ID || activeProjectId || '').trim();
   assertPrivilegedManagementRole_(targetPid || null);
@@ -4016,6 +4120,10 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   }
 
   return apiGetEscalationsData(activeProjectId);
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -4845,6 +4953,34 @@ function apiGetPresentationScopeOptions(projectId) {
 /**
  * Gathers scoped project data, calls Gemini to structure slides, and stores a token snapshot.
  */
+function apiArchiveClientPresentation(deckId, activeProjectId) {
+  const deckKey = String(deckId || '').trim();
+  const pid = String(activeProjectId || '').trim();
+  if (!deckKey || !pid) throw new Error('Presentation and project IDs are required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    assertPrivilegedManagementRole_(pid);
+    const ctx = assertPermission_('Projects', 'edit', pid);
+    const sh = ensureClientPresentationsSheet_();
+    const records = readSheetObjectsSafe_(CLIENT_DECKS_SHEET_);
+    const deck = records.find(d => String(d.Deck_ID) === deckKey && String(d.Project_ID) === pid);
+    if (!deck) throw new Error('Presentation not found in this project.');
+    if (String(deck.Status || 'PUBLISHED') === 'ARCHIVED') return { success: true, archived: true, alreadyArchived: true };
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    const statusCol = headers.indexOf('Status') + 1;
+    const updatedCol = headers.indexOf('Updated_At') + 1;
+    if (!statusCol || !updatedCol) throw new Error('Client presentation sheet schema is incomplete.');
+    sh.getRange(deck._rowIndex, statusCol).setValue('ARCHIVED');
+    sh.getRange(deck._rowIndex, updatedCol).setValue(new Date().toISOString());
+    if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'ARCHIVE_CLIENT_PRESENTATION', 'Client_Presentations', deckKey, null, { projectId: pid }, 'Archived client presentation and revoked its public token');
+    return { success: true, archived: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
 function apiGenerateClientPresentation(config) {
   const cfg = config || {};
   const pid = String(cfg.projectId || '').trim();
@@ -4965,8 +5101,7 @@ function apiGenerateClientPresentation(config) {
   const aiDeck = generateAiSlideDeckWithGemini_(factPacket, audienceTone, customPrompt);
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
-  const sh = ensureClientPresentationsSheet_();
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss') + '-' + Math.floor(1000 + Math.random() * 9000);
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
@@ -4984,7 +5119,11 @@ function apiGenerateClientPresentation(config) {
     rawMetrics: factPacket
   };
 
-  sh.appendRow([
+  const writeLock = LockService.getScriptLock();
+  writeLock.waitLock(15000);
+  try {
+    const sh = ensureClientPresentationsSheet_();
+    sh.appendRow([
     deckId,
     pid,
     deckTitle,
@@ -4998,7 +5137,10 @@ function apiGenerateClientPresentation(config) {
     nowIso,
     nowIso,
     'PUBLISHED'
-  ]);
+    ]);
+  } finally {
+    writeLock.releaseLock();
+  }
 
   return {
     success: true,
@@ -5219,7 +5361,7 @@ function apiStartFreshDatabase(confirmationText) {
     });
 
     // Backup must succeed before the first destructive operation.
-    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
     var backup = DriveApp.getFileById(getMasterSpreadsheetId_()).makeCopy('PMO_PRE_START_FRESH_BACKUP_' + stamp);
     var cleared = [];
     var totalRows = 0;
@@ -5254,7 +5396,7 @@ function apiStartFreshDatabase(confirmationText) {
 function apiCreateDatabaseBackupCopy() {
   var ctx = assertDatabaseTransferAdmin_();
   var source = DriveApp.getFileById(getMasterSpreadsheetId_());
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var copy = source.makeCopy('PMO_DATABASE_BACKUP_' + stamp);
   if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'DATABASE_EXPORT', 'Database', getMasterSpreadsheetId_(), null, { backupId: copy.getId() }, 'Created full Google Sheets database backup');
   return { success: true, id: copy.getId(), name: copy.getName(), url: copy.getUrl() };
@@ -5263,7 +5405,7 @@ function apiCreateDatabaseBackupCopy() {
 function apiCreateDatabaseTemplateCopy() {
   assertDatabaseTransferAdmin_();
   var source = getMasterSpreadsheet_();
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '_' + Math.floor(1000 + Math.random() * 9000);
   var template = SpreadsheetApp.create('PMO_DATABASE_TEMPLATE_' + stamp);
   var first = template.getSheets()[0];
   var usedFirst = false;
