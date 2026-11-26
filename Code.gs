@@ -3657,7 +3657,7 @@ function apiDispatchPmoDigestEmail(recipientEmail, subjectLine, digestBody, acti
   const ctx = assertPermission_('Projects', 'view', pid || null);
 
   const toList = String(recipientEmail || '')
-    .split(/[,;\s]+/)
+      .split(/[,;\s]+/)
     .map(s => s.trim())
     .filter(Boolean);
 
