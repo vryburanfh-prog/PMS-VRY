@@ -4094,6 +4094,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   }
 
   var record = {
+    // This API holds the Script Lock; the allocator reuses the held lock.
     Escalation_ID: escId || generateNextId_(resolvePhase18TabName_(), 'Escalation_ID', 'ESC', 5),
     Project_ID: targetPid || 'PORTFOLIO',
     Source_Type: String(p.Source_Type || 'MANUAL').trim().toUpperCase(),
@@ -4329,6 +4330,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
+    // The allocator reserves the ID before the later append lock is acquired.
     Snapshot_ID: generateNextId_(resolvePhase19TabName_(), 'Snapshot_ID', 'SNP', 5),
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
