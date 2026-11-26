@@ -37,3 +37,11 @@ test('escalation creation uses the lock-protected allocator instead of timestamp
  assert.ok(idGeneration>wait,'ID allocation occurs while the script lock is held');
  assert.doesNotMatch(body,/Math\.random\s*\(/,'random ID generation removed');
 });
+
+test('escalation creation uses duplicate-checked database insertion',()=>{
+ const body=bodyFor('apiUpsertEscalationItem');
+ const wait=body.indexOf('lock.waitLock(15000)');
+ const insert=body.indexOf('insertRecord_(resolvePhase18TabName_(), record)');
+ assert.ok(insert>wait,'insert helper executes inside the script lock');
+ assert.doesNotMatch(body,/sheet\\.appendRow\\s*\\(/,'direct append removed');
+});
