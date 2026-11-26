@@ -1,0 +1,28 @@
+name: WBS Delete and Digest Trigger Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/wbs-delete-digest-trigger-locks.test.js'
+      - '.github/workflows/wbs-delete-digest-trigger-locks-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/wbs-delete-digest-trigger-locks.test.js'
+      - '.github/workflows/wbs-delete-digest-trigger-locks-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: wbs-delete-digest-trigger-locks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  wbs-delete-digest-trigger-locks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/wbs-delete-digest-trigger-locks.test.js
