@@ -35,5 +35,5 @@ test('escalation creation uses the lock-protected allocator instead of timestamp
  const wait=body.indexOf('lock.waitLock(15000)');
  const idGeneration=body.indexOf("generateNextId_(resolvePhase18TabName_(), 'Escalation_ID', 'ESC', 5)");
  assert.ok(idGeneration>wait,'ID allocation occurs while the script lock is held');
- assert.doesNotMatch(body,/Math\\.random\\s*\\(/,'random ID generation removed');
+ assert.doesNotMatch(body,/Math\.random\s*\(/,'random ID generation removed');
 });
