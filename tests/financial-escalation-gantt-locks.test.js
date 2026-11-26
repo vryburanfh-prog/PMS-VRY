@@ -43,5 +43,5 @@ test('escalation creation uses duplicate-checked database insertion',()=>{
  const wait=body.indexOf('lock.waitLock(15000)');
  const insert=body.indexOf('insertRecord_(resolvePhase18TabName_(), record)');
  assert.ok(insert>wait,'insert helper executes inside the script lock');
- assert.doesNotMatch(body,/sheet\\.appendRow\\s*\\(/,'direct append removed');
+ assert.doesNotMatch(body,/sheet\.appendRow\s*\(/,'direct append removed');
 });
