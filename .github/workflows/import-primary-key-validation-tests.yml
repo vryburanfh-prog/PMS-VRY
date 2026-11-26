@@ -1,0 +1,34 @@
+name: Import Primary Key Validation Tests
+
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'Database.gs'
+      - 'tests/import-primary-key-validation.test.js'
+      - '.github/workflows/import-primary-key-validation-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'Database.gs'
+      - 'tests/import-primary-key-validation.test.js'
+      - '.github/workflows/import-primary-key-validation-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: import-primary-key-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  import-primary-key-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/import-primary-key-validation.test.js
