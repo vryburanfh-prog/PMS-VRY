@@ -184,6 +184,9 @@ function getEffectiveRolePermissions_(roleName, configuredRows) {
  * overwritten. Missing role/module combinations are appended only.
  */
 function seedDefaultPermissions_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
   const sheet = getMasterSpreadsheet_().getSheetByName(DB_CONFIG.TABS.ROLE_PERMISSIONS);
   if (!sheet) throw new Error('Sheet not found: ' + DB_CONFIG.TABS.ROLE_PERMISSIONS);
   const existingRows = getCachedTableRecords_(DB_CONFIG.TABS.ROLE_PERMISSIONS) || [];
@@ -229,6 +232,9 @@ function seedDefaultPermissions_() {
     });
   });
   return 'Role permission matrix checked for the six required roles. Added missing role/module combinations and initialized blank permission fields in ' + updated + ' rows; explicit permission settings and other roles were preserved.';
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
