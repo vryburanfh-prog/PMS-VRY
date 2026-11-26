@@ -1,0 +1,71 @@
+name: Apps Script Runtime Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: Apps Script test entrypoint
+        required: true
+        default: phase1RuntimeIntegrationTestSuite
+        type: choice
+        options:
+          - phase1RuntimeIntegrationTestSuite
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gas-runtime-integration-tests
+  cancel-in-progress: false
+
+jobs:
+  runtime-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check required secrets
+        env:
+          SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
+          SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+          CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
+        run: |
+          if [ -z "$SCRIPT_ID" ] || [ -z "$SPREADSHEET_ID" ] || [ -z "$CLASPRC" ]; then
+            echo "::notice::Blocked: set GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, GAS_CLASPRC_JSON. No Apps Script call was attempted."
+            exit 0
+          fi
+          echo "Required credentials and test target configured."
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configure test-only clasp target
+        env:
+          SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
+          SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+          CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
+        run: |
+          printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s"}\n' "$SCRIPT_ID" > .clasp.json
+          echo "TEST_SPREADSHEET_ID=$SPREADSHEET_ID" >> "$GITHUB_ENV"
+          npm install --global @google/clasp
+
+      - name: Run isolated Apps Script suite
+        env:
+          TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+          TEST_FUNCTION: ${{ inputs.test_suite }}
+        run: |
+          set -euo pipefail
+          clasp run-function "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
+
+      - name: Upload result artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apps-script-runtime-test-result
+          path: gas-runtime-result.json
+          if-no-files-found: ignore
+          retention-days: 7
