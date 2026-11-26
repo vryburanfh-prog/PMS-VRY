@@ -1,0 +1,28 @@
+name: Financial Escalation and Gantt Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/financial-escalation-gantt-locks.test.js'
+      - '.github/workflows/financial-escalation-gantt-locks-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/financial-escalation-gantt-locks.test.js'
+      - '.github/workflows/financial-escalation-gantt-locks-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: financial-escalation-gantt-locks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  financial-escalation-gantt-locks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/financial-escalation-gantt-locks.test.js
