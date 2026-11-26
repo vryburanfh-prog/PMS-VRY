@@ -1,0 +1,28 @@
+name: PMO Digest Email Dispatch Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/pmo-digest-email-dispatch-lock.test.js'
+      - '.github/workflows/pmo-digest-email-dispatch-lock-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/pmo-digest-email-dispatch-lock.test.js'
+      - '.github/workflows/pmo-digest-email-dispatch-lock-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pmo-digest-email-dispatch-lock-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pmo-digest-email-dispatch-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/pmo-digest-email-dispatch-lock.test.js
