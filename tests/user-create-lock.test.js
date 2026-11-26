@@ -43,3 +43,13 @@ test('partial account-creation failures trigger compensating cleanup across depe
   assert.ok(userCleanup > trustedCleanup && rethrow > userCleanup);
   assert.match(fn, /cleanupErrors\.length/);
 });
+
+test('bulk project assignments reserve unique IDs before the batch insert', () => {
+  const start = source.indexOf('function syncUserProjectAssignments_(');
+  const end = source.indexOf('function apiCreateUser(', start);
+  assert.ok(start >= 0 && end > start, 'assignment sync helper exists');
+  const helper = source.slice(start, end);
+  assert.match(helper, /generateNextId_\(DB_CONFIG\.TABS\.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4\)/);
+  assert.ok(helper.indexOf('generateNextId_(') < helper.indexOf('insertRecords_('));
+  assert.doesNotMatch(helper, /maxAssignmentNumber/);
+});
