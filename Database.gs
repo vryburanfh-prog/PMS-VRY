@@ -211,6 +211,9 @@ function updateRecordById_(tabName, idColumn, recordId, updatesObj) {
   const ownsLock = !lock.hasLock();
   if (ownsLock) lock.waitLock(10000);
   try {
+    if (updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, idColumn) && String(updatesObj[idColumn] == null ? '' : updatesObj[idColumn]).trim() !== String(recordId == null ? '' : recordId).trim()) {
+      throw new Error('Primary-key changes are not allowed for ' + tabName + ' (' + idColumn + ').');
+    }
     const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
     if (!sheet) throw new Error('Database table not found: ' + tabName);
     const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
