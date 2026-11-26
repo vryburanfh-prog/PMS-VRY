@@ -1,0 +1,28 @@
+name: Progress Log Submitter HTML Escaping Tests
+on:
+  pull_request:
+    paths:
+      - 'Presentation.html'
+      - 'tests/progress-log-submitter-html-escaping.test.js'
+      - '.github/workflows/progress-log-submitter-html-escaping-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Presentation.html'
+      - 'tests/progress-log-submitter-html-escaping.test.js'
+      - '.github/workflows/progress-log-submitter-html-escaping-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: progress-log-submitter-html-escaping-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  progress-log-submitter-html-escaping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/progress-log-submitter-html-escaping.test.js

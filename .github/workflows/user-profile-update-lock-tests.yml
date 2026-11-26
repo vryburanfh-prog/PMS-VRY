@@ -1,0 +1,28 @@
+name: User Profile Update Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/user-profile-update-lock.test.js'
+      - '.github/workflows/user-profile-update-lock-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/user-profile-update-lock.test.js'
+      - '.github/workflows/user-profile-update-lock-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: user-profile-update-lock-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  user-profile-update-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/user-profile-update-lock.test.js

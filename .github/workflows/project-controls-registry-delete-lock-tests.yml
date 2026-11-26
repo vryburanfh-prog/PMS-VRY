@@ -1,0 +1,28 @@
+name: Project Controls Registry Delete Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/project-controls-registry-delete-lock.test.js'
+      - '.github/workflows/project-controls-registry-delete-lock-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/project-controls-registry-delete-lock.test.js'
+      - '.github/workflows/project-controls-registry-delete-lock-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: project-controls-delete-lock-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  controls-delete-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/project-controls-registry-delete-lock.test.js
