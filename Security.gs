@@ -188,13 +188,10 @@ function seedDefaultPermissions_() {
   if (!sheet) throw new Error('Sheet not found: ' + DB_CONFIG.TABS.ROLE_PERMISSIONS);
   const existingRows = getCachedTableRecords_(DB_CONFIG.TABS.ROLE_PERMISSIONS) || [];
   const existingKeys = {};
-  let maxId = 0;
   existingRows.forEach(function (row) {
     const role = normalizeRoleName_(row.Role_Name);
     const moduleName = String(row.Module_Name || '').trim();
     existingKeys[role + '|' + moduleName] = row;
-    const match = String(row.Permission_ID || '').match(/^PRM-(\d+)$/i);
-    if (match) maxId = Math.max(maxId, Number(match[1]) || 0);
   });
 
   let updated = 0;
@@ -210,8 +207,7 @@ function seedDefaultPermissions_() {
       };
       const existing = existingKeys[key];
       if (!existing) {
-        maxId++;
-        patch.Permission_ID = 'PRM-' + String(maxId).padStart(4, '0');
+        patch.Permission_ID = generateNextId_(DB_CONFIG.TABS.ROLE_PERMISSIONS, 'Permission_ID', 'PRM', 4);
         insertRecord_(DB_CONFIG.TABS.ROLE_PERMISSIONS, patch);
         existingKeys[key] = patch;
         updated++;
