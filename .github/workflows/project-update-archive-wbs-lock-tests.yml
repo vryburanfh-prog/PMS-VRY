@@ -1,0 +1,28 @@
+name: Project Update and Archive Lock Tests
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'tests/project-update-archive-wbs-lock.test.js'
+      - '.github/workflows/project-update-archive-wbs-lock-tests.yml'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'tests/project-update-archive-wbs-lock.test.js'
+      - '.github/workflows/project-update-archive-wbs-lock-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: project-update-archive-lock-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  project-update-archive-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --test tests/project-update-archive-wbs-lock.test.js
