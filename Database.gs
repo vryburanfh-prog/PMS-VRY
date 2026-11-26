@@ -348,7 +348,7 @@ function generateNextId_(tabName, idColumn, prefix, padLength) {
         const value = String(row[0] || '').trim();
         if (!value.startsWith(marker)) return;
         const suffix = value.slice(marker.length);
-        if (/^\\d+$/.test(suffix)) maxNum = Math.max(maxNum, parseInt(suffix, 10) || 0);
+        if (/^\d+$/.test(suffix)) maxNum = Math.max(maxNum, parseInt(suffix, 10) || 0);
       });
     }
 
