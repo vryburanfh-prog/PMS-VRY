@@ -4094,7 +4094,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   }
 
   var record = {
-    Escalation_ID: escId || ('ESC-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'UTC', 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900)),
+    Escalation_ID: escId || generateNextId_(resolvePhase18TabName_(), 'Escalation_ID', 'ESC', 5),
     Project_ID: targetPid || 'PORTFOLIO',
     Source_Type: String(p.Source_Type || 'MANUAL').trim().toUpperCase(),
     Severity: String(p.Severity || 'HIGH').trim().toUpperCase(),
