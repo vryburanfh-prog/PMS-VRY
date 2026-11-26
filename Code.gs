@@ -4069,254 +4069,7 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
 
   var sheet = ensurePhase18Sheet_();
   var lastRow = sheet.getLastRow();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colIdx = {};
-  headers.forEach(function(h, i) { colIdx[String(h).trim()] = i + 1; });
-
-  var nowIso = new Date().toISOString();
-  var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
-  var escId = String(p.Escalation_ID || '').trim();
-
-  var existingRowIndex = -1;
-  if (escId && lastRow >= 2 && colIdx['Escalation_ID']) {
-    var ids = sheet.getRange(2, colIdx['Escalation_ID'], lastRow - 1, 1).getValues();
-    for (var r = 0; r < ids.length; r++) {
-      if (String(ids[r][0]).trim() === escId) {
-        existingRowIndex = r + 2;
-        break;
-      }
-    }
-  }
-
-  var record = {
-    // This API holds the Script Lock; the allocator reuses the held lock.
-    Escalation_ID: escId || generateNextId_(resolvePhase18TabName_(), 'Escalation_ID', 'ESC', 5),
-    Project_ID: targetPid || 'PORTFOLIO',
-    Source_Type: String(p.Source_Type || 'MANUAL').trim().toUpperCase(),
-    Severity: String(p.Severity || 'HIGH').trim().toUpperCase(),
-    Title: title,
-    Owner_Email: String(p.Owner_Email || actor).trim(),
-    Status: String(p.Status || 'OPEN').trim().toUpperCase(),
-    Notes: String(p.Notes || '').trim(),
-    Created_By: actor,
-    Created_At: nowIso,
-    Updated_At: nowIso
-  };
-
-  if (existingRowIndex > 0) {
-    if (colIdx['Created_By']) {
-      record.Created_By = sheet.getRange(existingRowIndex, colIdx['Created_By']).getValue() || actor;
-    }
-    if (colIdx['Created_At']) {
-      record.Created_At = sheet.getRange(existingRowIndex, colIdx['Created_At']).getValue() || nowIso;
-    }
-    Object.keys(record).forEach(function(k) {
-      if (colIdx[k]) {
-        sheet.getRange(existingRowIndex, colIdx[k]).setValue(record[k]);
-      }
-    });
-  } else {
-    var newRowValues = headers.map(function(h) {
-      var key = String(h).trim();
-      return record[key] !== undefined ? record[key] : '';
-    });
-    sheet.appendRow(newRowValues);
-  }
-
-  if (typeof writeAuditLog_ === 'function') {
-    writeAuditLog_(
-      ctx,
-      existingRowIndex > 0 ? 'UPDATE_ESCALATION' : 'CREATE_ESCALATION',
-      'Escalations',
-      record.Project_ID,
-      null,
-      record,
-      (existingRowIndex > 0 ? 'Updated' : 'Created') + ' escalation ' + record.Escalation_ID
-    );
-  }
-
-  return apiGetEscalationsData(activeProjectId);
-
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-// ============================================================================
-// PHASE 19: SNAPSHOT ARCHIVING & REPORTING TEMPLATES
-// ============================================================================
-
-var PHASE19_HEADERS_ = [
-  'Snapshot_ID',
-  'Project_ID',
-  'Label',
-  'Captured_By',
-  'Captured_At',
-  'Total_Budget',
-  'Total_Committed',
-  'Total_Actual',
-  'Budget_Variance',
-  'Open_Escalations',
-  'Overdue_Items',
-  'High_Alerts',
-  'Notes'
-];
-
-function resolvePhase19TabName_() {
-  var tabs = (typeof DB_CONFIG !== 'undefined' && DB_CONFIG.TABS) ? DB_CONFIG.TABS : {};
-  return tabs.PMO_SNAPSHOTS || tabs.SNAPSHOTS || 'PMO_Snapshots';
-}
-
-function ensurePhase19Sheet_() {
-  var ss = getMasterSpreadsheet_();
-  var tabName = resolvePhase19TabName_();
-  var sheet = ss.getSheetByName(tabName);
-  if (!sheet) {
-    sheet = ss.insertSheet(tabName);
-    sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
-    return sheet;
-  }
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
-  }
-  return sheet;
-}
-
-function readPhase19RowsSafe_() {
-  try {
-    var ss = getMasterSpreadsheet_();
-    var tabName = resolvePhase19TabName_();
-    var sheet = ss.getSheetByName(tabName);
-    if (!sheet || sheet.getLastRow() < 2) return [];
-    return getTableRecords_(tabName).map(function(r) {
-      var copy = Object.assign({}, r);
-      delete copy._rowIndex;
-      return copy;
-    });
-  } catch (e) {
-    return [];
-  }
-}
-
-function computePhase19CurrentMetrics_(pid) {
-  var execData = (typeof apiGetExecutiveDashboardData === 'function')
-    ? apiGetExecutiveDashboardData(pid)
-    : { summary: {}, projectRows: [] };
-
-  var alertData = (typeof apiGetAlertThresholdsData === 'function')
-    ? apiGetAlertThresholdsData(pid, { maxAllocPct: 100, budgetWarnPct: 85 })
-    : { alerts: [], counts: { high: 0 } };
-
-  var schedData = (typeof apiGetScheduleRiskData === 'function')
-    ? apiGetScheduleRiskData(pid, { lookaheadDays: 7 })
-    : { items: [], counts: { overdue: 0 } };
-
-  var escData = (typeof apiGetEscalationsData === 'function')
-    ? apiGetEscalationsData(pid)
-    : { escalations: [], counts: { open: 0 } };
-
-  var budget = 0;
-  var committed = 0;
-  var actual = 0;
-  var variance = 0;
-
-  if (pid && execData.projectRows && execData.projectRows.length) {
-    var match = execData.projectRows.find(function(p) {
-      return String(p.projectId || p.Project_ID || '').trim() === pid;
-    });
-    if (match) {
-      budget = Number(match.budget || match.Budget_Amount || 0);
-      committed = Number(match.committed || match.Committed_Amount || 0);
-      actual = Number(match.actual || match.Actual_Spend || 0);
-      variance = Number((budget - actual).toFixed(2));
-    }
-  }
-
-  if (!pid || (budget === 0 && actual === 0 && execData.summary)) {
-    var s = execData.summary || {};
-    budget = Number(s.portfolioBudget || 0);
-    committed = Number(s.portfolioCommitted || 0);
-    actual = Number(s.portfolioActual || 0);
-    variance = Number(s.portfolioVariance !== undefined ? s.portfolioVariance : (budget - actual)).toFixed(2);
-    variance = Number(variance);
-  }
-
-  var overdueCount = (schedData.counts && schedData.counts.overdue !== undefined)
-    ? Number(schedData.counts.overdue)
-    : (schedData.items || []).filter(function(i) {
-        return i.riskLevel === 'OVERDUE' && (!pid || i.projectId === pid);
-      }).length;
-
-  var highAlertsCount = (alertData.counts && alertData.counts.high !== undefined)
-    ? Number(alertData.counts.high)
-    : (alertData.alerts || []).filter(function(a) {
-        return a.severity === 'HIGH' && (!pid || String(a.projectId || '').indexOf(pid) !== -1);
-      }).length;
-
-  var openEscCount = (escData.counts && escData.counts.open !== undefined)
-    ? Number(escData.counts.open)
-    : (escData.escalations || []).filter(function(e) {
-        return String(e.Status || '').toUpperCase() !== 'RESOLVED' && (!pid || e.Project_ID === pid);
-      }).length;
-
-  return {
-    totalBudget: Number(budget.toFixed(2)),
-    totalCommitted: Number(committed.toFixed(2)),
-    totalActual: Number(actual.toFixed(2)),
-    budgetVariance: Number(variance.toFixed(2)),
-    openEscalations: openEscCount,
-    overdueItems: overdueCount,
-    highAlerts: highAlertsCount
-  };
-}
-
-/**
- * Returns saved PMO snapshots visible to the current user along with current
- * baseline metrics for comparison.
- */
-function apiGetSnapshotsAndTemplatesData(activeProjectId) {
-  var pid = activeProjectId ? String(activeProjectId).trim() : '';
-  assertPrivilegedManagementRole_(pid || null);
-  var ctx = assertPermission_('Projects', 'view', pid || null);
-
-  var allProjs = (typeof safePhase11Records_ === 'function')
-    ? safePhase11Records_(resolvePhase11TabName_('projects'))
-    : [];
-  var visibleIds = new Set();
-  allProjs.forEach(function(p) {
-    var k = String(p.Project_ID || '').trim();
-    if (k && (ctx.isGlobalViewer || ctx.assignedProjectIds.includes(k))) {
-      visibleIds.add(k);
-    }
-  });
-
-  var rows = readPhase19RowsSafe_().filter(function(r) {
-    var rPid = String(r.Project_ID || '').trim();
-    if (!rPid || rPid === 'PORTFOLIO') return true;
-    return visibleIds.has(rPid);
-  }).reverse();
-
-  var current = computePhase19CurrentMetrics_(pid);
-
-  return {
-    success: true,
-    activeProjectId: pid,
-    current: current,
-    snapshots: rows.slice(0, 30)
-  };
-}
-
-/**
- * Captures and persists a point-in-time PMO snapshot in the spreadsheet.
- */
-function apiCapturePmoSnapshot(payload, activeProjectId) {
-  var p = payload || {};
-  var targetPid = String(p.Project_ID || activeProjectId || '').trim();
-  assertPrivilegedManagementRole_(targetPid || null);
-  var ctx = assertPermission_('Projects', 'edit', targetPid || null);
-
-  var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var metrics = computePhase19CurrentMetrics_(targetPid);
   var metrics = computePhase19CurrentMetrics_(targetPid);
 
   var now = new Date();
@@ -4341,15 +4094,11 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
+  var lock = LockService.getScriptLock();
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    sheet.appendRow(rowValues);
-    if (typeof invalidateTableCache_ === 'function') invalidateTableCache_(resolvePhase19TabName_());
+    insertRecord_(resolvePhase19TabName_(), record);
   } finally {
     lock.releaseLock();
   }
@@ -4979,7 +4728,7 @@ function apiArchiveClientPresentation(deckId, activeProjectId) {
   try {
     assertPrivilegedManagementRole_(pid);
     const ctx = assertPermission_('Projects', 'edit', pid);
-    const sh = ensureClientPresentationsSheet_();
+    ensureClientPresentationsSheet_();
     const records = readSheetObjectsSafe_(CLIENT_DECKS_SHEET_);
     const deck = records.find(d => String(d.Deck_ID) === deckKey && String(d.Project_ID) === pid);
     if (!deck) throw new Error('Presentation not found in this project.');
@@ -5140,21 +4889,21 @@ function apiGenerateClientPresentation(config) {
   writeLock.waitLock(15000);
   try {
     const sh = ensureClientPresentationsSheet_();
-    sh.appendRow([
-    deckId,
-    pid,
-    deckTitle,
-    focusScope,
-    JSON.stringify(selectedWbsIds),
-    audienceTone,
-    customPrompt,
-    JSON.stringify(fullDeckPayload),
-    shareToken,
-    actor,
-    nowIso,
-    nowIso,
-    'PUBLISHED'
-    ]);
+    insertRecord_(CLIENT_DECKS_SHEET_, {
+      Deck_ID: deckId,
+      Project_ID: pid,
+      Deck_Title: deckTitle,
+      Focus_Scope: focusScope,
+      Selected_WBS_JSON: JSON.stringify(selectedWbsIds),
+      Audience_Tone: audienceTone,
+      Custom_Prompt: customPrompt,
+      Deck_JSON: JSON.stringify(fullDeckPayload),
+      Share_Token: shareToken,
+      Created_By: actor,
+      Created_At: nowIso,
+      Updated_At: nowIso,
+      Status: 'PUBLISHED'
+    });
   } finally {
     writeLock.releaseLock();
   }
