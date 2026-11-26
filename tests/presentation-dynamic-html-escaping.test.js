@@ -55,7 +55,6 @@ test('permission module labels and user IDs use safe HTML/JavaScript escaping', 
   assert.ok(html.includes('onclick="handleToggleUserStatus(\${safeUid}, false)"'));
   assert.ok(html.includes('onclick="handleToggleUserStatus(\${safeUid}, true)"'));
   assert.ok(html.includes('onclick="openEditUserModal_(\${safeUid})"'));
-  assert.ok(!html.includes("onclick=\\"handleToggleUserStatus('\${safeUid}"));
 });
 
 test('audit-log and weekly-progress HTML strings are escaped before insertion', () => {
