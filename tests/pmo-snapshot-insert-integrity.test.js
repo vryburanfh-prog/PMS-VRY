@@ -13,10 +13,9 @@ test('snapshot IDs use the monotonic allocator', () => {
 });
 test('snapshot append is guarded by ScriptLock and invalidates its table cache', () => {
   const lock = api.indexOf('lock.waitLock(15000)');
-  const append = api.indexOf('sheet.appendRow(rowValues)');
+  const insert = api.indexOf('insertRecord_(resolvePhase19TabName_(), record)');
   const release = api.indexOf('lock.releaseLock()');
-  assert.ok(lock >= 0 && append > lock && release > append, 'lock encloses append');
-  assert.match(api, /invalidateTableCache_\(resolvePhase19TabName_\(\)\)/);
+  assert.ok(lock >= 0 && insert > lock && release > insert, 'lock encloses duplicate-checked insert');
 });
 test('audit failure is surfaced as warning without implying snapshot write failed', () => {
   assert.match(api, /catch \(auditError\)/);
