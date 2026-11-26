@@ -21,11 +21,11 @@ Create and authorize OAuth locally. Prefer an account with access only to the te
 
 ## Apps Script prerequisites
 1. Copy the spreadsheet and bound Apps Script project. Use synthetic data only.
-2. Ensure the copied project is associated with a Google Cloud project as needed.
-3. Enable the Apps Script API.
-4. Configure API execution in the manifest and deploy as an API executable.
+2. Create/use a **standard Google Cloud project** (not the default Apps Script-managed project) and associate the copied script with it. The Apps Script project and OAuth client used by `clasp` must share this Cloud project.
+3. Enable the Apps Script API in that Cloud project and configure the OAuth consent screen/client. The OAuth client should be a Desktop application for the local authorization flow.
+4. In the test project's manifest, configure API execution access as `MYSELF` (only the deploying owner can execute). Deploy as an API executable. Do not use anonymous access. Google documents the API executable access modes and requirements in its official docs.
 5. Copy `docs/modernization/apps-script-runtime-test-harness-template.gs` into the isolated test project (not production). It checks allocator uniqueness/monotonicity, reconciliation against a synthetic high ID, and duplicate insert rejection.
-6. Run the test entrypoint locally once and verify it targets the test copy before configuring GitHub credentials.
+6. Authorize `clasp` locally using the OAuth client and project scopes, then run the test entrypoint locally once and verify it targets the test copy before configuring GitHub credentials. The token/refresh token is sensitive and grants access as your Google account.
 
 ## Run
 1. Open the repository Actions tab.
@@ -46,4 +46,4 @@ Missing secrets produce a notice and a blocked/no-execution exit. That is **not*
 True lock contention requires multiple independent API executions launched concurrently. The workflow's single invocation is a smoke/integration runner only; a separate concurrency driver will be added after the test entrypoint is installed and authorized.
 
 ## Cost and security
-Expected to stay within GitHub Actions free quota and Apps Script quotas. This creates no paid deployment and makes no production changes. OAuth tokens are sensitive; revoke/rotate if exposed and remove the repository secrets when no longer required.
+Expected to stay within GitHub Actions free quota and Apps Script quotas. This creates no paid deployment and makes no production changes. **Security note:** the OAuth secret in GitHub Actions can act as the authorized account; limit repository access, keep the test script API executable restricted to `MYSELF`, do not grant Apps Script API project-edit access unless separately needed, and revoke/rotate credentials if exposed. Remove repository secrets when no longer required.
