@@ -1614,7 +1614,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
       tbody.innerHTML = baselines.map(b => `
         <tr>
           <td class="py-1.5 px-3 font-mono">${escapeHtmlSafe_(b.Baseline_ID)}</td>
-          <td class="py-1.5 px-3 font-bold">Rev ${b.Revision_Number}</td>
+          <td class="py-1.5 px-3 font-bold">Rev ${escapeHtmlSafe_(b.Revision_Number)}</td>
           <td class="py-1.5 px-3 font-medium">${escapeHtmlSafe_(b.Baseline_Name)}</td>
           <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_By || '-')}</td>
           <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_Date || '-')}</td>
