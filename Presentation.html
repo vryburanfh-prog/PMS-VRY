@@ -2213,7 +2213,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             const p = res.context.permissions[mod];
             return `
               <tr>
-                <td class="py-2 px-3 font-medium">${mod}</td>
+                <td class="py-2 px-3 font-medium">${escapeHtmlSafe_(mod)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.view)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.create)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.edit)}</td>
@@ -7102,11 +7102,11 @@ function canManageProject_() {
           ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Active</span>'
           : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">Inactive</span>';
 
-        const safeUid = uid.replace(/'/g, "\\'");
+        const safeUid = safeJsArg_(uid);
         const statusAction = isActive
-          ? `<button type="button" onclick="handleToggleUserStatus('${safeUid}', false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
-          : `<button type="button" onclick="handleToggleUserStatus('${safeUid}', true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
-        const actionBtn = `<button type="button" onclick="openEditUserModal_('${safeUid}')" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${statusAction}`;
+          ? `<button type="button" onclick="handleToggleUserStatus(${safeUid}, false)" class="text-xs font-semibold text-rose-600 hover:underline">Deactivate</button>`
+          : `<button type="button" onclick="handleToggleUserStatus(${safeUid}, true)" class="text-xs font-semibold text-emerald-700 hover:underline">Activate</button>`;
+        const actionBtn = `<button type="button" onclick="openEditUserModal_(${safeUid})" class="text-xs font-semibold text-indigo-700 hover:underline mr-2">Edit</button>${statusAction}`;
 
         return `
           <tr class="hover:bg-slate-50">
