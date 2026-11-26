@@ -149,6 +149,7 @@ function syncUserProjectAssignments_(userRecord, requestedProjectIds, actorCtx) 
     const pid = String(a.Project_ID || '').trim();
     if (desired.indexOf(pid) === -1) assignmentUpdates.push({ id:a.Assignment_ID, updates:{ Assignment_Status:'Inactive', Is_Active:'FALSE', Last_Updated:now } });
   });
+  // Reserve IDs individually so a batch can be allocated before its single insert.
   const newAssignments = [];
   desired.forEach(function (pid) {
     if (activeByProject[pid]) {
