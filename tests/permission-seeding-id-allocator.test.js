@@ -14,3 +14,11 @@ test('permission seeding allocates IDs through the shared lock-protected allocat
   assert.match(seed, /insertRecord_\(DB_CONFIG\.TABS\.ROLE_PERMISSIONS,\s*patch\)/);
   assert.doesNotMatch(seed, /maxId\s*\+\+|padStart\(4,\s*'0'\)/);
 });
+
+test('permission seeding serializes its read-modify-insert loop', () => {
+  const lock = seed.indexOf('lock.waitLock(15000)');
+  const read = seed.indexOf('getCachedTableRecords_(DB_CONFIG.TABS.ROLE_PERMISSIONS)');
+  const loop = seed.indexOf('REQUIRED_SYSTEM_ROLES.forEach');
+  const release = seed.indexOf('lock.releaseLock()');
+  assert.ok(lock >= 0 && read > lock && loop > read && release > loop, 'seed is serialized from initial read through all inserts');
+});
