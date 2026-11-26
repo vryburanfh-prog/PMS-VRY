@@ -20,21 +20,10 @@ concurrency:
 
 jobs:
   runtime-tests:
+    if: ${{ secrets.GAS_TEST_SCRIPT_ID != '' && secrets.GAS_TEST_SPREADSHEET_ID != '' && secrets.GAS_CLASPRC_JSON != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check required secrets
-        env:
-          SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
-          SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
-          CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
-        run: |
-          if [ -z "$SCRIPT_ID" ] || [ -z "$SPREADSHEET_ID" ] || [ -z "$CLASPRC" ]; then
-            echo "::notice::Blocked: set GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, GAS_CLASPRC_JSON. No Apps Script call was attempted."
-            exit 0
-          fi
-          echo "Required credentials and test target configured."
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -50,7 +39,6 @@ jobs:
           printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
           printf '{"scriptId":"%s"}\n' "$SCRIPT_ID" > .clasp.json
-          echo "TEST_SPREADSHEET_ID=$SPREADSHEET_ID" >> "$GITHUB_ENV"
           npm install --global @google/clasp
 
       - name: Run isolated Apps Script suite
@@ -61,7 +49,20 @@ jobs:
           set -euo pipefail
           clasp run-function "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
 
-      - name: Upload result artifact
+      - name: Validate suite result is PASS
+        run: |
+          node -e '
+            const fs = require("fs");
+            const result = JSON.parse(fs.readFileSync("gas-runtime-result.json", "utf8"));
+            if (result.error) throw new Error("Apps Script execution error: " + JSON.stringify(result.error));
+            const payload = result.response?.result;
+            if (!payload || payload.status !== "PASS") {
+              throw new Error("Test entrypoint must return {status:\"PASS\"}; actual result: " + JSON.stringify(payload));
+            }
+            console.log("Apps Script test suite reported PASS.");
+          '
+
+      - name: Upload runtime result
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -69,3 +70,14 @@ jobs:
           path: gas-runtime-result.json
           if-no-files-found: ignore
           retention-days: 7
+
+  missing-secrets-notice:
+    if: ${{ secrets.GAS_TEST_SCRIPT_ID == '' || secrets.GAS_TEST_SPREADSHEET_ID == '' || secrets.GAS_CLASPRC_JSON == '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Report blocked setup
+        run: |
+          echo "::notice::Integration run blocked: configure GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, and GAS_CLASPRC_JSON repository secrets."
+          echo "No Apps Script call was made. This blocked run is not a passing test."
