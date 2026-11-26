@@ -691,7 +691,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
   document.getElementById('ws-project-id').textContent = proj.Project_ID + ' • ' + (proj.Project_Category || 'General');
   document.getElementById('ws-project-name').textContent = proj.Project_Name;
   document.getElementById('ws-project-meta').textContent =
-    `Client: ${escapeHtmlSafe_(proj.Client || '-')} | PM: ${escapeHtmlSafe_(proj.Project_Manager || '-')} | Location: ${proj.Project_Location || '-'}`;
+    `Client: ${proj.Client || '-'} | PM: ${proj.Project_Manager || '-'} | Location: ${proj.Project_Location || '-'}`;
   document.getElementById('ws-status-badge').textContent = proj.Project_Status || 'Active';
   document.getElementById('ws-health-badge').textContent = proj.Project_Health || 'On Track';
   document.getElementById('ws-tab-heading').textContent = tabName;
@@ -1966,7 +1966,7 @@ html[data-theme="light"] body { background-color: #f1f5f9; color: #1e293b; }
             <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Health || '-')}</td>
             <td class="py-2 px-3">${p.Overall_Actual_Progress || 0}% / ${p.Overall_Planned_Progress || 0}%</td>
             <td class="py-2 px-3 text-right space-x-2">
-              <button onclick='startEditProject(${escapeHtmlSafe_(JSON.stringify(p))})' class="text-indigo-600 hover:underline font-medium">Edit</button>
+              <button onclick='startEditProject(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(p)))}))' class="text-indigo-600 hover:underline font-medium">Edit</button>
               <button onclick="archiveProject(${safeJsArg_(p.Project_ID)}, ${!archived})" class="text-amber-700 hover:underline font-medium">${archived ? 'Restore' : 'Archive'}</button>
             </td>
           </tr>
@@ -5821,7 +5821,7 @@ function safeDeckShareUrl_(value) {
                     <span class="font-semibold text-slate-900">${escapeHtmlSafe_(cand.title)}</span>
                     <span class="text-[11px] text-slate-500 ml-1">(${escapeHtmlSafe_(cand.projectId || '-')})</span>
                   </div>
-                  <button type="button" onclick='promoteCandidateToEscalation_(${escapeHtmlSafe_(JSON.stringify(cand))})'
+                  <button type="button" onclick='promoteCandidateToEscalation_(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(cand)))}))'
                     class="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold shrink-0">
                     + Escalate
                   </button>
@@ -5868,8 +5868,8 @@ function safeDeckShareUrl_(value) {
                           <td class="py-2 px-3">${escapeHtmlSafe_(row.Owner_Email || '')}</td>
                           <td class="py-2 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${stBadge}">${escapeHtmlSafe_(stUpper)}</span></td>
                           <td class="py-2 px-3 whitespace-nowrap space-x-1">
-                            <button type="button" onclick='editEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})' class="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-[11px]">Edit</button>
-                            ${stUpper !== 'RESOLVED' ? `<button type="button" onclick='resolveEscalationRow_(${escapeHtmlSafe_(JSON.stringify(row))})' class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold">Resolve</button>` : ''}
+                            <button type="button" onclick='editEscalationRow_(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(row)))}))' class="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-100 text-[11px]">Edit</button>
+                            ${stUpper !== 'RESOLVED' ? `<button type="button" onclick='resolveEscalationRow_(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(row)))}))' class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold">Resolve</button>` : ''}
                           </td>
                         </tr>
                       `;
@@ -6413,7 +6413,7 @@ function safeDeckShareUrl_(value) {
                         </td>
                         <td class="py-2 px-3 whitespace-nowrap">
                           ${typeof openEscalationsModal === 'function'
-                            ? `<button type="button" onclick='escalateWorkItem_(${escapeHtmlSafe_(JSON.stringify(it))})' class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-semibold">+ Escalate</button>`
+                            ? `<button type="button" onclick='escalateWorkItem_(JSON.parse(${escapeHtmlSafe_(JSON.stringify(JSON.stringify(it)))}))' class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-semibold">+ Escalate</button>`
                             : '—'}
                         </td>
                       </tr>
