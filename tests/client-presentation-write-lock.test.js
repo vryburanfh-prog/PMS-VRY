@@ -10,10 +10,9 @@ test('client presentation persistence is serialized without locking AI generatio
  const lock=body.indexOf('LockService.getScriptLock()');
  const wait=body.indexOf('writeLock.waitLock(15000)');
  const ensure=body.indexOf('ensureClientPresentationsSheet_()');
- const append=body.indexOf('sh.appendRow(');
- const release=body.indexOf('writeLock.releaseLock()');
- assert.ok(ai>=0&&lock>ai,'external AI deck generation occurs before lock');
- assert.ok(wait>lock&&ensure>wait&&append>ensure,'sheet initialization and append protected');
+ const insert=body.indexOf('insertRecord_(CLIENT_DECKS_SHEET_,');
+ assert.ok(wait>lock&&ensure>wait&&insert>ensure,'sheet initialization and duplicate-checked insert protected');
+ assert.ok(release>insert,'release after insert');
  assert.ok(release>append,'release after append');
  assert.match(body,/finally\s*\{[\s\S]*?writeLock\.releaseLock\(\);?\s*\}/);
  assert.match(body,/const deckId = generateNextId_\(CLIENT_DECKS_SHEET_, 'Deck_ID', 'DECK', 5\)/,'deck IDs use the monotonic allocator');
