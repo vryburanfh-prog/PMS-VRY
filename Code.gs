@@ -4316,7 +4316,6 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
   var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   var metrics = computePhase19CurrentMetrics_(targetPid);
 
   var now = new Date();
@@ -4341,15 +4340,10 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
   try {
-    sheet.appendRow(rowValues);
-    if (typeof invalidateTableCache_ === 'function') invalidateTableCache_(resolvePhase19TabName_());
+    insertRecord_(resolvePhase19TabName_(), record);
   } finally {
     lock.releaseLock();
   }
@@ -5139,22 +5133,22 @@ function apiGenerateClientPresentation(config) {
   const writeLock = LockService.getScriptLock();
   writeLock.waitLock(15000);
   try {
-    const sh = ensureClientPresentationsSheet_();
-    sh.appendRow([
-    deckId,
-    pid,
-    deckTitle,
-    focusScope,
-    JSON.stringify(selectedWbsIds),
-    audienceTone,
-    customPrompt,
-    JSON.stringify(fullDeckPayload),
-    shareToken,
-    actor,
-    nowIso,
-    nowIso,
-    'PUBLISHED'
-    ]);
+    ensureClientPresentationsSheet_();
+    insertRecord_(CLIENT_DECKS_SHEET_, {
+      Deck_ID: deckId,
+      Project_ID: pid,
+      Deck_Title: deckTitle,
+      Focus_Scope: focusScope,
+      Selected_WBS_JSON: JSON.stringify(selectedWbsIds),
+      Audience_Tone: audienceTone,
+      Custom_Prompt: customPrompt,
+      Deck_JSON: JSON.stringify(fullDeckPayload),
+      Share_Token: shareToken,
+      Created_By: actor,
+      Created_At: nowIso,
+      Updated_At: nowIso,
+      Status: 'PUBLISHED'
+    });
   } finally {
     writeLock.releaseLock();
   }
