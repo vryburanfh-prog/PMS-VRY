@@ -13,6 +13,7 @@ test('dynamic project, registry, WBS, progress and report strings are HTML escap
     "escapeHtmlSafe_(p.Project_Location || '-')",
     "escapeHtmlSafe_(p.Project_Status || '-')",
     "escapeHtmlSafe_(p.Project_Health || '-')",
+    "escapeHtmlSafe_(b.Revision_Number)",
     "escapeHtmlSafe_(b.Remarks || '-')",
     "escapeHtmlSafe_(f.label)",
     "escapeHtmlSafe_(c.label)",
