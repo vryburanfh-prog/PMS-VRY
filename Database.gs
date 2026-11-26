@@ -323,6 +323,7 @@ function deleteRecordById_(tabName, idColumn, recordId) {
 
 /**
  * Allocate a monotonic record ID under the Apps Script global lock.
+ * Every allocated table/ID column must be registered in PRIMARY_KEY_COLUMNS_BY_TAB_.
  * The persisted counter prevents two callers from receiving the same ID even
  * when neither has inserted its record yet. Reconcile with the live sheet each
  * time so imports/manual edits that advance the sequence are respected.
