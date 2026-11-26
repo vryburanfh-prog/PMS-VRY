@@ -72,3 +72,47 @@ test('allocator fails closed for missing sheet or primary-key header', () => {
   const bad = harness({ headers: ['Name'], ids: [] });
   assert.throws(() => bad.allocate('Projects', 'Project_ID', 'PRJ', 3), /column.*missing/);
 });
+
+test('all ID allocator call sites are covered by the primary-key registry', () => {
+  const code = fs.readFileSync('Code.gs', 'utf8');
+  const security = fs.readFileSync('Security.gs', 'utf8');
+  const primaryStart = databaseSource.indexOf('const PRIMARY_KEY_COLUMNS_BY_TAB_ = {');
+  const primaryEnd = databaseSource.indexOf('\\n};', primaryStart);
+  assert.ok(primaryStart >= 0 && primaryEnd > primaryStart, 'primary-key registry boundaries exist');
+  const primaryBlock = databaseSource.slice(primaryStart, primaryEnd);
+  const primaryKeys = {};
+  for (const match of primaryBlock.matchAll(/([A-Za-z_]+):\\s*'([A-Za-z_]+)'/g)) primaryKeys[match[1]] = match[2];
+
+  const tabsStart = databaseSource.indexOf('TABS: {');
+  const tabsEnd = databaseSource.indexOf('\\n  }\\n};', tabsStart);
+  assert.ok(tabsStart >= 0 && tabsEnd > tabsStart, 'database table map boundaries exist');
+  const tableNames = {};
+  for (const match of databaseSource.slice(tabsStart, tabsEnd).matchAll(/([A-Z_]+):\\s*'([^']+)'/g)) tableNames[match[1]] = match[2];
+
+  const staticCalls = [code, security].flatMap(source => Array.from(source.matchAll(/generateNextId_\\(\\s*DB_CONFIG\\.TABS\\.([A-Z_]+)\\s*,\\s*['"]([^'"]+)['"]/g), m => ({ tabKey:m[1], idColumn:m[2] })));
+  for (const call of staticCalls) {
+    const table = tableNames[call.tabKey];
+    assert.ok(table, 'table constant resolves: ' + call.tabKey);
+    assert.equal(primaryKeys[table], call.idColumn, table + ' must map ' + call.idColumn);
+  }
+
+  const dynamicPairs = [
+    ['Role_Permissions', 'Permission_ID'],
+    ['Procurement_Logistics', 'Procurement_ID'],
+    ['Financial_Monitoring', 'Financial_ID'],
+    ['Escalations', 'Escalation_ID'],
+    ['PMO_Snapshots', 'Snapshot_ID'],
+    ['Client_Presentations', 'Deck_ID']
+  ];
+  dynamicPairs.forEach(([table, column]) => assert.equal(primaryKeys[table], column, table + ' must map ' + column));
+
+  const registryStart = code.indexOf('const CONTROLS_REGISTRY_CONFIG = {');
+  const registryEnd = code.indexOf('\\n};', registryStart);
+  assert.ok(registryStart >= 0 && registryEnd > registryStart, 'controls registry boundaries exist');
+  const registry = code.slice(registryStart, registryEnd);
+  for (const match of registry.matchAll(/['"]([^'"]+)['"]:\s*\\{[\\s\\S]*?tab:\s*DB_CONFIG\\.TABS\\.([A-Z_]+),[\\s\\S]*?idCol:\s*'([^']+)'/g)) {
+    const table = tableNames[match[2]];
+    assert.ok(table, 'registry table resolves: ' + match[2]);
+    assert.equal(primaryKeys[table], match[3], match[1] + ' registry must map ' + match[3]);
+  }
+});
