@@ -12,9 +12,12 @@ function block(src, name) {
 }
 test('archive presentation requires project edit permission and uses script lock', () => {
   const body = block(code, 'apiArchiveClientPresentation');
-  assert.ok(body.includes('assertPermission_(\'Projects\', \'edit\', pid)'));
-  assert.ok(body.includes('getScriptLock()'));
-  assert.ok(body.includes('lock.waitLock(15000)'));
+  const lock = body.indexOf('LockService.getScriptLock()');
+  const wait = body.indexOf('lock.waitLock(15000)');
+  const roleCheck = body.indexOf('assertPrivilegedManagementRole_(pid)');
+  const permissionCheck = body.indexOf("assertPermission_('Projects', 'edit', pid)");
+  assert.ok(lock >= 0 && wait > lock, 'acquires script lock');
+  assert.ok(roleCheck > wait && permissionCheck > roleCheck, 'authorization checks run inside the lock');
   assert.equal((body.match(/finally/g) || []).length, 1);
   assert.equal((body.match(/lock\.releaseLock\(\)/g) || []).length, 1);
   assert.ok(body.includes('lock.releaseLock()'));
