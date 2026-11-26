@@ -3905,7 +3905,7 @@ function runScheduledPmoDigestTrigger_() {
       : { digestText: 'Scheduled PMO Digest' };
 
     var toList = cfg.recipients
-      .split(/[,;\\s]+/)
+      .split(/[,;\s]+/)
       .map(function(s) { return s.trim(); })
       .filter(Boolean);
 
