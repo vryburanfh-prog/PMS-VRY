@@ -30,10 +30,11 @@ function phase1RuntimeIntegrationTestSuite(expectedSpreadsheetId) {
     for (let i = 0; i < 10; i++) {
       ids.push(generateNextId_(tabName, 'Test_ID', 'PH1RT', 6));
     }
-    assert_(new Set(ids).size === ids.length, 'allocator returns distinct IDs');
+    assert_(new Set(ids).size === ids.length,
+      'allocator returns distinct IDs; actual allocations: ' + JSON.stringify(ids));
     const suffixes = ids.map(id => Number(id.split('-').pop()));
     assert_(suffixes.every((value, i) => i === 0 || value > suffixes[i - 1]),
-      'allocated suffixes are strictly increasing');
+      'allocated suffixes are strictly increasing; actual suffixes: ' + JSON.stringify(suffixes));
     tests.push({name: 'allocator uniqueness/monotonicity', status: 'PASS', allocated: ids.length});
 
     sheet.getRange(2, 1, 1, 2).setValues([['PH1RT-900000', 'synthetic-high-watermark']]);
