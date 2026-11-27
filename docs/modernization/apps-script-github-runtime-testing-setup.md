@@ -1,6 +1,6 @@
 # Google Apps Script Runtime Tests — GitHub Actions Setup
 
-Workflow is manual-only (`workflow_dispatch`). It does not run on PRs, deploy, or push code to Apps Script; it calls a test entrypoint in a separately configured test project.
+Workflow supports manual dispatch and a narrowly scoped push trigger when this workflow file itself changes on the Phase 1 branch. It does not automatically synchronize repository source into Apps Script. `clasp run` calls the separately configured Apps Script test project; it does not upload the files in this repository.
 
 ## Safety
 - Use a copied Apps Script project and spreadsheet with synthetic data only.
