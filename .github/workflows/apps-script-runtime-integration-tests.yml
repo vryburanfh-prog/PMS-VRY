@@ -1,11 +1,6 @@
 name: Apps Script Runtime Integration Tests
 
 on:
-  push:
-    branches:
-      - pms-modernization/phase1-id-uniqueness-enforcement
-    paths:
-      - '.github/workflows/apps-script-runtime-integration-tests.yml'
   workflow_dispatch:
     inputs:
       test_suite:
@@ -83,12 +78,84 @@ jobs:
             const fs = require("fs");
             const result = JSON.parse(fs.readFileSync("gas-runtime-result.json", "utf8"));
             if (result.error) throw new Error("Apps Script execution error: " + JSON.stringify(result.error));
-            // clasp --json emits the Apps Script return value directly as "response".
             const payload = result.response?.result ?? result.response ?? result.result;
             if (!payload || payload.status !== "PASS") {
               throw new Error("Test entrypoint must return {status:\"PASS\"}; actual result: " + JSON.stringify(payload));
             }
-            console.log("Apps Script test suite reported PASS.");
+            console.log("Apps Script sequential runtime suite reported PASS.");
+          '
+
+      - name: Prepare parallel duplicate-insert test
+        if: steps.secrets-check.outputs.configured == 'true'
+        env:
+          TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-parallel-results
+          clasp run phase1RuntimePrepareDuplicateRace --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > runtime-parallel-results/prepare.json
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("runtime-parallel-results/prepare.json", "utf8"));
+            const p = r.response?.result ?? r.response ?? r.result;
+            if (!p || p.status !== "READY") throw new Error("Parallel duplicate-race preparation failed: " + JSON.stringify(p));
+          '
+
+      - name: Run 10 parallel allocator invocations
+        if: steps.secrets-check.outputs.configured == 'true'
+        env:
+          TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+        run: |
+          set -euo pipefail
+          pids=()
+          for i in $(seq 1 10); do
+            clasp run phase1RuntimeParallelAllocatorProbe --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > "runtime-parallel-results/allocator-$i.json" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          node -e '
+            const fs = require("fs");
+            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^allocator-\\d+\\.json$/.test(x));
+            if (files.length !== 10) throw new Error("Expected 10 allocator responses; found " + files.length);
+            const ids = files.map(f => {
+              const r = JSON.parse(fs.readFileSync("runtime-parallel-results/" + f, "utf8"));
+              const p = r.response?.result ?? r.response ?? r.result;
+              if (!p || p.status !== "PASS" || !p.id) throw new Error("Allocator probe failed in " + f + ": " + JSON.stringify(p));
+              return p.id;
+            });
+            if (new Set(ids).size !== 10) throw new Error("Parallel allocator returned duplicate IDs: " + JSON.stringify(ids));
+            console.log("10 parallel allocator invocations returned distinct IDs: " + JSON.stringify(ids));
+          '
+
+      - name: Run 10 parallel duplicate-insert invocations
+        if: steps.secrets-check.outputs.configured == 'true'
+        env:
+          TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+        run: |
+          set -euo pipefail
+          pids=()
+          for i in $(seq 1 10); do
+            clasp run phase1RuntimeDuplicateInsertProbe --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > "runtime-parallel-results/duplicate-$i.json" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          clasp run phase1RuntimeVerifyAndCleanupDuplicateRace --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > runtime-parallel-results/verify-cleanup.json
+          node -e '
+            const fs = require("fs");
+            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^duplicate-\\d+\\.json$/.test(x));
+            if (files.length !== 10) throw new Error("Expected 10 duplicate-insert responses; found " + files.length);
+            const statuses = files.map(f => {
+              const r = JSON.parse(fs.readFileSync("runtime-parallel-results/" + f, "utf8"));
+              const p = r.response?.result ?? r.response ?? r.result;
+              if (!p || !["INSERTED", "REJECTED"].includes(p.status)) throw new Error("Duplicate probe failed in " + f + ": " + JSON.stringify(p));
+              return p.status;
+            });
+            const inserted = statuses.filter(x => x === "INSERTED").length;
+            const rejected = statuses.filter(x => x === "REJECTED").length;
+            const v = JSON.parse(fs.readFileSync("runtime-parallel-results/verify-cleanup.json", "utf8"));
+            const vp = v.response?.result ?? v.response ?? v.result;
+            if (inserted !== 1 || rejected !== 9 || !vp || vp.status !== "PASS" || vp.retainedCount !== 1) {
+              throw new Error("Parallel duplicate-insert race failed: " + JSON.stringify({inserted,rejected,verification:vp}));
+            }
+            console.log("Parallel duplicate-insert race passed: one insert accepted, nine rejected.");
           '
 
       - name: Upload runtime result
@@ -96,6 +163,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apps-script-runtime-test-result
-          path: gas-runtime-result.json
+          path: |\n            gas-runtime-result.json\n            runtime-parallel-results/*.json
           if-no-files-found: ignore
           retention-days: 7
