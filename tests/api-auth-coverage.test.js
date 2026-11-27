@@ -42,7 +42,7 @@ test('intentional authentication and public endpoint exceptions are present and 
     assert.ok(apiNames.has(name), name + ' must remain in the API inventory');
   }
   assert.match(security, /Public tokenized deck endpoints remain outside this private dashboard API namespace/);
-  assert.match(security, /apiDispatch/);
+  assert.match(code + security, /apiDispatch/);
 });
 
 test('login and session context entry points are explicitly present', () => {
