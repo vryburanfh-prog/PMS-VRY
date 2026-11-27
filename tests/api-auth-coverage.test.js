@@ -24,7 +24,9 @@ const allowlist = new Set([...allowlistMatch[1].matchAll(/['"](api\w+)['"]/g)].m
 
 test('API inventory and authentication allowlist are synchronized', () => {
   const expected = new Set([...apiNames].filter(name => !intentionalExceptions.has(name)));
-  assert.deepEqual([...expected].sort(), [...allowlist].sort(),
+  const missing = [...expected].filter(name => !allowlist.has(name)).sort();
+  const unexpected = [...allowlist].filter(name => !apiNames.has(name)).sort();
+  assert.deepEqual({ missing, unexpected }, { missing: [], unexpected: [] },
     'every private API must be allowlisted and every allowlist entry must resolve to an API function');
 });
 
