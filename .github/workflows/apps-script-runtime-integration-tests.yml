@@ -62,6 +62,63 @@ jobs:
           printf '{"scriptId":"%s","projectId":"%s"}\n' "$SCRIPT_ID" "$PROJECT_ID" > .clasp.json
           npm install --global @google/clasp
 
+      - name: Sync Phase 1 source and update isolated API executable
+        if: steps.secrets-check.outputs.configured == 'true'
+        env:
+          SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
+          PROJECT_ID: ${{ secrets.GAS_TEST_GCP_PROJECT_ID }}
+          CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
+          DEPLOYMENT_ID_OVERRIDE: ${{ secrets.GAS_TEST_DEPLOYMENT_ID }}
+        run: |
+          set -euo pipefail
+          PROJECT_DIR="$RUNNER_TEMP/gas-test-project"
+          mkdir -p "$PROJECT_DIR"
+          printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","projectId":"%s"}\\n' "$SCRIPT_ID" "$PROJECT_ID" > "$PROJECT_DIR/.clasp.json"
+
+          # Pull the complete isolated project first so unrelated test-project files are preserved.
+          cd "$PROJECT_DIR"
+          clasp pull
+          test -f Database.gs || { echo "::error::Isolated project did not contain Database.gs; refusing to push."; exit 1; }
+
+          # Replace only the Phase 1 database source and runtime harness from this branch.
+          cp "$GITHUB_WORKSPACE/Database.gs" "$PROJECT_DIR/Database.gs"
+          cp "$GITHUB_WORKSPACE/docs/modernization/apps-script-runtime-test-harness-template.gs" "$PROJECT_DIR/Phase1RuntimeTestHarness.gs"
+          grep -q "function phase1RuntimeVerifyAndCleanupDuplicateRace" "$PROJECT_DIR/Phase1RuntimeTestHarness.gs"
+          grep -q "function generateNextId_" "$PROJECT_DIR/Database.gs"
+
+          # Push the pulled project plus the two updated files to the isolated script only.
+          clasp push --force
+
+          VERSION_OUTPUT="$(clasp version "Phase 1 runtime test source ${GITHUB_SHA}")"
+          echo "$VERSION_OUTPUT"
+          VERSION="$(printf '%s\\n' "$VERSION_OUTPUT" | sed -nE 's/.*version ([0-9]+).*/\\1/p' | tail -n 1)"
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine the newly created Apps Script version."
+            exit 1
+          fi
+
+          DEPLOYMENTS="$(clasp deployments)"
+          echo "$DEPLOYMENTS"
+          if [ -n "$DEPLOYMENT_ID_OVERRIDE" ]; then
+            TARGET_DEPLOYMENT="$DEPLOYMENT_ID_OVERRIDE"
+          else
+            # Prefer a deployment explicitly labelled API Executable.
+            TARGET_DEPLOYMENT="$(printf '%s\\n' "$DEPLOYMENTS" | awk '/API Executable/ { for (i=1; i<=NF; i++) if ($i ~ /^AKfy/) { print $i; count++ } } END { if (count != 1) exit 1 }')" || true
+            if [ -z "$TARGET_DEPLOYMENT" ]; then
+              # Safe fallback only when the project has exactly one deployment.
+              TARGET_DEPLOYMENT="$(printf '%s\\n' "$DEPLOYMENTS" | awk '/^[[:space:]]*-[[:space:]]+AKfy/ { print $2; count++ } END { if (count != 1) exit 1 }')" || true
+            fi
+          fi
+          if [ -z "$TARGET_DEPLOYMENT" ]; then
+            echo "::error::Could not uniquely identify the API Executable deployment. Add the exact deployment ID as GAS_TEST_DEPLOYMENT_ID; source has been pushed and versioned but not deployed."
+            exit 1
+          fi
+
+          clasp deploy -i "$TARGET_DEPLOYMENT" -V "$VERSION" -d "Phase 1 runtime integration tests"
+          echo "Updated isolated API executable deployment $TARGET_DEPLOYMENT to version $VERSION."
+
       - name: Run isolated Apps Script suite
         if: steps.secrets-check.outputs.configured == 'true'
         env:
