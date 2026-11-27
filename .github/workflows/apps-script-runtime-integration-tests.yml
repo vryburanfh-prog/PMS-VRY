@@ -28,11 +28,12 @@ jobs:
         env:
           SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
           SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
+          PROJECT_ID: ${{ secrets.GAS_TEST_GCP_PROJECT_ID }}
           CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
         run: |
-          if [ -z "$SCRIPT_ID" ] || [ -z "$SPREADSHEET_ID" ] || [ -z "$CLASPRC" ]; then
+          if [ -z "$SCRIPT_ID" ] || [ -z "$SPREADSHEET_ID" ] || [ -z "$PROJECT_ID" ] || [ -z "$CLASPRC" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Blocked: configure GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, and GAS_CLASPRC_JSON. No Google API call was attempted."
+            echo "::notice::Blocked: configure GAS_TEST_SCRIPT_ID, GAS_TEST_SPREADSHEET_ID, GAS_TEST_GCP_PROJECT_ID, and GAS_CLASPRC_JSON. No Google API call was attempted."
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
@@ -53,11 +54,12 @@ jobs:
         if: steps.secrets-check.outputs.configured == 'true'
         env:
           SCRIPT_ID: ${{ secrets.GAS_TEST_SCRIPT_ID }}
+          PROJECT_ID: ${{ secrets.GAS_TEST_GCP_PROJECT_ID }}
           CLASPRC: ${{ secrets.GAS_CLASPRC_JSON }}
         run: |
           printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
-          printf '{"scriptId":"%s"}\n' "$SCRIPT_ID" > .clasp.json
+          printf '{"scriptId":"%s","projectId":"%s"}\n' "$SCRIPT_ID" "$PROJECT_ID" > .clasp.json
           npm install --global @google/clasp
 
       - name: Run isolated Apps Script suite
