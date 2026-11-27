@@ -67,7 +67,7 @@ jobs:
           TEST_FUNCTION: ${{ inputs.test_suite }}
         run: |
           set -euo pipefail
-          clasp run-function "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
+          clasp run-function "$TEST_FUNCTION" --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json | tee gas-runtime-result.json
 
       - name: Validate suite result is PASS
         if: steps.secrets-check.outputs.configured == 'true'
@@ -76,9 +76,10 @@ jobs:
             const fs = require("fs");
             const result = JSON.parse(fs.readFileSync("gas-runtime-result.json", "utf8"));
             if (result.error) throw new Error("Apps Script execution error: " + JSON.stringify(result.error));
-            const payload = result.response?.result;
+            // clasp --json emits the Apps Script return value directly as "response".
+            const payload = result.response;
             if (!payload || payload.status !== "PASS") {
-              throw new Error("Test entrypoint must return {status:\"PASS\"}; actual result: " + JSON.stringify(payload));
+              throw new Error("Test entrypoint must return {status:\\"PASS\\"}; actual result: " + JSON.stringify(payload));
             }
             console.log("Apps Script test suite reported PASS.");
           '
