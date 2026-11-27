@@ -163,6 +163,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: apps-script-runtime-test-result
-          path: |\n            gas-runtime-result.json\n            runtime-parallel-results/*.json
+          path: |
+            gas-runtime-result.json
+            runtime-parallel-results/*.json
           if-no-files-found: ignore
           retention-days: 7
