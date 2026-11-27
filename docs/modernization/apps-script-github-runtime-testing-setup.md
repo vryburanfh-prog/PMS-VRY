@@ -1,6 +1,6 @@
 # Google Apps Script Runtime Tests — GitHub Actions Setup
 
-Workflow supports manual dispatch and a narrowly scoped push trigger when this workflow file itself changes on the Phase 1 branch. It does not automatically synchronize repository source into Apps Script. `clasp run` calls the separately configured Apps Script test project; it does not upload the files in this repository.
+Workflow is manual-dispatch only. It does not automatically synchronize repository source into Apps Script. `clasp run` calls the separately configured Apps Script test project; it does not upload the files in this repository.
 
 ## Safety
 - Use a copied Apps Script project and spreadsheet with synthetic data only.
@@ -48,7 +48,7 @@ Missing secrets produce a notice and a blocked/no-execution exit. That is **not*
 - Permission seeding idempotency/race
 - Lock release after controlled failures
 
-True lock contention requires multiple independent API executions launched concurrently. The updated harness now contains probe entrypoints for parallel ID allocation and duplicate insertion; the GitHub Actions concurrency driver will be added after these updated functions are installed and redeployed in the isolated test project.
+The manual workflow first runs the sequential smoke suite, then launches ten independent `clasp run` invocations concurrently for ID allocation and ten concurrently for duplicate insertion. It verifies ten distinct allocated IDs and exactly one accepted / nine rejected duplicate insert attempts. The parallel driver requires the updated harness functions to be installed and included in the isolated API executable deployment before the workflow is run.
 
 ## Cost and security
 Expected to stay within GitHub Actions free quota and Apps Script quotas. This creates no paid deployment and makes no production changes. **Security note:** the OAuth secret in GitHub Actions can act as the authorized account; limit repository access, keep the test script API executable restricted to `MYSELF`, do not grant Apps Script API project-edit access unless separately needed, and revoke/rotate credentials if exposed. Remove repository secrets when no longer required.
