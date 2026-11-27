@@ -4136,7 +4136,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
-    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900),
+    Snapshot_ID: '',
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
     Captured_By: actor,
@@ -4151,11 +4151,32 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
-  sheet.appendRow(rowValues);
+  // Serialize ID allocation and append so concurrent captures cannot reuse an ID.
+  var snapshotLock = LockService.getScriptLock();
+  snapshotLock.waitLock(30000);
+  try {
+    var idPrefix = 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-';
+    var existingIds = [];
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      existingIds = sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) {
+        return String(r[0] || '').trim();
+      });
+    }
+    var snapshotId;
+    do {
+      snapshotId = idPrefix + Math.floor(100000 + Math.random() * 900000);
+    } while (existingIds.indexOf(snapshotId) !== -1);
+    record.Snapshot_ID = snapshotId;
+
+    var rowValues = headers.map(function(h) {
+      var key = String(h).trim();
+      return record[key] !== undefined ? record[key] : '';
+    });
+    sheet.appendRow(rowValues);
+  } finally {
+    snapshotLock.releaseLock();
+  }
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(
