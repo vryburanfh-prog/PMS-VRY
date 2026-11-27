@@ -126,7 +126,8 @@ jobs:
           TEST_FUNCTION: ${{ inputs.test_suite || 'phase1RuntimeIntegrationTestSuite' }}
         run: |
           set -euo pipefail
-          clasp run "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
+          PARAMS="$(node -e 'process.stdout.write(JSON.stringify([process.env.TEST_SPREADSHEET_ID]))')"
+          clasp run "$TEST_FUNCTION" --params "$PARAMS" --json | tee gas-runtime-result.json
 
       - name: Validate suite result is PASS
         if: steps.secrets-check.outputs.configured == 'true'
@@ -148,8 +149,9 @@ jobs:
           TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
         run: |
           set -euo pipefail
+          PARAMS="$(node -e 'process.stdout.write(JSON.stringify([process.env.TEST_SPREADSHEET_ID]))')"
           mkdir -p runtime-parallel-results
-          clasp run phase1RuntimePrepareDuplicateRace --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > runtime-parallel-results/prepare.json
+          clasp run phase1RuntimePrepareDuplicateRace --params "$PARAMS" --json > runtime-parallel-results/prepare.json
           node -e '
             const r = JSON.parse(require("fs").readFileSync("runtime-parallel-results/prepare.json", "utf8"));
             const p = r.response?.result ?? r.response ?? r.result;
@@ -162,9 +164,10 @@ jobs:
           TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
         run: |
           set -euo pipefail
+          PARAMS="$(node -e 'process.stdout.write(JSON.stringify([process.env.TEST_SPREADSHEET_ID]))')"
           pids=()
           for i in $(seq 1 10); do
-            clasp run phase1RuntimeParallelAllocatorProbe --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > "runtime-parallel-results/allocator-$i.json" &
+            clasp run phase1RuntimeParallelAllocatorProbe --params "$PARAMS" --json > "runtime-parallel-results/allocator-$i.json" &
             pids+=("$!")
           done
           for pid in "${pids[@]}"; do wait "$pid"; done
@@ -188,13 +191,14 @@ jobs:
           TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
         run: |
           set -euo pipefail
+          PARAMS="$(node -e 'process.stdout.write(JSON.stringify([process.env.TEST_SPREADSHEET_ID]))')"
           pids=()
           for i in $(seq 1 10); do
-            clasp run phase1RuntimeDuplicateInsertProbe --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > "runtime-parallel-results/duplicate-$i.json" &
+            clasp run phase1RuntimeDuplicateInsertProbe --params "$PARAMS" --json > "runtime-parallel-results/duplicate-$i.json" &
             pids+=("$!")
           done
           for pid in "${pids[@]}"; do wait "$pid"; done
-          clasp run phase1RuntimeVerifyAndCleanupDuplicateRace --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > runtime-parallel-results/verify-cleanup.json
+          clasp run phase1RuntimeVerifyAndCleanupDuplicateRace --params "$PARAMS" --json > runtime-parallel-results/verify-cleanup.json
           node -e '
             const fs = require("fs");
             const files = fs.readdirSync("runtime-parallel-results").filter(x => /^duplicate-\d+\.json$/.test(x));
