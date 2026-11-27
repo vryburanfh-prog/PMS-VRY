@@ -1,6 +1,11 @@
 name: Apps Script Runtime Integration Tests
 
 on:
+  push:
+    branches:
+      - pms-modernization/phase1-id-uniqueness-enforcement
+    paths:
+      - '.github/workflows/apps-script-runtime-integration-tests.yml'
   workflow_dispatch:
     inputs:
       test_suite:
@@ -66,7 +71,7 @@ jobs:
         if: steps.secrets-check.outputs.configured == 'true'
         env:
           TEST_SPREADSHEET_ID: ${{ secrets.GAS_TEST_SPREADSHEET_ID }}
-          TEST_FUNCTION: ${{ inputs.test_suite }}
+          TEST_FUNCTION: ${{ inputs.test_suite || 'phase1RuntimeIntegrationTestSuite' }}
         run: |
           set -euo pipefail
           clasp run "$TEST_FUNCTION" --params "[\"$TEST_SPREADSHEET_ID\"]" --json | tee gas-runtime-result.json
