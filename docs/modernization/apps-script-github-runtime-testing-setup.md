@@ -1,6 +1,6 @@
 # Google Apps Script Runtime Tests — GitHub Actions Setup
 
-Workflow is manual-dispatch only. It does not automatically synchronize repository source into Apps Script. `clasp run` calls the separately configured Apps Script test project; it does not upload the files in this repository.
+Workflow is manual-dispatch only. Before testing, it authenticates to the isolated Apps Script project, pulls the current remote project, replaces only `Database.gs` and `Phase1RuntimeTestHarness.gs` from this branch, pushes the project, creates a new Apps Script version, and updates the existing API Executable deployment. It then runs the sequential and parallel runtime checks. The workflow does not touch the production script or spreadsheet.
 
 ## Safety
 - Use a copied Apps Script project and spreadsheet with synthetic data only.
@@ -16,7 +16,7 @@ Open repository Settings → Secrets and variables → Actions and create:
 | `GAS_TEST_SCRIPT_ID` | ID of the isolated Apps Script test project (the script ID from its editor URL) |
 | `GAS_TEST_SPREADSHEET_ID` | ID of the isolated test spreadsheet bound to that test project |
 | `GAS_TEST_GCP_PROJECT_ID` | **Project ID** of the standard Google Cloud project associated with the test script (not the Apps Script script ID or the project number) |
-| `GAS_CLASPRC_JSON` | Contents of locally authorized `~/.clasprc.json` for an account permitted to run the test |
+| `GAS_CLASPRC_JSON` | Contents of locally authorized `~/.clasprc.json` for an account permitted to run the test |\n| `GAS_TEST_DEPLOYMENT_ID` | Optional but recommended: exact deployment ID of the isolated API Executable. If omitted, the workflow selects a uniquely labelled API Executable deployment, or falls back only when the project has exactly one deployment. |
 
 Create and authorize OAuth locally. Prefer an account with access only to the test copy where feasible. Use a separate OAuth client/token. Keep Actions secrets access restricted.
 
@@ -48,7 +48,7 @@ Missing secrets produce a notice and a blocked/no-execution exit. That is **not*
 - Permission seeding idempotency/race
 - Lock release after controlled failures
 
-The manual workflow first runs the sequential smoke suite, then launches ten independent `clasp run` invocations concurrently for ID allocation and ten concurrently for duplicate insertion. It verifies ten distinct allocated IDs and exactly one accepted / nine rejected duplicate insert attempts. The parallel driver requires the updated harness functions to be installed and included in the isolated API executable deployment before the workflow is run.
+The workflow first synchronizes and deploys the current Phase 1 source, then runs the sequential smoke suite. It launches ten independent `clasp run` invocations concurrently for ID allocation and ten concurrently for duplicate insertion. It verifies ten distinct allocated IDs and exactly one accepted / nine rejected duplicate insert attempts.
 
 ## Cost and security
 Expected to stay within GitHub Actions free quota and Apps Script quotas. This creates no paid deployment and makes no production changes. **Security note:** the OAuth secret in GitHub Actions can act as the authorized account; limit repository access, keep the test script API executable restricted to `MYSELF`, do not grant Apps Script API project-edit access unless separately needed, and revoke/rotate credentials if exposed. Remove repository secrets when no longer required.
