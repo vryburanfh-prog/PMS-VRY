@@ -75,7 +75,7 @@ jobs:
           mkdir -p "$PROJECT_DIR"
           printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
           chmod 600 "$HOME/.clasprc.json"
-          printf '{"scriptId":"%s","projectId":"%s"}\\n' "$SCRIPT_ID" "$PROJECT_ID" > "$PROJECT_DIR/.clasp.json"
+          printf '{"scriptId":"%s","projectId":"%s"}\n' "$SCRIPT_ID" "$PROJECT_ID" > "$PROJECT_DIR/.clasp.json"
 
           # Pull the complete isolated project first so unrelated test-project files are preserved.
           cd "$PROJECT_DIR"
@@ -93,7 +93,7 @@ jobs:
 
           VERSION_OUTPUT="$(clasp version "Phase 1 runtime test source ${GITHUB_SHA}")"
           echo "$VERSION_OUTPUT"
-          VERSION="$(printf '%s\\n' "$VERSION_OUTPUT" | sed -nE 's/.*version ([0-9]+).*/\\1/p' | tail -n 1)"
+          VERSION="$(printf '%s\n' "$VERSION_OUTPUT" | sed -nE 's/.*version ([0-9]+).*/\1/p' | tail -n 1)"
           if [ -z "$VERSION" ]; then
             echo "::error::Could not determine the newly created Apps Script version."
             exit 1
@@ -105,10 +105,10 @@ jobs:
             TARGET_DEPLOYMENT="$DEPLOYMENT_ID_OVERRIDE"
           else
             # Prefer a deployment explicitly labelled API Executable.
-            TARGET_DEPLOYMENT="$(printf '%s\\n' "$DEPLOYMENTS" | awk '/API Executable/ { for (i=1; i<=NF; i++) if ($i ~ /^AKfy/) { print $i; count++ } } END { if (count != 1) exit 1 }')" || true
+            TARGET_DEPLOYMENT="$(printf '%s\n' "$DEPLOYMENTS" | awk '/API Executable/ { for (i=1; i<=NF; i++) if ($i ~ /^AKfy/) { print $i; count++ } } END { if (count != 1) exit 1 }')" || true
             if [ -z "$TARGET_DEPLOYMENT" ]; then
               # Safe fallback only when the project has exactly one deployment.
-              TARGET_DEPLOYMENT="$(printf '%s\\n' "$DEPLOYMENTS" | awk '/^[[:space:]]*-[[:space:]]+AKfy/ { print $2; count++ } END { if (count != 1) exit 1 }')" || true
+              TARGET_DEPLOYMENT="$(printf '%s\n' "$DEPLOYMENTS" | awk '/^[[:space:]]*-[[:space:]]+AKfy/ { print $2; count++ } END { if (count != 1) exit 1 }')" || true
             fi
           fi
           if [ -z "$TARGET_DEPLOYMENT" ]; then
@@ -170,7 +170,7 @@ jobs:
           for pid in "${pids[@]}"; do wait "$pid"; done
           node -e '
             const fs = require("fs");
-            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^allocator-\\d+\\.json$/.test(x));
+            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^allocator-\d+\.json$/.test(x));
             if (files.length !== 10) throw new Error("Expected 10 allocator responses; found " + files.length);
             const ids = files.map(f => {
               const r = JSON.parse(fs.readFileSync("runtime-parallel-results/" + f, "utf8"));
@@ -197,7 +197,7 @@ jobs:
           clasp run phase1RuntimeVerifyAndCleanupDuplicateRace --params "[\\"$TEST_SPREADSHEET_ID\\"]" --json > runtime-parallel-results/verify-cleanup.json
           node -e '
             const fs = require("fs");
-            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^duplicate-\\d+\\.json$/.test(x));
+            const files = fs.readdirSync("runtime-parallel-results").filter(x => /^duplicate-\d+\.json$/.test(x));
             if (files.length !== 10) throw new Error("Expected 10 duplicate-insert responses; found " + files.length);
             const statuses = files.map(f => {
               const r = JSON.parse(fs.readFileSync("runtime-parallel-results/" + f, "utf8"));
