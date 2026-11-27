@@ -13,8 +13,9 @@ Open repository Settings → Secrets and variables → Actions and create:
 
 | Secret | Value |
 |---|---|
-| `GAS_TEST_SCRIPT_ID` | ID of the isolated Apps Script test project |
-| `GAS_TEST_SPREADSHEET_ID` | ID of the isolated test spreadsheet |
+| `GAS_TEST_SCRIPT_ID` | ID of the isolated Apps Script test project (the script ID from its editor URL) |
+| `GAS_TEST_SPREADSHEET_ID` | ID of the isolated test spreadsheet bound to that test project |
+| `GAS_TEST_GCP_PROJECT_ID` | **Project ID** of the standard Google Cloud project associated with the test script (not the Apps Script script ID or the project number) |
 | `GAS_CLASPRC_JSON` | Contents of locally authorized `~/.clasprc.json` for an account permitted to run the test |
 
 Create and authorize OAuth locally. Prefer an account with access only to the test copy where feasible. Use a separate OAuth client/token. Keep Actions secrets access restricted.
@@ -24,8 +25,12 @@ Create and authorize OAuth locally. Prefer an account with access only to the te
 2. Create/use a **standard Google Cloud project** (not the default Apps Script-managed project) and associate the copied script with it. The Apps Script project and OAuth client used by `clasp` must share this Cloud project.
 3. Enable the Apps Script API in that Cloud project and configure the OAuth consent screen/client. The OAuth client should be a Desktop application for the local authorization flow.
 4. In the test project's manifest, configure API execution access as `MYSELF` (only the deploying owner can execute). Deploy as an API executable. Do not use anonymous access. Google documents the API executable access modes and requirements in its official docs.
-5. Copy `docs/modernization/apps-script-runtime-test-harness-template.gs` into the isolated test project (not production). It checks allocator uniqueness/monotonicity, reconciliation against a synthetic high ID, and duplicate insert rejection.
-6. Authorize `clasp` locally using the OAuth client and project scopes, then run the test entrypoint locally once and verify it targets the test copy before configuring GitHub credentials. The token/refresh token is sensitive and grants access as your Google account.
+5. Synchronize the Phase 1 runtime dependencies into the isolated test project only:
+   - Replace/create `Database.gs` using the exact file from the Phase 1 branch in this repository. This file contains `generateNextId_`, `insertRecord_`, `getMasterSpreadsheet_`, and `PRIMARY_KEY_COLUMNS_BY_TAB_` used by the runtime checks.
+   - Add `docs/modernization/apps-script-runtime-test-harness-template.gs` as a script file in that same isolated project. It defines `phase1RuntimeIntegrationTestSuite`.
+   - Do not copy the whole web app or production project settings for this smoke test. Do not make these changes in the production Apps Script project.
+6. Save the project, then update its API executable deployment so the deployed version includes the saved source. The GitHub workflow invokes the deployed function with `clasp run`; it does not push files or update deployments.
+7. Authorize `clasp` locally using the OAuth client and project scopes, then run the test entrypoint locally once and verify it targets the isolated spreadsheet before configuring GitHub credentials. The token/refresh token is sensitive and grants access as your Google account.
 
 ## Run
 1. Open the repository Actions tab.
