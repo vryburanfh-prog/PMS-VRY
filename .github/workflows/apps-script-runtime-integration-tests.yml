@@ -71,6 +71,11 @@ jobs:
           DEPLOYMENT_ID_OVERRIDE: ${{ secrets.GAS_TEST_DEPLOYMENT_ID }}
         run: |
           set -euo pipefail
+          EXPECTED_TEST_SCRIPT_ID="1O0bY2ceFtzR1t-7M-QLfKQxuWTKtcDALK0Tqn4k7AehmU2DnJKjNFcwS"
+          if [ "$SCRIPT_ID" != "$EXPECTED_TEST_SCRIPT_ID" ]; then
+            echo "::error::Safety stop: GAS_TEST_SCRIPT_ID is not the known isolated Phase 1 test project. No Apps Script project was pulled or changed."
+            exit 1
+          fi
           PROJECT_DIR="$RUNNER_TEMP/gas-test-project"
           mkdir -p "$PROJECT_DIR"
           printf '%s' "$CLASPRC" > "$HOME/.clasprc.json"
