@@ -27,7 +27,7 @@ Create and authorize OAuth locally. Prefer an account with access only to the te
 4. In the test project's manifest, configure API execution access as `MYSELF` (only the deploying owner can execute). Deploy as an API executable. Do not use anonymous access. Google documents the API executable access modes and requirements in its official docs.
 5. Synchronize the Phase 1 runtime dependencies into the isolated test project only:
    - Replace/create `Database.gs` using the exact file from the Phase 1 branch in this repository. This file contains `generateNextId_`, `insertRecord_`, `getMasterSpreadsheet_`, and `PRIMARY_KEY_COLUMNS_BY_TAB_` used by the runtime checks.
-   - Add `docs/modernization/apps-script-runtime-test-harness-template.gs` as a script file in that same isolated project. It defines `phase1RuntimeIntegrationTestSuite`.
+   - Add `docs/modernization/apps-script-runtime-test-harness-template.gs` as a script file in that same isolated project. It defines `phase1RuntimeIntegrationTestSuite` plus the parallel probe functions `phase1RuntimeParallelAllocatorProbe`, `phase1RuntimePrepareDuplicateRace`, `phase1RuntimeDuplicateInsertProbe`, and `phase1RuntimeVerifyAndCleanupDuplicateRace`.
    - Do not copy the whole web app or production project settings for this smoke test. Do not make these changes in the production Apps Script project.
 6. Save the project, then update its API executable deployment so the deployed version includes the saved source. The GitHub workflow invokes the deployed function with `clasp run`; it does not push files or update deployments.
 7. Authorize `clasp` locally using the OAuth client and project scopes, then run the test entrypoint locally once and verify it targets the isolated spreadsheet before configuring GitHub credentials. The token/refresh token is sensitive and grants access as your Google account.
@@ -48,7 +48,7 @@ Missing secrets produce a notice and a blocked/no-execution exit. That is **not*
 - Permission seeding idempotency/race
 - Lock release after controlled failures
 
-True lock contention requires multiple independent API executions launched concurrently. The workflow's single invocation is a smoke/integration runner only; a separate concurrency driver will be added after the test entrypoint is installed and authorized.
+True lock contention requires multiple independent API executions launched concurrently. The updated harness now contains probe entrypoints for parallel ID allocation and duplicate insertion; the GitHub Actions concurrency driver will be added after these updated functions are installed and redeployed in the isolated test project.
 
 ## Cost and security
 Expected to stay within GitHub Actions free quota and Apps Script quotas. This creates no paid deployment and makes no production changes. **Security note:** the OAuth secret in GitHub Actions can act as the authorized account; limit repository access, keep the test script API executable restricted to `MYSELF`, do not grant Apps Script API project-edit access unless separately needed, and revoke/rotate credentials if exposed. Remove repository secrets when no longer required.
