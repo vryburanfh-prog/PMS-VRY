@@ -75,3 +75,87 @@ function phase1RuntimeIntegrationTestSuite(expectedSpreadsheetId) {
     sheet.getRange(1, 1, 1, 2).setValues([['Test_ID', 'Test_Marker']]);
   }
 }
+
+/**
+ * Parallel allocator probe.
+ * Invoke this function from multiple independent clasp run executions at once.
+ * The test spreadsheet guard is mandatory; no production spreadsheet is accepted.
+ */
+function phase1RuntimeParallelAllocatorProbe(expectedSpreadsheetId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || !expectedSpreadsheetId || ss.getId() !== String(expectedSpreadsheetId)) {
+    throw new Error('Safety stop: active spreadsheet ID does not match configured test ID.');
+  }
+  const tabName = '__PHASE1_RUNTIME_TESTS';
+  const sheet = ss.getSheetByName(tabName);
+  if (!sheet) throw new Error('Run phase1RuntimeIntegrationTestSuite first to prepare the isolated test tab.');
+  const id = generateNextId_(tabName, 'Test_ID', 'PH1PAR', 6);
+  return { status: 'PASS', id: id, spreadsheetId: ss.getId() };
+}
+
+/**
+ * Prepare a clean synthetic table before launching parallel duplicate-insert probes.
+ * Run exactly once before the parallel calls.
+ */
+function phase1RuntimePrepareDuplicateRace(expectedSpreadsheetId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || !expectedSpreadsheetId || ss.getId() !== String(expectedSpreadsheetId)) {
+    throw new Error('Safety stop: active spreadsheet ID does not match configured test ID.');
+  }
+  const tabName = '__PHASE1_DUPLICATE_RACE';
+  let sheet = ss.getSheetByName(tabName);
+  if (!sheet) sheet = ss.insertSheet(tabName);
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, 2).setValues([['Test_ID', 'Test_Marker']]);
+  return { status: 'READY', spreadsheetId: ss.getId(), tabName: tabName };
+}
+
+/**
+ * Invoke this function from multiple independent clasp run executions at once.
+ * Exactly one execution should insert the shared key; all others should be rejected.
+ */
+function phase1RuntimeDuplicateInsertProbe(expectedSpreadsheetId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || !expectedSpreadsheetId || ss.getId() !== String(expectedSpreadsheetId)) {
+    throw new Error('Safety stop: active spreadsheet ID does not match configured test ID.');
+  }
+  const tabName = '__PHASE1_DUPLICATE_RACE';
+  const sheet = ss.getSheetByName(tabName);
+  if (!sheet) throw new Error('Run phase1RuntimePrepareDuplicateRace first.');
+  PRIMARY_KEY_COLUMNS_BY_TAB_[tabName] = 'Test_ID';
+  const candidate = 'PH1DUP-RACE-000001';
+  try {
+    insertRecord_(tabName, { Test_ID: candidate, Test_Marker: 'parallel-probe' });
+    return { status: 'INSERTED', id: candidate };
+  } catch (error) {
+    const message = String(error && error.message || error);
+    if (/already exists|Duplicate/i.test(message)) return { status: 'REJECTED', id: candidate };
+    throw error;
+  }
+}
+
+/**
+ * Verify the parallel duplicate-insert outcome and clear the synthetic test table.
+ * Run only after all parallel probe executions have completed.
+ */
+function phase1RuntimeVerifyAndCleanupDuplicateRace(expectedSpreadsheetId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || !expectedSpreadsheetId || ss.getId() !== String(expectedSpreadsheetId)) {
+    throw new Error('Safety stop: active spreadsheet ID does not match configured test ID.');
+  }
+  const tabName = '__PHASE1_DUPLICATE_RACE';
+  const sheet = ss.getSheetByName(tabName);
+  if (!sheet) throw new Error('Duplicate-race test tab not found.');
+  const values = sheet.getLastRow() >= 2
+    ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues()
+    : [];
+  const retained = values.filter(row => String(row[0]) === 'PH1DUP-RACE-000001').length;
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, 2).setValues([['Test_ID', 'Test_Marker']]);
+  delete PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
+  if (retained !== 1) {
+    throw new Error('Parallel duplicate-insert assertion failed: expected exactly one retained row, found ' + retained);
+  }
+  return { status: 'PASS', retainedCount: retained, spreadsheetId: ss.getId() };
+}
+
