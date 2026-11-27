@@ -1,0 +1,50 @@
+name: Phase 1 Full Test Suite
+on:
+  pull_request:
+    paths:
+      - 'Code.gs'
+      - 'Database.gs'
+      - 'Security.gs'
+      - 'Presentation.html'
+      - 'tests/**'
+      - '.github/workflows/phase1-full-validation.yml'
+      - '.github/workflows/apps-script-runtime-integration-tests.yml'
+      - 'docs/modernization/apps-script-runtime-test-harness-template.gs'
+      - 'docs/modernization/apps-script-github-runtime-testing-setup.md'
+  push:
+    branches:
+      - 'pms-modernization/**'
+    paths:
+      - 'Code.gs'
+      - 'Database.gs'
+      - 'Security.gs'
+      - 'Presentation.html'
+      - 'tests/**'
+      - '.github/workflows/phase1-full-validation.yml'
+      - '.github/workflows/apps-script-runtime-integration-tests.yml'
+      - 'docs/modernization/apps-script-runtime-test-harness-template.gs'
+      - 'docs/modernization/apps-script-github-runtime-testing-setup.md'
+permissions:
+  contents: read
+concurrency:
+  group: phase1-full-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax-check Apps Script server sources
+        run: |
+          node --check < Code.gs
+          node --check < Database.gs
+          node --check < Security.gs
+      - name: Validate Apps Script runtime workflow YAML and harness syntax
+        run: |
+          ruby -e 'require "yaml"; YAML.parse_file(".github/workflows/apps-script-runtime-integration-tests.yml"); puts "Runtime workflow YAML parses."'
+          node --check < docs/modernization/apps-script-runtime-test-harness-template.gs
+      - name: Run all repository tests
+        run: node --test tests/*.test.js

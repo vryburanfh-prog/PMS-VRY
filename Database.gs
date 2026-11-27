@@ -108,6 +108,57 @@ function getTableRecords_(tabName) {
   return records;
 }
 
+// Primary-key columns for records created through the database insert helpers.
+// Duplicate IDs are rejected while the Script Lock is held, preventing concurrent
+// max+1 generators from silently inserting the same key.
+const PRIMARY_KEY_COLUMNS_BY_TAB_ = {
+  Users: 'User_ID', Auth_Credentials: 'Credential_ID', Auth_Sessions: 'Session_ID', Projects: 'Project_ID', Project_Assignments: 'Assignment_ID', Audit_Logs: 'Audit_ID', Role_Permissions: 'Permission_ID',
+  Main_WBS: 'Main_WBS_ID', Sub_WBS: 'Sub_WBS_ID', Activities_Schedule: 'Activity_ID',
+  Schedule_Dependencies: 'Dependency_ID', Project_Baselines: 'Baseline_ID',
+  Progress_Updates: 'Log_ID', Milestones: 'Milestone_ID', Deliverables: 'Deliverable_ID',
+  Permits: 'Permit_ID', Risks: 'Risk_ID', Issues: 'Issue_ID', Repository_Links: 'Repository_ID',
+  Weekly_Reports: 'Report_ID', Team_Workload: 'Assignment_ID', Approvals: 'Approval_ID',
+  Procurement_Logistics: 'Procurement_ID', Financial_Monitoring: 'Financial_ID', Escalations: 'Escalation_ID', PMO_Snapshots: 'Snapshot_ID', Client_Presentations: 'Deck_ID'
+};
+
+
+/** Validate imported primary-key values before replacing destination rows. */
+function validateImportedPrimaryKeys_(tabName, headers, rows) {
+  const idColumn = PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
+  if (!idColumn) return;
+  const idIndex = headers.indexOf(idColumn);
+  if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from import tab ' + tabName + '.');
+  const seen = new Set();
+  (Array.isArray(rows) ? rows : []).forEach(function(row, rowIndex) {
+    const id = String(row[idIndex] == null ? '' : row[idIndex]).trim();
+    if (!id) throw new Error('Missing ' + idColumn + ' in import tab ' + tabName + ' at source row ' + (rowIndex + 2) + '.');
+    if (seen.has(id)) throw new Error('Duplicate ' + idColumn + ' in import tab ' + tabName + ': ' + id + '.');
+    seen.add(id);
+  });
+}
+
+function assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, records) {
+  const idColumn = PRIMARY_KEY_COLUMNS_BY_TAB_[tabName];
+  if (!idColumn) return;
+  const idIndex = headers.indexOf(idColumn);
+  if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from ' + tabName);
+  const candidateIds = records.map(function(record) { return String(record[idColumn] || '').trim(); });
+  if (candidateIds.some(function(id) { return !id; })) throw new Error('Primary-key value is required for insert into ' + tabName + ' (' + idColumn + ').');
+  if (!candidateIds.length) return;
+  const candidateSet = new Set();
+  candidateIds.forEach(function(id) {
+    if (candidateSet.has(id)) throw new Error('Duplicate ' + idColumn + ' in insert batch: ' + id);
+    candidateSet.add(id);
+  });
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const existing = sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues();
+  existing.forEach(function(row) {
+    const id = String(row[0] || '').trim();
+    if (id && candidateSet.has(id)) throw new Error('Record ID already exists in ' + tabName + ': ' + id + '. Retry the operation.');
+  });
+}
+
 function insertRecord_(tabName, recordObj) {
   // Serialize row appends so simultaneous requests cannot race on the target row.
   const lock = LockService.getScriptLock();
@@ -123,6 +174,7 @@ function insertRecord_(tabName, recordObj) {
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
     if (!headers.some(Boolean)) throw new Error('Database table has an empty header row: ' + tabName);
 
+    assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, [recordObj || {}]);
     const newRow = headers.map(header => recordObj && recordObj[header] !== undefined ? recordObj[header] : '');
     sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([newRow]);
     invalidateTableCache_(tabName);
@@ -146,8 +198,10 @@ function insertRecords_(tabName, records) {
     const lastCol = sheet.getLastColumn();
     if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
     const headers = sheet.getRange(1,1,1,lastCol).getValues()[0].map(h => String(h).trim());
+    assertUniquePrimaryKeyForInsert_(sheet, tabName, headers, list);
     const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
+    invalidateTableCache_(tabName);
     return rows.length;
   } finally { if (ownsLock) lock.releaseLock(); }
 }
@@ -157,6 +211,9 @@ function updateRecordById_(tabName, idColumn, recordId, updatesObj) {
   const ownsLock = !lock.hasLock();
   if (ownsLock) lock.waitLock(10000);
   try {
+    if (updatesObj && Object.prototype.hasOwnProperty.call(updatesObj, idColumn) && String(updatesObj[idColumn] == null ? '' : updatesObj[idColumn]).trim() !== String(recordId == null ? '' : recordId).trim()) {
+      throw new Error('Primary-key changes are not allowed for ' + tabName + ' (' + idColumn + ').');
+    }
     const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
     if (!sheet) throw new Error('Database table not found: ' + tabName);
     const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
@@ -267,22 +324,47 @@ function deleteRecordById_(tabName, idColumn, recordId) {
   }
 }
 
+/**
+ * Allocate a monotonic record ID under the Apps Script global lock.
+ * Every allocated table/ID column must be registered in PRIMARY_KEY_COLUMNS_BY_TAB_.
+ * The persisted counter prevents two callers from receiving the same ID even
+ * when neither has inserted its record yet. Reconcile with the live sheet each
+ * time so imports/manual edits that advance the sequence are respected.
+ */
 function generateNextId_(tabName, idColumn, prefix, padLength) {
-  const records = getTableRecords_(tabName);
-  let maxNum = 0;
-  const regex = new RegExp('^' + prefix + '-(\\d+)$');
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(15000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
+    if (!sheet) throw new Error('Database table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf(idColumn);
+    if (idIndex < 0) throw new Error('Primary-key column "' + idColumn + '" missing from ' + tabName);
 
-  records.forEach(rec => {
-    const val = String(rec[idColumn] || '').trim();
-    const match = val.match(regex);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (num > maxNum) maxNum = num;
+    let maxNum = 0;
+    const marker = String(prefix) + '-';
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().forEach(function(row) {
+        const value = String(row[0] || '').trim();
+        if (!value.startsWith(marker)) return;
+        const suffix = value.slice(marker.length);
+        if (/^\d+$/.test(suffix)) maxNum = Math.max(maxNum, parseInt(suffix, 10) || 0);
+      });
     }
-  });
 
-  const nextNum = String(maxNum + 1).padStart(padLength || 3, '0');
-  return prefix + '-' + nextNum;
+    const propertyKey = 'ID_ALLOCATOR_V1:' + encodeURIComponent(tabName) + ':' + encodeURIComponent(idColumn) + ':' + encodeURIComponent(prefix);
+    const properties = PropertiesService.getScriptProperties();
+    const stored = parseInt(properties.getProperty(propertyKey) || '0', 10);
+    const nextNum = Math.max(maxNum, Number.isFinite(stored) ? stored : 0) + 1;
+    properties.setProperty(propertyKey, String(nextNum));
+    return String(prefix) + '-' + String(nextNum).padStart(padLength || 3, '0');
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
 
 function getNowTimestamp_() {
