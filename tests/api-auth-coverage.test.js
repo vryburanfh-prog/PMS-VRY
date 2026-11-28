@@ -41,7 +41,7 @@ test('intentional authentication and public endpoint exceptions are present and 
   for (const name of intentionalExceptions) {
     assert.ok(apiNames.has(name), name + ' must remain in the API inventory');
   }
-  assert.match(security, /Public tokenized deck endpoints remain outside the private dashboard API namespace/);
+  assert.match(security, /Public tokenized deck endpoints remain outside this private dashboard API namespace/);
   assert.match(code + security, /apiDispatch/);
 });
 
