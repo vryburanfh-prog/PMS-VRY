@@ -23,7 +23,9 @@ test('snapshot capture serializes ID allocation and row insertion with script lo
   assert.ok(appendAt < releaseAt, 'append must occur before lock release');
 });
 
-test('snapshot IDs check existing IDs and use six-digit random suffix', () => {
+test('snapshot IDs check the Snapshot_ID header column and use collision-resistant suffix', () => {
+  assert.match(capture, /headers\.map\(function\(h\) \{ return String\(h\)\.trim\(\); \}\)\.indexOf\('Snapshot_ID'\) \+ 1/);
+  assert.match(capture, /sheet\.getRange\(2, snapshotIdColumn, lastRow - 1, 1\)/);
   assert.match(capture, /existingIds\.indexOf\(snapshotId\) !== -1/);
   assert.match(capture, /Math\.floor\(100000 \+ Math\.random\(\) \* 900000\)/);
   assert.match(capture, /record\.Snapshot_ID = snapshotId/);
