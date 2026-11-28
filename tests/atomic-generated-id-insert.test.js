@@ -56,7 +56,7 @@ test('generated ID and row insertion are performed under one lock; header mappin
   const unlockAt = h.events.indexOf('unlock');
   const invalidateAt = h.events.indexOf('invalidate:Project_Baselines');
   assert.ok(lockAt >= 0 && lockAt < readAt && readAt < writeAt && writeAt < unlockAt);
-  assert.ok(unlockAt < invalidateAt);
+  assert.ok(writeAt < invalidateAt && invalidateAt < unlockAt);
 });
 
 test('lock is released when insertion fails', () => {
