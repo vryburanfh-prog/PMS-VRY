@@ -79,7 +79,7 @@ test('user creation uses atomic generated-ID insert rather than split ID generat
   const start = code.indexOf('function apiCreateUser(');
   const end = code.indexOf('\nfunction ', start + 1);
   const fn = code.slice(start, end < 0 ? code.length : end);
-  assert.match(fn, /insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.USERS, 'User_ID', 'USR', 3, newUser\)/);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser, function(recordObj, headers, rows)"));
   assert.doesNotMatch(fn, /generateNextId_\(DB_CONFIG\.TABS\.USERS/);
 });
 
@@ -249,7 +249,7 @@ test('generated-ID inventory gate: no active legacy allocator call sites in Code
 test('Security generated-ID creation paths use atomic insert helpers', () => {
   const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
   assert.ok(security.includes("insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values)"));
-  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord)"));
+  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows)"));
   assert.equal((security.match(/insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord\)/g) || []).length, 2);
   assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord)"));
   assert.ok(security.includes("Credential_ID: ''"));
