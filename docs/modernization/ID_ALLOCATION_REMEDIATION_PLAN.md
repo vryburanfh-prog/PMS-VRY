@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Inventory completed; atomic helper implemented and two create-only handlers (project baseline and user creation) migrated on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
+**Status:** Inventory completed; atomic helper implemented and three handlers (project baseline, user creation, and weekly-report create path) migrated on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -46,9 +46,9 @@ Do not use a helper that only locks ID generation and then releases before inser
 
 ## Safe rollout sequence
 
-- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated ID, lock/read/write ordering, and lock release on write failure. CI validation is pending. Additional concurrent-request and custom-ID behavior tests remain to be added. User creation migration has a static regression test added; CI is currently running on the latest commit.
-- **Stage A pilot migrations:** `apiCreateProjectBaseline` and `apiCreateUser` now use the atomic helper for generated ID and append. Baseline revision number is still calculated outside the lock and is a separate concurrency issue. User creation still has multi-step side effects (credential creation, admin email registration, project assignment sync) that are not transactional.
-- **Stage B — create-only handlers:** migrate create-only API paths first, where behavior is easiest to isolate.
+- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated ID, lock/read/write ordering, and lock release on write failure. CI validation passed on the previous pilot; the latest weekly-report migration is now queued for CI. Additional concurrent-request and custom-ID behavior tests remain to be added. Static regression checks cover the user and weekly-report migrations.
+- **Stage A pilot migrations:** `apiCreateProjectBaseline`, `apiCreateUser`, and the create branch of `apiSaveWeeklyReport` now use the atomic helper for generated ID and append. Baseline revision number is still calculated outside the lock and is a separate concurrency issue. User creation still has multi-step side effects (credential creation, admin email registration, project assignment sync) that are not transactional.
+- **Stage B — create-only handlers:** create-only paths are mostly covered by pilots; continue with create branches of mixed handlers, keeping update paths unchanged.
 - **Stage C — mixed create/update handlers:** refactor each handler's create branch only; keep update paths unchanged. Preserve permission checks, ownership checks, validation, field allowlists, audit actions, response shape, and ID formats.
 - **Stage D — multi-record/multi-table paths:** handle project creation/creator assignment and activity/dependency creation separately. These operations currently span multiple writes and are not transactionally atomic; the ID race fix must not imply transaction guarantees.
 - **Stage E — inventory gate:** add static coverage proving every generated-ID call site is migrated or explicitly documented as an exception. Run all regression tests and review diffs before requesting merge.
