@@ -103,3 +103,14 @@ test('team workload create path uses atomic ID allocation and preserves update p
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.TEAM_WORKLOAD"));
   assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD"));
 });
+
+
+test('procurement create path uses atomic ID insert while edit path stays intact', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProcurementItem(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(procTab, 'Procurement_ID', 'PRC', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(procTab"));
+  assert.ok(fn.includes("updateRecordById_(procTab, 'Procurement_ID'"));
+});
