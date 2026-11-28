@@ -3536,16 +3536,16 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 mb-1">Responsible Team Lead</label>
-                  <input type="text" id="p8-wk-lead" value="${proj.Project_Manager || ''}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
+                  <input type="text" id="p8-wk-lead" value="${escapeHtmlSafe_(proj.Project_Manager || '')}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
                 </div>
 
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 mb-1">Overall Planned %</label>
-                  <input type="number" step="0.01" min="0" max="100" id="p8-wk-planned" value="${proj.Overall_Planned_Progress || 0}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
+                  <input type="number" step="0.01" min="0" max="100" id="p8-wk-planned" value="${escapeHtmlSafe_(proj.Overall_Planned_Progress || 0)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
                 </div>
                 <div>
                   <label class="block text-[11px] font-semibold text-slate-600 mb-1">Overall Actual %</label>
-                  <input type="number" step="0.01" min="0" max="100" id="p8-wk-actual" value="${proj.Overall_Actual_Progress || 0}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
+                  <input type="number" step="0.01" min="0" max="100" id="p8-wk-actual" value="${escapeHtmlSafe_(proj.Overall_Actual_Progress || 0)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">
                 </div>
                 <div class="md:col-span-2">
                   <label class="block text-[11px] font-semibold text-slate-600 mb-1">Accomplishments This Week</label>
@@ -3601,26 +3601,26 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                   <div>
                     <span class="font-mono text-slate-500 mr-2">${escapeHtmlSafe_(r.Report_ID)}</span>
-                    <strong class="text-slate-900">${r.Reporting_Week || 'Weekly Report'}</strong>
-                    <span class="text-slate-500 ml-2">(${r.Reporting_Period || '-'})</span>
+                    <strong class="text-slate-900">${escapeHtmlSafe_(r.Reporting_Week || 'Weekly Report')}</strong>
+                    <span class="text-slate-500 ml-2">(${escapeHtmlSafe_(r.Reporting_Period || '-')})</span>
                     ${r.Main_WBS_ID ? `<span class="ml-2 px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px]">${escapeHtmlSafe_(r.Main_WBS_ID)}</span>` : ''}
                   </div>
                   <div class="flex items-center gap-3">
-                    <span class="font-semibold text-indigo-700">Planned: ${r.Overall_Planned_Progress || 0}% | Actual: ${r.Overall_Actual_Progress || 0}%</span>
+                    <span class="font-semibold text-indigo-700">Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% | Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%</span>
                     ${st.permissions.weeklyEdit ? `<button onclick="editWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-indigo-600 hover:underline font-medium">Edit</button>` : ''}
                     ${st.permissions.weeklyDelete ? `<button onclick="deleteWeeklyReport(${safeJsArg_(r.Report_ID)})" class="text-rose-600 hover:underline font-medium">Delete</button>` : ''}
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                  <div><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</div>
-                  <div><strong>Ongoing:</strong> ${r.Ongoing_Activities || '-'}</div>
-                  <div><strong>Pending:</strong> ${r.Pending_Activities || '-'}</div>
-                  <div><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</div>
-                  <div><strong>Issues:</strong> ${r.Issues_Encountered || '-'}</div>
-                  <div><strong>Mitigation:</strong> ${r.Mitigation_Measures || '-'}</div>
-                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</div>
+                  <div><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</div>
+                  <div><strong>Ongoing:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</div>
+                  <div><strong>Pending:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</div>
+                  <div><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</div>
+                  <div><strong>Issues:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</div>
+                  <div><strong>Mitigation:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</div>
+                  <div class="md:col-span-2"><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</div>
                 </div>
-                <div class="text-[11px] text-slate-400">Lead: ${r.Responsible_Team_Lead || '-'}${r.Remarks ? ' • Remarks: ' + r.Remarks : ''}</div>
+                <div class="text-[11px] text-slate-400">Lead: ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')} ${r.Remarks ? ' • Remarks: ' + escapeHtmlSafe_(r.Remarks) : ''}</div>
               </div>
             `).join('') : `<div class="p-6 text-center text-slate-400 border border-slate-200 rounded-lg">No weekly reports recorded yet for this project.</div>`}
           </div>
@@ -3760,15 +3760,15 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <tbody>
               ${st.logs.map(l => `
                 <tr>
-                  <td>${l.Log_ID || ''}</td>
-                  <td>${l.Log_Date || ''}</td>
-                  <td>${l.Activity_ID || ''}</td>
-                  <td>${[l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(' / ')}</td>
-                  <td>${l.Quantity_Accomplished || 0}</td>
-                  <td>${l.Reported_Progress_Pct || 0}%</td>
-                  <td>${l.Submitted_By || ''}</td>
-                  <td>${l.Approval_Status || ''}</td>
-                  <td>${l.Notes || ''}</td>
+                  <td>${escapeHtmlSafe_(l.Log_ID || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Log_Date || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Activity_ID || '')}</td>
+                  <td>${escapeHtmlSafe_([l.Main_WBS_ID, l.Sub_WBS_ID].filter(Boolean).join(' / '))}</td>
+                  <td>${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
+                  <td>${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
+                  <td>${escapeHtmlSafe_(l.Submitted_By || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Approval_Status || '')}</td>
+                  <td>${escapeHtmlSafe_(l.Notes || '')}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -3779,16 +3779,16 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           ${st.weeklyReports.map(r => `
             <div style="border:1px solid #cbd5e1;padding:12px;margin-bottom:14px;border-radius:6px;font-size:12px;">
               <div style="font-weight:bold;font-size:14px;margin-bottom:6px;">
-                ${escapeHtmlSafe_(r.Report_ID)} — ${r.Reporting_Week || ''} (${r.Reporting_Period || ''}) | Planned: ${r.Overall_Planned_Progress || 0}% / Actual: ${r.Overall_Actual_Progress || 0}%
+                ${escapeHtmlSafe_(r.Report_ID)} — ${escapeHtmlSafe_(r.Reporting_Week || '')} (${escapeHtmlSafe_(r.Reporting_Period || '')}) | Planned: ${escapeHtmlSafe_(r.Overall_Planned_Progress || 0)}% / Actual: ${escapeHtmlSafe_(r.Overall_Actual_Progress || 0)}%
               </div>
-              <p><strong>Accomplishments:</strong> ${r.Accomplishments || '-'}</p>
-              <p><strong>Ongoing Activities:</strong> ${r.Ongoing_Activities || '-'}</p>
-              <p><strong>Pending Activities:</strong> ${r.Pending_Activities || '-'}</p>
-              <p><strong>Issues Encountered:</strong> ${r.Issues_Encountered || '-'}</p>
-              <p><strong>Mitigation Measures:</strong> ${r.Mitigation_Measures || '-'}</p>
-              <p><strong>Next Steps:</strong> ${r.Next_Steps || '-'}</p>
-              <p><strong>Management Support Needed:</strong> ${r.Management_Support_Needed || '-'}</p>
-              <p style="color:#64748b;"><strong>Lead:</strong> ${r.Responsible_Team_Lead || '-'} | <strong>Remarks:</strong> ${r.Remarks || '-'}</p>
+              <p><strong>Accomplishments:</strong> ${escapeHtmlSafe_(r.Accomplishments || '-')}</p>
+              <p><strong>Ongoing Activities:</strong> ${escapeHtmlSafe_(r.Ongoing_Activities || '-')}</p>
+              <p><strong>Pending Activities:</strong> ${escapeHtmlSafe_(r.Pending_Activities || '-')}</p>
+              <p><strong>Issues Encountered:</strong> ${escapeHtmlSafe_(r.Issues_Encountered || '-')}</p>
+              <p><strong>Mitigation Measures:</strong> ${escapeHtmlSafe_(r.Mitigation_Measures || '-')}</p>
+              <p><strong>Next Steps:</strong> ${escapeHtmlSafe_(r.Next_Steps || '-')}</p>
+              <p><strong>Management Support Needed:</strong> ${escapeHtmlSafe_(r.Management_Support_Needed || '-')}</p>
+              <p style="color:#64748b;"><strong>Lead:</strong> ${escapeHtmlSafe_(r.Responsible_Team_Lead || '-')} | <strong>Remarks:</strong> ${escapeHtmlSafe_(r.Remarks || '-')}</p>
             </div>
           `).join('')}
         `;
@@ -3797,7 +3797,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         <!DOCTYPE html>
         <html>
         <head>
-          <title>${proj.Project_ID || ''} - ${isLogs ? 'Daily Progress Logs' : 'Weekly Reports'}</title>
+          <title>${escapeHtmlSafe_(proj.Project_ID || '')} - ${isLogs ? 'Daily Progress Logs' : 'Weekly Reports'}</title>
           <style>body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; } h1 { margin-bottom: 4px; }
 /* QA remediation: keyboard focus, readable controls, and system dark-mode support. */
 :focus-visible { outline: 3px solid #6366f1 !important; outline-offset: 2px; }
@@ -3814,9 +3814,9 @@ button, input, select, textarea { min-height: 2.25rem; }
 </style>
         </head>
         <body>
-          <h1>${proj.Project_ID || ''} — ${proj.Project_Name || ''}</h1>
+          <h1>${escapeHtmlSafe_(proj.Project_ID || '')} — ${escapeHtmlSafe_(proj.Project_Name || '')}</h1>
           <div style="font-size:12px;color:#475569;margin-bottom:18px;">
-            Client: ${proj.Client || '-'} | PM: ${proj.Project_Manager || '-'} | Planned: ${proj.Overall_Planned_Progress || 0}% | Actual: ${proj.Overall_Actual_Progress || 0}%
+            Client: ${escapeHtmlSafe_(proj.Client || '-')} | PM: ${escapeHtmlSafe_(proj.Project_Manager || '-')} | Planned: ${escapeHtmlSafe_(proj.Overall_Planned_Progress || 0)}% | Actual: ${escapeHtmlSafe_(proj.Overall_Actual_Progress || 0)}%
           </div>
           ${bodyHtml}
           <script>window.onload = function() { window.print(); };<\/script>
