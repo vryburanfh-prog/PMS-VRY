@@ -1326,7 +1326,6 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
     .filter(b => String(b.Project_ID).trim() === pid);
 
   const nextRev = existingBaselines.reduce((max, b) => Math.max(max, Number(b.Revision_Number) || 0), 0) + 1;
-  const baselineId = generateNextId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3);
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   const mainWbs = getTableRecords_(DB_CONFIG.TABS.MAIN_WBS).filter(r => String(r.Project_ID).trim() === pid);
@@ -1343,7 +1342,7 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   };
 
   const record = {
-    Baseline_ID: baselineId,
+    Baseline_ID: '',
     Project_ID: pid,
     Revision_Number: nextRev,
     Baseline_Name: String(baselineName || ('Baseline Rev ' + nextRev)).trim(),
@@ -1353,7 +1352,7 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
     Remarks: String(remarks || '').trim()
   };
 
-  insertRecord_(DB_CONFIG.TABS.BASELINES, record);
+  const baselineId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record);
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
   return { success: true, baseline: record };
