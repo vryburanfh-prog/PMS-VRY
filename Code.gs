@@ -1232,129 +1232,153 @@ function wouldCreateDependencyCycle_(projectId, predecessorId, successorId) {
 }
 
 function apiSaveActivity(payload) {
-  const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
-  const isUpdate = Boolean(existing);
-  if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
-  const ctx = assertScheduleActivityPermission_(payload.Project_ID, isUpdate ? 'edit' : 'create', existing);
-  // Preserve fields not exposed by the current edit form.
-  if (isUpdate) payload = Object.assign({}, existing, payload);
-
-  if (!payload.Project_ID || !String(payload.Activity_Name || '').trim()) {
-    throw new Error('Project ID and Activity Name are required.');
-  }
-  let activityMain = null;
-  let activitySub = null;
-  if (payload.Main_WBS_ID) {
-    activityMain = findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID);
-    assertRecordProjectOwnership_(activityMain, payload.Project_ID, 'Activity Main WBS');
-  }
-  if (payload.Sub_WBS_ID) {
-    activitySub = findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID);
-    assertRecordProjectOwnership_(activitySub, payload.Project_ID, 'Activity Sub WBS');
-    if (payload.Main_WBS_ID && String(activitySub.Parent_Main_WBS_ID || '') !== String(payload.Main_WBS_ID)) throw new Error('Selected Sub WBS does not belong to the selected Main WBS.');
-    if (!payload.Main_WBS_ID) payload.Main_WBS_ID = String(activitySub.Parent_Main_WBS_ID || '');
-  }
-  // A schedule activity may be assigned at either of the two WBS tiers.
-  // Main WBS is mandatory and Sub WBS is optional, allowing activities to be
-  // assigned directly to Main WBS or to its Sub WBS in the two-tier interface.
-  if (!payload.Main_WBS_ID) throw new Error('Select a Main WBS for this Schedule Activity.');
-  const currentActivityDependencies = (getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES) || []).filter(function (d) {
-    return String(d.Project_ID || '').trim() === String(payload.Project_ID).trim() && String(d.Successor_ID || '').trim() === String(isUpdate ? existing.Activity_ID : '').trim() && isActiveDependencyRecord_(d);
-  });
-  if (payload.Predecessor_ID || currentActivityDependencies.length || (isUpdate && existing.Predecessor_ID)) {
-    assertPermission_('Dependencies', isUpdate ? 'edit' : 'create', payload.Project_ID);
-  }
-  if (payload.Predecessor_ID) {
-    const predecessorId = String(payload.Predecessor_ID).trim();
-    assertRecordProjectOwnership_(findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', predecessorId), payload.Project_ID, 'Predecessor activity');
-    const successorIdForCycle = isUpdate ? String(existing.Activity_ID) : 'PENDING_NEW_ACTIVITY';
-    if (isUpdate && wouldCreateDependencyCycle_(payload.Project_ID, predecessorId, successorIdForCycle)) throw new Error('This dependency would create a circular schedule relationship.');
-    if (isUpdate && predecessorId === String(existing.Activity_ID)) throw new Error('An activity cannot be its own predecessor.');
-  }
-
-  const baseDur = payload.Baseline_Duration !== '' && payload.Baseline_Duration !== undefined
-    ? Number(payload.Baseline_Duration)
-    : calculateDurationDays_(payload.Baseline_Start_Date, payload.Baseline_Finish_Date, false);
-
-  const refFinish = payload.Actual_Finish_Date || payload.Forecast_Finish_Date || '';
-  const varianceDays = calculateScheduleVarianceDays_(payload.Baseline_Finish_Date, refFinish);
-
-  let actId = isUpdate ? String(payload.Activity_ID).trim() : '';
-
-  const record = {
-    Activity_ID: actId,
-    Project_ID: String(payload.Project_ID).trim(),
-    Main_WBS_ID: String(payload.Main_WBS_ID || '').trim(),
-    Sub_WBS_ID: String(payload.Sub_WBS_ID || '').trim(),
-    Predecessor_ID: String(payload.Predecessor_ID || '').trim(),
-    Dependency_Type: String(payload.Dependency_Type || 'FS').trim(),
-    Lag_Or_Lead_Days: Number(payload.Lag_Or_Lead_Days) || 0,
-    Created_By_Email: isUpdate ? String(existing.Created_By_Email || ctx.email).trim().toLowerCase() : String(ctx.email || '').trim().toLowerCase(),
-    Updated_By_Email: String(ctx.email || '').trim().toLowerCase(),
-    Activity_Name: String(payload.Activity_Name).trim(),
-    Responsible_Person: String(payload.Responsible_Person || '').trim(),
-    Activity_Weight: Number(payload.Activity_Weight) || 0,
-    Target_Quantity: Number(payload.Target_Quantity) || 0,
-    Actual_Quantity: Number(payload.Actual_Quantity) || 0,
-    Unit_Of_Measure: String(payload.Unit_Of_Measure || '').trim(),
-    Baseline_Start_Date: String(payload.Baseline_Start_Date || '').trim(),
-    Baseline_Finish_Date: String(payload.Baseline_Finish_Date || '').trim(),
-    Baseline_Duration: baseDur,
-    Forecast_Start_Date: String(payload.Forecast_Start_Date || payload.Baseline_Start_Date || '').trim(),
-    Forecast_Finish_Date: String(payload.Forecast_Finish_Date || payload.Baseline_Finish_Date || '').trim(),
-    Actual_Start_Date: String(payload.Actual_Start_Date || '').trim(),
-    Actual_Finish_Date: String(payload.Actual_Finish_Date || '').trim(),
-    Planned_Progress: Number(payload.Planned_Progress) || 0,
-    Actual_Progress: Number(payload.Actual_Progress) || 0,
-    Schedule_Variance_Days: varianceDays,
-    Is_Critical: payload.Is_Critical ? 'TRUE' : 'FALSE',
-    Status: String(payload.Status || 'Not Started').trim(),
-    Remarks: String(payload.Remarks || '').trim()
-  };
-
-  if (isUpdate) {
-    const res = updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, record);
-    writeAuditLog_(ctx, 'UPDATE_ACTIVITY', 'WBS_Schedule', actId, res.previous, res.updated, 'Updated schedule activity');
-  } else {
-    insertRecordWithGeneratedId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4, record);
-    actId = record.Activity_ID;
-    writeAuditLog_(ctx, 'CREATE_ACTIVITY', 'WBS_Schedule', actId, null, record, 'Created schedule activity');
-  }
-
-  // Synchronize the activity's single predecessor relationship; keep removed links as inactive history.
-  const dependencyRows = (getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES) || []).filter(function (d) {
-    return String(d.Project_ID || '').trim() === record.Project_ID && String(d.Successor_ID || '').trim() === actId && isActiveDependencyRecord_(d);
-  });
-  const selectedPredecessor = String(payload.Predecessor_ID || '').trim();
-  const dependencyType = String(payload.Dependency_Type || 'FS').trim();
-  const lagDays = Number(payload.Lag_Or_Lead_Days) || 0;
-  const sameDependency = selectedPredecessor ? dependencyRows.find(function (d) { return String(d.Predecessor_ID || '').trim() === selectedPredecessor; }) : null;
-  dependencyRows.forEach(function (d) {
-    if (!selectedPredecessor || String(d.Predecessor_ID || '').trim() !== selectedPredecessor) {
-      updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', d.Dependency_ID, { Is_Active: 'FALSE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
+  const activityMutationLock = LockService.getScriptLock();
+  activityMutationLock.waitLock(10000);
+  try {
+  
+    const existing = payload.Activity_ID ? findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', payload.Activity_ID) : null;
+    const isUpdate = Boolean(existing);
+    if (isUpdate) assertRecordProjectOwnership_(existing, payload.Project_ID, 'Activity record');
+    const ctx = assertScheduleActivityPermission_(payload.Project_ID, isUpdate ? 'edit' : 'create', existing);
+    // Preserve fields not exposed by the current edit form.
+    if (isUpdate) payload = Object.assign({}, existing, payload);
+  
+    if (!payload.Project_ID || !String(payload.Activity_Name || '').trim()) {
+      throw new Error('Project ID and Activity Name are required.');
     }
-  });
-  if (selectedPredecessor) {
-    if (sameDependency) {
-      updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', sameDependency.Dependency_ID, { Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays, Is_Active: 'TRUE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
+    let activityMain = null;
+    let activitySub = null;
+    if (payload.Main_WBS_ID) {
+      activityMain = findRecordRowById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', payload.Main_WBS_ID);
+      assertRecordProjectOwnership_(activityMain, payload.Project_ID, 'Activity Main WBS');
+    }
+    if (payload.Sub_WBS_ID) {
+      activitySub = findRecordRowById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', payload.Sub_WBS_ID);
+      assertRecordProjectOwnership_(activitySub, payload.Project_ID, 'Activity Sub WBS');
+      if (payload.Main_WBS_ID && String(activitySub.Parent_Main_WBS_ID || '') !== String(payload.Main_WBS_ID)) throw new Error('Selected Sub WBS does not belong to the selected Main WBS.');
+      if (!payload.Main_WBS_ID) payload.Main_WBS_ID = String(activitySub.Parent_Main_WBS_ID || '');
+    }
+    // A schedule activity may be assigned at either of the two WBS tiers.
+    // Main WBS is mandatory and Sub WBS is optional, allowing activities to be
+    // assigned directly to Main WBS or to its Sub WBS in the two-tier interface.
+    if (!payload.Main_WBS_ID) throw new Error('Select a Main WBS for this Schedule Activity.');
+    const currentActivityDependencies = (getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES) || []).filter(function (d) {
+      return String(d.Project_ID || '').trim() === String(payload.Project_ID).trim() && String(d.Successor_ID || '').trim() === String(isUpdate ? existing.Activity_ID : '').trim() && isActiveDependencyRecord_(d);
+    });
+    if (payload.Predecessor_ID || currentActivityDependencies.length || (isUpdate && existing.Predecessor_ID)) {
+      assertPermission_('Dependencies', isUpdate ? 'edit' : 'create', payload.Project_ID);
+    }
+    if (payload.Predecessor_ID) {
+      const predecessorId = String(payload.Predecessor_ID).trim();
+      assertRecordProjectOwnership_(findRecordRowById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', predecessorId), payload.Project_ID, 'Predecessor activity');
+      const successorIdForCycle = isUpdate ? String(existing.Activity_ID) : 'PENDING_NEW_ACTIVITY';
+      if (isUpdate && wouldCreateDependencyCycle_(payload.Project_ID, predecessorId, successorIdForCycle)) throw new Error('This dependency would create a circular schedule relationship.');
+      if (isUpdate && predecessorId === String(existing.Activity_ID)) throw new Error('An activity cannot be its own predecessor.');
+    }
+  
+    const baseDur = payload.Baseline_Duration !== '' && payload.Baseline_Duration !== undefined
+      ? Number(payload.Baseline_Duration)
+      : calculateDurationDays_(payload.Baseline_Start_Date, payload.Baseline_Finish_Date, false);
+  
+    const refFinish = payload.Actual_Finish_Date || payload.Forecast_Finish_Date || '';
+    const varianceDays = calculateScheduleVarianceDays_(payload.Baseline_Finish_Date, refFinish);
+  
+    let actId = isUpdate ? String(payload.Activity_ID).trim() : '';
+  
+    const record = {
+      Activity_ID: actId,
+      Project_ID: String(payload.Project_ID).trim(),
+      Main_WBS_ID: String(payload.Main_WBS_ID || '').trim(),
+      Sub_WBS_ID: String(payload.Sub_WBS_ID || '').trim(),
+      Predecessor_ID: String(payload.Predecessor_ID || '').trim(),
+      Dependency_Type: String(payload.Dependency_Type || 'FS').trim(),
+      Lag_Or_Lead_Days: Number(payload.Lag_Or_Lead_Days) || 0,
+      Created_By_Email: isUpdate ? String(existing.Created_By_Email || ctx.email).trim().toLowerCase() : String(ctx.email || '').trim().toLowerCase(),
+      Updated_By_Email: String(ctx.email || '').trim().toLowerCase(),
+      Activity_Name: String(payload.Activity_Name).trim(),
+      Responsible_Person: String(payload.Responsible_Person || '').trim(),
+      Activity_Weight: Number(payload.Activity_Weight) || 0,
+      Target_Quantity: Number(payload.Target_Quantity) || 0,
+      Actual_Quantity: Number(payload.Actual_Quantity) || 0,
+      Unit_Of_Measure: String(payload.Unit_Of_Measure || '').trim(),
+      Baseline_Start_Date: String(payload.Baseline_Start_Date || '').trim(),
+      Baseline_Finish_Date: String(payload.Baseline_Finish_Date || '').trim(),
+      Baseline_Duration: baseDur,
+      Forecast_Start_Date: String(payload.Forecast_Start_Date || payload.Baseline_Start_Date || '').trim(),
+      Forecast_Finish_Date: String(payload.Forecast_Finish_Date || payload.Baseline_Finish_Date || '').trim(),
+      Actual_Start_Date: String(payload.Actual_Start_Date || '').trim(),
+      Actual_Finish_Date: String(payload.Actual_Finish_Date || '').trim(),
+      Planned_Progress: Number(payload.Planned_Progress) || 0,
+      Actual_Progress: Number(payload.Actual_Progress) || 0,
+      Schedule_Variance_Days: varianceDays,
+      Is_Critical: payload.Is_Critical ? 'TRUE' : 'FALSE',
+      Status: String(payload.Status || 'Not Started').trim(),
+      Remarks: String(payload.Remarks || '').trim()
+    };
+  
+    let activityAuditPrevious = null;
+    let activityAuditUpdated = record;
+    if (isUpdate) {
+      const res = updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, record);
+      activityAuditPrevious = res.previous;
+      activityAuditUpdated = res.updated;
     } else {
-      const dependency = {
-        Dependency_ID: '', Project_ID: record.Project_ID,
-        Predecessor_ID: selectedPredecessor, Successor_ID: actId,
-        Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays,
-        Is_Active: 'TRUE', Created_By: ctx.email, Created_At: getNowTimestamp_(),
-        Updated_By: ctx.email, Updated_At: getNowTimestamp_(), Remarks: 'Linked via WBS & Schedule'
-      };
-      insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependency);
+      insertRecordWithGeneratedId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4, record);
+      actId = record.Activity_ID;
     }
+  
+    let dependencyRows = [];
+    let createdDependencyId = '';
+    try {
+      // Synchronize the activity's single predecessor relationship; keep removed links as inactive history.
+      dependencyRows = (getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES) || []).filter(function (d) {
+        return String(d.Project_ID || '').trim() === record.Project_ID && String(d.Successor_ID || '').trim() === actId && isActiveDependencyRecord_(d);
+      });
+      const selectedPredecessor = String(payload.Predecessor_ID || '').trim();
+      const dependencyType = String(payload.Dependency_Type || 'FS').trim();
+      const lagDays = Number(payload.Lag_Or_Lead_Days) || 0;
+      const sameDependency = selectedPredecessor ? dependencyRows.find(function (d) { return String(d.Predecessor_ID || '').trim() === selectedPredecessor; }) : null;
+      dependencyRows.forEach(function (d) {
+        if (!selectedPredecessor || String(d.Predecessor_ID || '').trim() !== selectedPredecessor) {
+          updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', d.Dependency_ID, { Is_Active: 'FALSE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
+        }
+      });
+      if (selectedPredecessor) {
+        if (sameDependency) {
+          updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', sameDependency.Dependency_ID, { Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays, Is_Active: 'TRUE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
+        } else {
+          const dependency = {
+            Dependency_ID: '', Project_ID: record.Project_ID,
+            Predecessor_ID: selectedPredecessor, Successor_ID: actId,
+            Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays,
+            Is_Active: 'TRUE', Created_By: ctx.email, Created_At: getNowTimestamp_(),
+            Updated_By: ctx.email, Updated_At: getNowTimestamp_(), Remarks: 'Linked via WBS & Schedule'
+          };
+          insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependency);
+          createdDependencyId = dependency.Dependency_ID;
+        }
+      }
+    
+    
+    } catch (dependencyError) {
+      if (createdDependencyId) deleteRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', createdDependencyId);
+      if (isUpdate) {
+        updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, existing);
+        dependencyRows.forEach(function(previousDependency) {
+          updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', previousDependency.Dependency_ID, previousDependency);
+        });
+      } else if (actId) {
+        deleteRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId);
+      }
+      throw dependencyError;
+    }
+    writeAuditLog_(ctx, isUpdate ? 'UPDATE_ACTIVITY' : 'CREATE_ACTIVITY', 'WBS_Schedule', actId, activityAuditPrevious, activityAuditUpdated, (isUpdate ? 'Updated' : 'Created') + ' schedule activity');
+    return { success: true, activity: record };
+  
+  } finally {
+    activityMutationLock.releaseLock();
   }
-
-  return { success: true, activity: record };
 }
-
-/**
- * Returns full Gantt dataset, saved baselines, and project weighting method.
- */
 function apiGetGanttAndBaselines(projectId) {
   const ctx = assertPermission_('Gantt_Chart', 'view', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
