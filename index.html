@@ -4286,8 +4286,8 @@ button, input, select, textarea { min-height: 2.25rem; }
           </div>
 
           <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-            <h3 class="text-sm font-bold text-slate-900">${sectionTitle}</h3>
-            <button onclick="openProcurementAndFinancialsModule('${activeSub}')"
+            <h3 class="text-sm font-bold text-slate-900">${escapeHtmlSafe_(sectionTitle)}</h3>
+            <button onclick="openProcurementAndFinancialsModule(${safeJsArg_(activeSub)})"
               class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-medium">
               ↻ Refresh
             </button>
@@ -4410,13 +4410,13 @@ button, input, select, textarea { min-height: 2.25rem; }
                       return `
                         <tr class="hover:bg-slate-50">
                           <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(p.Procurement_ID) }</td>
-                          <td class="py-2 px-3 font-mono">${p.PO_Or_Reference || '-'}</td>
-                          <td class="py-2 px-3 font-semibold text-slate-900">${p.Item_Description}</td>
-                          <td class="py-2 px-3">${p.Vendor_Or_Carrier || '-'}</td>
-                          <td class="py-2 px-3">${p.Quantity ?? 0}</td>
+                          <td class="py-2 px-3 font-mono">${escapeHtmlSafe_(p.PO_Or_Reference || '-')}</td>
+                          <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(p.Item_Description || '-')}</td>
+                          <td class="py-2 px-3">${escapeHtmlSafe_(p.Vendor_Or_Carrier || '-')}</td>
+                          <td class="py-2 px-3">${escapeHtmlSafe_(p.Quantity ?? 0)}</td>
                           <td class="py-2 px-3 font-semibold text-slate-900">${formatCurrencyNum(p.Total_Cost)}</td>
-                          <td class="py-2 px-3 whitespace-nowrap">${p.Expected_Delivery_Date || '-'}</td>
-                          <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${p.Delivery_Status || 'Pending'}</span></td>
+                          <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(p.Expected_Delivery_Date || '-')}</td>
+                          <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(p.Delivery_Status || 'Pending')}</span></td>
                           <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${viewBtn}${editBtn}${delBtn}</td>
                         </tr>
                       `;
@@ -4525,13 +4525,13 @@ button, input, select, textarea { min-height: 2.25rem; }
                       return `
                         <tr class="hover:bg-slate-50">
                           <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(f.Financial_ID) }</td>
-                          <td class="py-2 px-3 font-semibold text-slate-900">${f.Cost_Category}</td>
-                          <td class="py-2 px-3">${f.Line_Item_Description || '-'}</td>
+                          <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(f.Cost_Category || '-')}</td>
+                          <td class="py-2 px-3">${escapeHtmlSafe_(f.Line_Item_Description || '-')}</td>
                           <td class="py-2 px-3">${formatCurrencyNum(f.Budget_Amount)}</td>
                           <td class="py-2 px-3">${formatCurrencyNum(f.Committed_Amount)}</td>
                           <td class="py-2 px-3 font-semibold">${formatCurrencyNum(f.Actual_Spend)}</td>
                           <td class="py-2 px-3 ${vCls}">${v >= 0 ? '+' : ''}${formatCurrencyNum(v)}</td>
-                          <td class="py-2 px-3 font-medium">${f.Burn_Pct ?? 0}%</td>
+                          <td class="py-2 px-3 font-medium">${escapeHtmlSafe_(f.Burn_Pct ?? 0)}%</td>
                           <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${viewBtn}${editBtn}${delBtn}</td>
                         </tr>
                       `;
