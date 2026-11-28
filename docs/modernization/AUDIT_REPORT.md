@@ -98,3 +98,16 @@ The code has useful foundations: a server-side role permission ceiling, project 
 - API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
 
 This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
+
+
+## Phase 1 remediation status update (2026-11-28)
+
+### PMO snapshot insertion integrity — PR #100
+- **Change under review:** snapshot ID allocation and sheet append are serialized under a script lock; lock release is in a `finally` block.
+- **Collision prevention:** the code locates the `Snapshot_ID` column by header, reads existing IDs while holding the lock, and retries generated six-digit suffixes when a collision is detected.
+- **Regression coverage:** static source tests plus a Node mocked-runtime test exercise header-column mapping, collision retry, lock-before-append, release-before-audit ordering.
+- **CI:** latest branch commit `5ead126d78cac52c18ec970cdaa99a15765f07c1` passed both push and PR checks. This is a mocked runtime, not execution inside Google Apps Script.
+- **Status:** open PR; not merged or deployed. Real Apps Script concurrency/runtime validation remains pending.
+- **Known limitation:** the business-data append and subsequent audit-log insert are not atomic across sheets. An audit failure can occur after the snapshot row has been written; this remains a tracked reliability issue.
+
+The remediation is narrowly scoped and does not establish that other table IDs are protected from concurrent allocation. The broader ID-generation finding remains open until creation handlers are inventoried and tested.
