@@ -745,14 +745,10 @@ function apiCreateProject(payload) {
     throw new Error('Project Name is required.');
   }
 
-  const newId = payload.Project_ID && String(payload.Project_ID).trim()
-    ? String(payload.Project_ID).trim()
-    : generateNextId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3);
+  let newId = payload.Project_ID && String(payload.Project_ID).trim() ? String(payload.Project_ID).trim() : '';
 
-  const existing = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId);
-  if (existing) {
-    throw new Error('A project with Project_ID "' + newId + '" already exists.');
-  }
+  const existing = newId ? findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId) : null;
+  if (existing) throw new Error('A project with Project_ID "' + newId + '" already exists.');
 
   const nowDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const nowTs = getNowTimestamp_();
@@ -787,7 +783,11 @@ function apiCreateProject(payload) {
     Updated_At: nowTs
   };
 
-  insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
+  if (newId) {
+    insertRecordWithProvidedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId, record);
+  } else {
+    newId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3, record);
+  }
 
   // Assign creator automatically if not global admin/management
   const assignmentRecord = {
