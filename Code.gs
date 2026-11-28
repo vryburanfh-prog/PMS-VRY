@@ -791,7 +791,7 @@ function apiCreateProject(payload) {
 
   // Assign creator automatically if not global admin/management
   const assignmentRecord = {
-    Assignment_ID: assignId,
+    Assignment_ID: '',
     Project_ID: newId,
     User_ID: ctx.user.userId || '',
     User_Email: ctx.user.email,
