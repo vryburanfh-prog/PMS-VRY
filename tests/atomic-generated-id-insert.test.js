@@ -72,3 +72,13 @@ test('helper rejects a missing ID column before attempting a write and releases 
   assert.ok(h.events.includes('unlock'));
   assert.ok(!h.events.includes('write'));
 });
+
+
+test('user creation uses atomic generated-ID insert rather than split ID generation and append', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateUser(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.match(fn, /insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.USERS, 'User_ID', 'USR', 3, newUser\)/);
+  assert.doesNotMatch(fn, /generateNextId_\(DB_CONFIG\.TABS\.USERS/);
+});
