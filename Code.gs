@@ -1315,6 +1315,37 @@ function apiGetGanttAndBaselines(projectId) {
 /**
  * Captures an immutable schedule baseline snapshot in Project_Baselines.
  */
+/**
+ * Captures the baseline source tables directly from the spreadsheet.
+ * Caller must hold ScriptLock; this avoids cache staleness and cross-table drift
+ * during the baseline snapshot capture.
+ */
+function buildProjectBaselineSnapshotUnderLock_(projectId) {
+  const pid = String(projectId || '').trim();
+  const ss = getMasterSpreadsheet_();
+  const readRecords = function(tabName) {
+    const sheet = ss.getSheetByName(tabName);
+    if (!sheet) throw new Error('Baseline source table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    const lastRow = sheet.getLastRow();
+    if (lastCol < 1 || lastRow < 2) return [];
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
+    const rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    return rows.map(row => {
+      const record = {};
+      headers.forEach((header, index) => { if (header) record[header] = row[index]; });
+      return record;
+    });
+  };
+  return {
+    capturedAt: getNowTimestamp_(),
+    mainWbs: readRecords(DB_CONFIG.TABS.MAIN_WBS).filter(r => String(r.Project_ID || '').trim() === pid),
+    subWbs: readRecords(DB_CONFIG.TABS.SUB_WBS).filter(r => String(r.Project_ID || '').trim() === pid),
+    activities: readRecords(DB_CONFIG.TABS.ACTIVITIES).filter(r => String(r.Project_ID || '').trim() === pid),
+    dependencies: readRecords(DB_CONFIG.TABS.DEPENDENCIES).filter(r => String(r.Project_ID || '').trim() === pid && isActiveDependencyRecord_(r))
+  };
+}
+
 function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   const ctx = assertPermission_('WBS_Schedule', 'approve', projectId);
   if (!projectId) throw new Error('Project_ID is required.');
@@ -1324,19 +1355,6 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
 
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-  const mainWbs = getTableRecords_(DB_CONFIG.TABS.MAIN_WBS).filter(r => String(r.Project_ID).trim() === pid);
-  const subWbs = getTableRecords_(DB_CONFIG.TABS.SUB_WBS).filter(r => String(r.Project_ID).trim() === pid);
-  const activities = getTableRecords_(DB_CONFIG.TABS.ACTIVITIES).filter(r => String(r.Project_ID).trim() === pid);
-  const dependencies = getTableRecords_(DB_CONFIG.TABS.DEPENDENCIES).filter(r => String(r.Project_ID).trim() === pid && isActiveDependencyRecord_(r));
-
-  const snapshot = {
-    capturedAt: getNowTimestamp_(),
-    mainWbs: mainWbs,
-    subWbs: subWbs,
-    activities: activities,
-    dependencies: dependencies
-  };
-
   const record = {
     Baseline_ID: '',
     Project_ID: pid,
@@ -1344,7 +1362,7 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
     Baseline_Name: String(baselineName || '').trim(),
     Approved_By: ctx.user.fullName + ' (' + ctx.user.email + ')',
     Approved_Date: todayStr,
-    Snapshot_JSON: JSON.stringify(snapshot),
+    Snapshot_JSON: '',
     Remarks: String(remarks || '').trim()
   };
 
@@ -1355,6 +1373,7 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
     nextRev = rows.reduce((max, row) => String(row[projectIndex] || '').trim() === pid ? Math.max(max, Number(row[revisionIndex]) || 0) : max, 0) + 1;
     recordObj.Revision_Number = nextRev;
     recordObj.Baseline_Name = String(baselineName || ('Baseline Rev ' + nextRev)).trim();
+    recordObj.Snapshot_JSON = JSON.stringify(buildProjectBaselineSnapshotUnderLock_(pid));
   });
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
