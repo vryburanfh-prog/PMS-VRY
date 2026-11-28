@@ -159,3 +159,12 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - **Security verification:** Google ID-token login validates audience, issuer, verified email, expiry, and required subject claim. Password failed-attempt counters and trusted-admin allowlist updates are serialized.
 - **Runtime-mocked auth validation:** password login tests cover fifth-failure lockout, successful counter reset/session creation, and revalidation when the credential hash changes between reads. Google ID-token validation checks audience, issuer, verified email, expiry, and subject.
 - **Status:** targeted source changes and regression tests pass in CI on consolidated head `308fe0f` (40 tests, 0 failures across the workflow). Snapshot metrics and append are now protected by the same lock; full backup copies also serialize with database writes. These are Node mocks/static tests, not Apps Script runtime testing or true concurrent-request validation.
+
+
+### Known cross-sheet transaction / rollback gaps
+- Activity create/update and predecessor-dependency synchronization are separate sheet writes. A failure during dependency synchronization can leave the activity and dependency history partially updated.
+- Daily progress-log writes, schedule-activity actual-progress updates, and project rollup recalculation are separate operations. Failure can leave partial state.
+- Project deletion cascades across multiple sheets under a lock but has no full rollback if a later sheet delete fails.
+- Business writes and audit-log inserts are not a cross-sheet transaction; an audit-log failure after a business write may cause an API error while the business record remains persisted.
+- Database reset/import are backup-first and locked, but replacement is not transactional across sheets. Restore procedure and rehearsal are required before production use.
+- **Status:** these gaps are documented in the Phase 1 runtime test plan and remain acceptance blockers; do not claim atomic cross-sheet transactions.
