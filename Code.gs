@@ -225,7 +225,7 @@ function apiCreateUser(userPayload) {
   });
 
   const newUser = {
-    User_ID: generateNextId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3),
+    User_ID: '',
     Email: email,
     Full_Name: fullName,
     Position: posVal,
@@ -238,7 +238,7 @@ function apiCreateUser(userPayload) {
     Updated_At: getNowTimestamp_()
   };
 
-  insertRecord_(DB_CONFIG.TABS.USERS, newUser);
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser);
   if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
   if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
   const assignedProjectIds = syncUserProjectAssignments_(newUser, userPayload.assignedProjectIds || [], ctx);
