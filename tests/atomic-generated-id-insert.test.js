@@ -522,3 +522,16 @@ test('CSV export neutralizes formula-like text while preserving numeric negative
   assert.ok(csv.includes(',-25,'));
   assert.ok(csv.includes('"a,b"'));
 });
+
+
+test('Google ID token login safely handles malformed claims and validates audience, azp, subject, and time bounds', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function apiLoginWithGoogleCredential(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const fn = security.slice(start, end < 0 ? security.length : end);
+  assert.ok(fn.includes('try { claims = JSON.parse(response.getContentText() || \'{}\'); } catch (e)'));
+  assert.ok(fn.includes('authorizedParty && authorizedParty !== clientId'));
+  assert.ok(fn.includes('!subject'));
+  assert.ok(fn.includes('issuedAt > nowSeconds + 60'));
+  assert.ok(fn.includes('nowSeconds - issuedAt > 3600'));
+});
