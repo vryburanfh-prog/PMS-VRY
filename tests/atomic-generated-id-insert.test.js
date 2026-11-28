@@ -323,7 +323,19 @@ test('project-controls registry rendering escapes untrusted text and restricts l
 
 test('inline JavaScript in index.html parses after registry rendering changes', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m => m[1]).filter(s => s.trim());
-  assert.ok(scripts.length > 0);
-  scripts.forEach((source, i) => assert.doesNotThrow(() => new vm.Script(source), 'inline script ' + i + ' must parse'));
+  const scripts = [];
+  let cursor = 0;
+  while (cursor < html.length) {
+    const open = html.indexOf('<script', cursor);
+    if (open < 0) break;
+    const openEnd = html.indexOf('>', open);
+    const close = html.indexOf('</script>', openEnd);
+    if (openEnd < 0 || close < 0) break;
+    scripts.push(html.slice(openEnd + 1, close));
+    cursor = close + 9;
+  }
+  const nonEmpty = scripts.filter(source => source.trim());
+  assert.ok(nonEmpty.length > 0);
+  nonEmpty.forEach((source, i) => assert.doesNotThrow(() => new vm.Script(source), 'inline script ' + i + ' must parse'));
 });
+
