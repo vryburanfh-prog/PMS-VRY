@@ -148,6 +148,7 @@ function insertRecords_(tabName, records) {
     const headers = sheet.getRange(1,1,1,lastCol).getValues()[0].map(h => String(h).trim());
     const rows = list.map(record => headers.map(header => record[header] !== undefined ? record[header] : ''));
     sheet.getRange(sheet.getLastRow()+1,1,rows.length,headers.length).setValues(rows);
+    invalidateTableCache_(tabName);
     return rows.length;
   } finally { if (ownsLock) lock.releaseLock(); }
 }

@@ -1632,9 +1632,7 @@ function apiDeleteProjectControlRecord(projectId, registryKey, recordId) {
     throw new Error('Record does not belong to the active project.');
   }
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(cfg.tab);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordsByIds_(cfg.tab, cfg.idCol, [recordId]);
 
   writeAuditLog_(ctx, 'DELETE_' + cfg.module.toUpperCase(), cfg.module, recordId, existing, null, 'Deleted ' + registryKey + ' record');
   return { success: true };
@@ -2033,9 +2031,7 @@ function apiDeleteWeeklyReport(projectId, reportId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.WEEKLY_REPORTS);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordsByIds_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', [reportId]);
 
   writeAuditLog_(ctx, 'DELETE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, null, 'Deleted weekly project report');
   return { success: true };
@@ -2293,9 +2289,7 @@ function apiDeleteTeamWorkloadAssignment(projectId, assignmentId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  const sheet = ss.getSheetByName(DB_CONFIG.TABS.TEAM_WORKLOAD);
-  sheet.deleteRow(existing._rowIndex);
+  deleteRecordsByIds_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', [assignmentId]);
 
   writeAuditLog_(ctx, 'DELETE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, null, 'Deleted team workload assignment');
   return { success: true };
@@ -2524,8 +2518,7 @@ function apiDeleteProcurementItem(projectId, procurementId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(procTab).deleteRow(existing._rowIndex);
+  deleteRecordsByIds_(procTab, 'Procurement_ID', [procurementId]);
 
   writeAuditLog_(ctx, 'DELETE_PROCUREMENT', procTab, procurementId, prevClean, null, 'Deleted procurement/logistics item');
   return { success: true };
@@ -2599,8 +2592,7 @@ function apiDeleteFinancialItem(projectId, financialId) {
   const prevClean = Object.assign({}, existing);
   delete prevClean._rowIndex;
 
-  const ss = getMasterSpreadsheet_();
-  ss.getSheetByName(finTab).deleteRow(existing._rowIndex);
+  deleteRecordsByIds_(finTab, 'Financial_ID', [financialId]);
 
   writeAuditLog_(ctx, 'DELETE_FINANCIAL', finTab, financialId, prevClean, null, 'Deleted financial monitoring item');
   return { success: true };
@@ -4136,7 +4128,7 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
 
   var record = {
-    Snapshot_ID: 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900),
+    Snapshot_ID: '',
     Project_ID: targetPid || 'PORTFOLIO',
     Label: label,
     Captured_By: actor,
@@ -4151,11 +4143,34 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
     Notes: String(p.Notes || '').trim()
   };
 
-  var rowValues = headers.map(function(h) {
-    var key = String(h).trim();
-    return record[key] !== undefined ? record[key] : '';
-  });
-  sheet.appendRow(rowValues);
+  // Serialize ID allocation and append so concurrent captures cannot reuse an ID.
+  var snapshotLock = LockService.getScriptLock();
+  snapshotLock.waitLock(30000);
+  try {
+    var idPrefix = 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-';
+    var snapshotIdColumn = headers.map(function(h) { return String(h).trim(); }).indexOf('Snapshot_ID') + 1;
+    if (snapshotIdColumn < 1) throw new Error('PMO snapshot sheet is missing Snapshot_ID header.');
+    var existingIds = [];
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      existingIds = sheet.getRange(2, snapshotIdColumn, lastRow - 1, 1).getValues().map(function(r) {
+        return String(r[0] || '').trim();
+      });
+    }
+    var snapshotId;
+    do {
+      snapshotId = idPrefix + Math.floor(100000 + Math.random() * 900000);
+    } while (existingIds.indexOf(snapshotId) !== -1);
+    record.Snapshot_ID = snapshotId;
+
+    var rowValues = headers.map(function(h) {
+      var key = String(h).trim();
+      return record[key] !== undefined ? record[key] : '';
+    });
+    sheet.appendRow(rowValues);
+  } finally {
+    snapshotLock.releaseLock();
+  }
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(

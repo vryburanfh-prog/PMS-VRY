@@ -98,3 +98,47 @@ The code has useful foundations: a server-side role permission ceiling, project 
 - API inventory scanning found no obvious missing assertion in the sampled WBS depth compatibility endpoint (it calls the privileged WBS assertion), nor in the project-module report endpoint (it asserts module view permission and filters by project).
 
 This update remains a targeted static review; it does not substitute for execution-based testing, full taint analysis, or a security assessment of deployment settings and Apps Script scopes.
+
+
+## Phase 1 remediation status update (2026-11-28)
+
+### PMO snapshot insertion integrity — PR #100
+- **Change under review:** snapshot ID allocation and sheet append are serialized under a script lock; lock release is in a `finally` block.
+- **Collision prevention:** the code locates the `Snapshot_ID` column by header, reads existing IDs while holding the lock, and retries generated six-digit suffixes when a collision is detected.
+- **Regression coverage:** static source tests plus a Node mocked-runtime test exercise header-column mapping, collision retry, lock-before-append, release-before-audit ordering.
+- **CI:** latest branch commit `5ead126d78cac52c18ec970cdaa99a15765f07c1` passed both push and PR checks. This is a mocked runtime, not execution inside Google Apps Script.
+- **Status:** open PR; not merged or deployed. Real Apps Script concurrency/runtime validation remains pending.
+- **Known limitation:** the business-data append and subsequent audit-log insert are not atomic across sheets. An audit failure can occur after the snapshot row has been written; this remains a tracked reliability issue.
+
+The remediation is narrowly scoped and does not establish that other table IDs are protected from concurrent allocation. The broader ID-generation finding remains open until creation handlers are inventoried and tested.
+
+
+### Bulk insert cache invalidation — remediated in PR #100
+- The initial observation was that `insertRecords_` did not invalidate cacheable-table caches after bulk writes.
+- Call-site inventory found the current bulk helper use is for `Project_Assignments`, which is not in the cacheable-table list; no current cacheable-table caller was identified.
+- **Remediation:** `insertRecords_` now calls `invalidateTableCache_(tabName)` after the successful bulk write, preventing stale cache if future bulk callers use a cacheable table.
+- Added a regression test in the PR workflow. This is a preventive fix; the initial observation was not confirmed as a current user-impacting defect.
+
+
+### Direct project-record deletion — remediation in PR #100
+- Targeted source inventory identified five API deletion paths using `sheet.deleteRow(existing._rowIndex)` after a prior table read: registry records, weekly reports, team workload, procurement, and financial records.
+- This pattern could act on a stale row index if concurrent operations shift rows between the read and delete, and it bypassed the shared locking/cache invalidation helper.
+- **Remediation:** all five paths now call `deleteRecordsByIds_`, which locates rows by ID under a script lock and invalidates applicable caches. A regression test asserts these APIs use the shared helper instead of row-index deletion.
+- Audit log writes remain after the deletion and are not part of a cross-sheet transaction; that limitation remains.
+
+### General ID allocation — confirmed broader Phase 1 finding
+- Source inventory found 14 `generateNextId_` call sites in `Code.gs`, covering user, project, assignment, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial record creation.
+- `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
+- **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
+
+
+### General ID allocation — remediation design and acceptance criteria
+
+**Proposed safe remediation (separate targeted PR):**
+1. Add a database helper that acquires the script lock, reads the ID column directly from the sheet (not from cache), computes the next ID, assigns it to the record, and performs the append while retaining the same lock.
+2. Make the helper release the lock in `finally`, including failures in ID calculation or append.
+3. Refactor create-only paths first, then mixed create/update handlers individually. Preserve caller-provided IDs only where the existing API intentionally supports them; validate uniqueness under the lock before write.
+4. Keep existing update paths unchanged and preserve permission checks, project ownership validation, field allowlists, and audit events.
+5. Add mocked-runtime tests for concurrent requests, duplicate/collision detection, lock release on write failure, header mapping, and custom-ID handling. Include static inventory coverage so every generated-ID creation path uses the atomic helper.
+
+**Acceptance criteria:** all generated IDs are unique under concurrent create calls; allocation and write occur under one lock; failure releases the lock; all 14 generation call sites are accounted for; API behavior and ID formats remain compatible; full CI passes. Apps Script runtime testing remains a separate required gate.
