@@ -2980,7 +2980,7 @@ function convertRecordsToCsv_(rows) {
     if (val === null || val === undefined) return '';
     let str = String(val);
     // Spreadsheet formula injection defense for values beginning with =, +, -, or @.
-    if (/^[\s\u0000-\u001F]*[=+\-@]/.test(str)) str = "'" + str;
+    if (typeof val === 'string' && /^[\s\u0000-\u001F]*[=+\-@]/.test(str)) str = "'" + str;
     if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
     return str;
   };
