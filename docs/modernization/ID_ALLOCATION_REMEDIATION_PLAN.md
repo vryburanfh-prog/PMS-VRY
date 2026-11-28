@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Inventory completed; Stage A helper and first create-only migration are implemented on this follow-up branch. CI validation pending.  
+**Status:** Inventory completed; Stage A helper and first create-only migration are implemented on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
