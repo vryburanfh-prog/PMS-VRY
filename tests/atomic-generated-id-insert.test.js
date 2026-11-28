@@ -236,8 +236,20 @@ test('project creation uses atomic insert for generated IDs and locked duplicate
 });
 
 
-test('generated-ID inventory gate: legacy allocator has no active call sites in Code.gs', () => {
-  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
-  const matches = code.match(/generateNextId_\s*\(/g) || [];
-  assert.equal(matches.length, 0, 'No API should call the unlocked legacy ID allocator.');
+test('generated-ID inventory gate: no active legacy allocator call sites in Code.gs or Security.gs', () => {
+  for (const file of ['Code.gs', 'Security.gs']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const matches = source.match(/generateNextId_\s*\(/g) || [];
+    assert.equal(matches.length, 0, file + ' must not call the legacy unlocked allocator.');
+  }
+});
+
+
+
+test('Security generated-ID creation paths use atomic insert helpers', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  assert.ok(security.includes("insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values)"));
+  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord)"));
+  assert.equal((security.match(/insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord\)/g) || []).length, 2);
+  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord)"));
 });
