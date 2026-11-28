@@ -409,9 +409,10 @@ test('team workload assignment renderer escapes all sheet-backed fields', () => 
   const start = html.indexOf('function renderProjectWorkloadTable(');
   const end = html.indexOf('\nfunction ', start + 1);
   const fn = html.slice(start, end < 0 ? html.length : end);
-  for (const field of ['Employee_Name','Employee_ID','Position','Department_Or_Team','Main_Scope_Of_Responsibility','Workload_Allocation_Pct','Assignment_Status']) {
+  for (const field of ['Employee_Name','Employee_ID','Main_Scope_Of_Responsibility','Workload_Allocation_Pct','Assignment_Status']) {
     assert.ok(fn.includes('escapeHtmlSafe_(w.' + field), 'workload renderer must escape ' + field);
   }
+  assert.ok(fn.includes("escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')"));
   assert.ok(fn.includes('escapeHtmlSafe_(wbsStr)'));
   assert.ok(fn.includes('escapeHtmlSafe_(dateStr)'));
 });
