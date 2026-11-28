@@ -530,3 +530,19 @@ test('full database backup copy serializes with database mutations', () => {
   const audit = api.indexOf('writeAuditLog_');
   assert.ok(lock >= 0 && copy > lock && release > copy && audit > release, 'backup is copied under lock and audit is outside the lock');
 });
+
+
+test('activity dependency validation and synchronization are serialized with rollback', () => {
+  const start = code.indexOf('function apiSaveActivity');
+  const end = code.indexOf('\nfunction ', start + 10);
+  assert.ok(start >= 0 && end > start, 'activity API boundaries exist');
+  const api = code.slice(start, end);
+  const lock = api.indexOf('activityMutationLock.waitLock(10000)');
+  const cycleCheck = api.indexOf('wouldCreateDependencyCycle_');
+  const dependencyWrite = api.indexOf("insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependency)");
+  const release = api.indexOf('activityMutationLock.releaseLock()');
+  assert.ok(lock >= 0 && cycleCheck > lock && dependencyWrite > lock && release > dependencyWrite, 'cycle checks and dependency writes share lock');
+  assert.ok(api.includes("deleteRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId)"), 'failed create rolls back activity row');
+  assert.ok(api.includes("updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, existing)"), 'failed update restores prior activity');
+  assert.ok(api.includes("updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', previousDependency.Dependency_ID, previousDependency)"), 'failed dependency sync restores previous active links');
+});
