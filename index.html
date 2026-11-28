@@ -1604,10 +1604,10 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div id="gantt-progress-banner" class="flex flex-wrap items-center gap-4 text-xs">
               <span class="px-2.5 py-1 rounded bg-slate-100 font-semibold text-slate-700">
-                Planned: <strong id="gantt-planned-val">${proj.Overall_Planned_Progress || 0}%</strong>
+                Planned: <strong id="gantt-planned-val">${escapeHtmlSafe_(proj.Overall_Planned_Progress || 0)}%</strong>
               </span>
               <span class="px-2.5 py-1 rounded bg-indigo-50 font-semibold text-indigo-800">
-                Actual: <strong id="gantt-actual-val">${proj.Overall_Actual_Progress || 0}%</strong>
+                Actual: <strong id="gantt-actual-val">${escapeHtmlSafe_(proj.Overall_Actual_Progress || 0)}%</strong>
               </span>
               <span class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 font-semibold text-emerald-800">Total Earned Weight: <strong id="gantt-earned-weight-val">—</strong></span>
               <span class="flex items-center gap-3 text-[11px] text-slate-500">
@@ -2035,7 +2035,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <div class="w-16 flex-shrink-0 px-2 py-1.5 border-r border-slate-200 text-right font-semibold text-emerald-700">${r.earnedWeight.toFixed(2)}%</div>
             <div class="w-16 flex-shrink-0 px-2 py-1.5 border-r border-slate-200 text-right font-semibold text-slate-700">${r.equivalentProgress.toFixed(1)}%</div>
             <div class="relative flex-1 h-9" style="min-width:${timelineWidth}px;">
-              ${baseSpan ? `<div title="Baseline: ${r.bStart} → ${r.bEnd}" class="absolute top-1.5 h-1.5 bg-slate-400 rounded-sm opacity-80" style="left:${baseSpan.left}px; width:${baseSpan.width}px;"></div>` : ''}
+              ${baseSpan ? `<div title="Baseline: ${escapeHtmlSafe_(r.bStart)} → ${escapeHtmlSafe_(r.bEnd)}" class="absolute top-1.5 h-1.5 bg-slate-400 rounded-sm opacity-80" style="left:${baseSpan.left}px; width:${baseSpan.width}px;"></div>` : ''}
               ${foreSpan ? `
                 <div ${clickAttr} title="${escapeHtmlSafe_(r.label)} | ${escapeHtmlSafe_(r.fStart || r.bStart)} → ${escapeHtmlSafe_(r.fEnd || r.bEnd)} (${Number(r.actualPct) || 0}%)"
                   class="absolute top-4 h-3.5 ${barColor} rounded-sm shadow-sm flex items-center overflow-hidden"
@@ -2704,7 +2704,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
     function openControlsRegistryModule(registryKey) {
       const container = document.getElementById('ws-tab-content');
-      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${registryKey} registry from Google Sheets...</div>`;
+      container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Loading ${escapeHtmlSafe_(registryKey)} registry from Google Sheets...</div>`;
 
       PMS_SERVER_RUN
         .withSuccessHandler(res => {
@@ -2721,7 +2721,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           renderControlsRegistryTable();
         })
         .withFailureHandler(err => {
-          container.innerHTML = `<div class="p-4 rounded bg-red-50 border border-red-200 text-red-700 text-xs">Error loading ${registryKey}: ${escapeHtmlSafe_(err.message)}</div>`;
+          container.innerHTML = `<div class="p-4 rounded bg-red-50 border border-red-200 text-red-700 text-xs">Error loading ${escapeHtmlSafe_(registryKey)}: ${escapeHtmlSafe_(err.message)}</div>`;
         })
         .apiGetProjectControlRegistry(APP_STATE.selectedProjectId, registryKey);
     }
@@ -2861,7 +2861,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       const kpiEl = document.getElementById('reg-kpi-strip');
       if (kpiEl) {
         kpiEl.innerHTML = `
-          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${st.key}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${total}</div></div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Total ${escapeHtmlSafe_(st.key)}</div><div class="text-lg font-bold text-slate-900 mt-0.5">${total}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Active / Open</div><div class="text-lg font-bold text-indigo-700 mt-0.5">${openCount}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">Completed / Closed</div><div class="text-lg font-bold text-emerald-700 mt-0.5">${closedCount}</div></div>
           <div class="p-3 bg-slate-50 rounded border border-slate-200"><div class="text-[11px] text-slate-400 uppercase font-semibold">${alertLabel}</div><div class="text-lg font-bold text-rose-700 mt-0.5">${alertCount}</div></div>
@@ -2946,7 +2946,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       });
 
       if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="${schema.columns.length + 1}" class="py-5 text-center text-slate-400">No ${st.key.toLowerCase()} found for this project.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${schema.columns.length + 1}" class="py-5 text-center text-slate-400">No ${escapeHtmlSafe_(st.key.toLowerCase())} found for this project.</td></tr>`;
         return;
       }
 
