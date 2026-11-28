@@ -433,3 +433,14 @@ test('team workload rollup escapes position and department values', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.ok(html.includes("escapeHtmlSafe_([r.position, r.department].filter(Boolean).join(' • ') || '-')"));
 });
+
+
+test('audit-log and portfolio rollup tables escape sheet-backed values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['ts','actor','action','entity','note']) {
+    assert.ok(html.includes('escapeHtmlSafe_(' + field + ')'), 'audit log must escape ' + field);
+  }
+  for (const field of ['Project_ID','Project_Name','Status','Latest_Progress','Overallocated_Resources']) {
+    assert.ok(html.includes('escapeHtmlSafe_(r.' + field + ')'), 'portfolio rollup must escape ' + field);
+  }
+});
