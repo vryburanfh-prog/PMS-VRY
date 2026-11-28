@@ -9,6 +9,7 @@ on:
       - 'tests/pmo-snapshot-capture-runtime.test.js'
       - 'tests/database-bulk-cache-invalidation.test.js'
       - 'tests/project-delete-locking.test.js'
+      - 'tests/atomic-generated-id-insert.test.js'
       - 'Database.gs'
       - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
   push:
@@ -37,4 +38,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node --test tests/pmo-snapshot-insert-integrity.test.js tests/api-auth-coverage.test.js tests/pmo-snapshot-capture-runtime.test.js tests/database-bulk-cache-invalidation.test.js tests/project-delete-locking.test.js
+      - run: node --test tests/pmo-snapshot-insert-integrity.test.js tests/api-auth-coverage.test.js tests/pmo-snapshot-capture-runtime.test.js tests/database-bulk-cache-invalidation.test.js tests/project-delete-locking.test.js tests/atomic-generated-id-insert.test.js
