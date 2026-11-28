@@ -111,3 +111,9 @@ This update remains a targeted static review; it does not substitute for executi
 - **Known limitation:** the business-data append and subsequent audit-log insert are not atomic across sheets. An audit failure can occur after the snapshot row has been written; this remains a tracked reliability issue.
 
 The remediation is narrowly scoped and does not establish that other table IDs are protected from concurrent allocation. The broader ID-generation finding remains open until creation handlers are inventoried and tested.
+
+
+### Additional targeted finding — bulk insert cache invalidation
+- `insertRecord_` invalidates the cache for cacheable tables after insertion, while `insertRecords_` does not currently call the invalidation helper after its write.
+- Cacheable tables are limited to `Role_Permissions` and `System_Settings`; stale cached values could persist up to the cache TTL if the bulk helper is used for either table.
+- **Status:** observed in helper source; caller/usage inventory and impact confirmation remain pending. Do not classify as confirmed user-visible defect until call sites are checked.
