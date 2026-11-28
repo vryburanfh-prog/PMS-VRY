@@ -366,3 +366,14 @@ test('WBS, baseline, portfolio, project register, and filter renderers escape dy
   required.forEach(fragment => assert.ok(html.includes(fragment), 'missing escape in rendering path: ' + fragment));
   assert.ok(html.includes("startEditProject(JSON.parse("));
 });
+
+
+test('remaining Gantt and registry labels escape dynamic values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(html.includes("escapeHtmlSafe_(proj.Overall_Planned_Progress || 0)"));
+  assert.ok(html.includes("escapeHtmlSafe_(proj.Overall_Actual_Progress || 0)"));
+  assert.ok(html.includes("escapeHtmlSafe_(r.bStart)"));
+  assert.ok(html.includes("escapeHtmlSafe_(r.bEnd)"));
+  assert.ok(html.includes("Loading ${escapeHtmlSafe_(registryKey)} registry"));
+  assert.ok(html.includes("Total ${escapeHtmlSafe_(st.key)}"));
+});
