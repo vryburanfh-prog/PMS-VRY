@@ -988,7 +988,7 @@ function apiSaveMainWbs(payload) {
     ? Number(payload.Actual_Duration)
     : calculateDurationDays_(payload.Actual_Start_Date, payload.Actual_Finish_Date, false);
 
-  const mainWbsId = isUpdate ? String(payload.Main_WBS_ID).trim() : generateNextId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3);
+  let mainWbsId = isUpdate ? String(payload.Main_WBS_ID).trim() : '';
   const mainWbsCode = String(payload.WBS_Code || mainWbsId).trim();
   if (!mainWbsCode) throw new Error('Main WBS Code is required.');
   if ((getTableRecords_(DB_CONFIG.TABS.MAIN_WBS) || []).some(function (x) {
@@ -1026,7 +1026,7 @@ function apiSaveMainWbs(payload) {
     const res = updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', record.Main_WBS_ID, record);
     writeAuditLog_(ctx, 'UPDATE_MAIN_WBS', 'WBS_Schedule', record.Main_WBS_ID, res.previous, res.updated, 'Updated Main WBS');
   } else {
-    insertRecord_(DB_CONFIG.TABS.MAIN_WBS, record);
+    mainWbsId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3, record);
     writeAuditLog_(ctx, 'CREATE_MAIN_WBS', 'WBS_Schedule', record.Main_WBS_ID, null, record, 'Created Main WBS');
   }
 
