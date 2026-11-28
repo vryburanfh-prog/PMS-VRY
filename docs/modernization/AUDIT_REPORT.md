@@ -64,12 +64,12 @@ The code has useful foundations: a server-side role permission ceiling, project 
 **Recommendation:** Centralize mutations, invalidate affected caches, and use short TTL for permission/configuration caches or bypass caches for security-sensitive decisions.
 
 ### P2 — Medium: UI rendering uses innerHTML extensively
-**Evidence:** index.html dynamically builds module HTML with innerHTML. The project Controls Registry renderer had unescaped status values, field options/labels, WBS names, and record-cell values; link fields also accepted arbitrary schemes.
+**Evidence:** index.html dynamically builds module HTML with innerHTML. Targeted review identified raw sheet-backed fields in Project Controls Registry, WBS/Schedule, Project Register/Portfolio, Progress Logs, Weekly Reports and their printable exports, Team Workload, Procurement, Financials, Governance Audit Logs, and portfolio roll-up views.
 
-**Remediated in PR #102:** Registry status/options/labels/WBS names and table cell values are HTML-escaped; registry links are restricted to HTTP(S), escaped in the href context, and rendered with `noopener noreferrer`. Regression tests check the encoding/scheme guard and parse inline scripts after substituting the Apps Script template directive.
+**Remediated in PR #102:** dynamic text in those reviewed tables/cards/exports is escaped; project register edit payloads are passed through a safe JS argument helper; registry links are restricted to HTTP(S), escaped, and rendered with `noopener noreferrer`. Tests assert the escape points and parse inline JavaScript after replacing the Apps Script template directive.
 
-**Still open:** full taint tracing across the remaining innerHTML paths, safe JS argument review, and XSS testing for other modules.
-**Impact:** XSS remains possible in any other unreviewed rendering path.
+**Still open:** full taint tracing across the remaining innerHTML paths, especially other modules and export surfaces, plus browser-based XSS verification.
+**Impact:** XSS remains possible in any unreviewed rendering path.
 **Severity:** Medium residual risk.
 
 
