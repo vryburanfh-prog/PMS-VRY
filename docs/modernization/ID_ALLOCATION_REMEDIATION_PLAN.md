@@ -28,7 +28,7 @@ PR #100 adds a lock-protected ID allocation specifically for PMO snapshots. This
 | `apiSaveProcurementItem` | Procurement_Logistics | Procurement_ID | PRC | 4 | Create/update |
 | `apiSaveFinancialItem` | Financial_Monitoring | Financial_ID | FIN | 4 | Create/update |
 
-**Inventory count:** 14 call sites in 13 API/function paths. The project-create path allocates two IDs in separate tables; the activity-save path can allocate an activity ID and a dependency ID.
+**Inventory count:** 14 call sites in 13 API/function paths. The project-create path allocates two IDs in separate tables; the activity-save path can allocate an activity ID and a dependency ID. All 14 call sites have now been migrated to atomic insert helpers. A static inventory gate verifies that `generateNextId_` has no remaining callers in `Code.gs`.
 
 ## Proposed remediation architecture
 
@@ -51,7 +51,7 @@ Do not use a helper that only locks ID generation and then releases before inser
 - **Stage B — create-only handlers:** create-only paths are mostly covered by pilots; continue with create branches of mixed handlers, keeping update paths unchanged.
 - **Stage C — mixed create/update handlers:** refactor each handler's create branch only; keep update paths unchanged. Preserve permission checks, ownership checks, validation, field allowlists, audit actions, response shape, and ID formats.
 - **Stage D — multi-record/multi-table paths:** handle project creation/creator assignment and activity/dependency creation separately. These operations currently span multiple writes and are not transactionally atomic; the ID race fix must not imply transaction guarantees.
-- **Stage E — inventory gate:** add static coverage proving every generated-ID call site is migrated or explicitly documented as an exception. Run all regression tests and review diffs before requesting merge.
+- **Stage E — inventory gate:** implemented static coverage proving no active `generateNextId_` call sites remain in `Code.gs`. Run all regression tests and review diffs before requesting merge.
 - **Stage F — Apps Script runtime test:** validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
 
 ## Acceptance criteria
