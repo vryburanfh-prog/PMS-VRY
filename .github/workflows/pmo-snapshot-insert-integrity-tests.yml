@@ -19,6 +19,7 @@ on:
     paths:
       - 'Code.gs'
       - 'Security.gs'
+      - 'index.html'
       - 'tests/pmo-snapshot-insert-integrity.test.js'
       - 'tests/api-auth-coverage.test.js'
       - 'tests/pmo-snapshot-capture-runtime.test.js'
