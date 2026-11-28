@@ -3403,13 +3403,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         return `
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(l.Log_ID)}</td>
-            <td class="py-2 px-3 whitespace-nowrap">${l.Log_Date || '-'}</td>
-            <td class="py-2 px-3 font-mono text-[11px]">${scopeLabel}</td>
-            <td class="py-2 px-3">${l.Quantity_Accomplished || 0}</td>
-            <td class="py-2 px-3 font-bold text-indigo-700">${l.Reported_Progress_Pct || 0}%</td>
-            <td class="py-2 px-3">${l.Submitted_By || '-'}</td>
-            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-semibold ${badgeCls}">${status}</span></td>
-            <td class="py-2 px-3 max-w-xs truncate" title="${l.Notes || ''}">${l.Notes || '-'}</td>
+            <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(l.Log_Date || '-')}</td>
+            <td class="py-2 px-3 font-mono text-[11px]">${escapeHtmlSafe_(scopeLabel)}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(l.Quantity_Accomplished || 0)}</td>
+            <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(l.Reported_Progress_Pct || 0)}%</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(l.Submitted_By || '-')}</td>
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-semibold ${badgeCls}">${escapeHtmlSafe_(status)}</span></td>
+            <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(l.Notes || '')}">${escapeHtmlSafe_(l.Notes || '-')}</td>
             <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${viewBtn}${editBtn}${approveBtns}${rejectBtn}</td>
           </tr>
         `;
