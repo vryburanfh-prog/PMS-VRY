@@ -127,6 +127,6 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - Audit log writes remain after the deletion and are not part of a cross-sheet transaction; that limitation remains.
 
 ### General ID allocation — confirmed broader Phase 1 finding
-- Source inventory found 14 `generateNextId_` call occurrences in `Code.gs` (13 call sites plus the helper definition occurrence count depends on search method; creation paths include user, project, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial records).
+- Source inventory found 14 `generateNextId_` call sites in `Code.gs`, covering user, project, assignment, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial record creation.
 - `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
 - **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
