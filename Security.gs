@@ -280,8 +280,8 @@ function applyManagementViewAllPagesPolicy_() {
         }
       });
     } else {
-      values.Permission_ID = generateNextId_(tabName, 'Permission_ID', 'PRM', 4);
-      insertRecord_(tabName, values);
+      values.Permission_ID = '';
+      insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values);
       added++;
     }
   });
@@ -412,7 +412,8 @@ function createPasswordCredential_(userId, username, password) {
   const all = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
   if (all.some(r => String(r.Username || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
   const salt = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, authRandomToken_(), Utilities.Charset.UTF_8));
-  insertRecord_(DB_CONFIG.TABS.AUTH_CREDENTIALS, { Credential_ID: generateNextId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5), User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() });
+  const credentialRecord = { Credential_ID: '', User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord);
 }
 function findValidAuthSession_(token) {
   const raw = String(token || '').trim();
@@ -457,7 +458,8 @@ function apiLoginWithPassword(username, password) {
   updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
   const token = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+  const sessionRecord = { Session_ID:'', Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord);
   writeAuditLog_({email:'username:'+name,fullName:user.Full_Name,user:{email:'username:'+name,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'PASSWORD'}, 'Password login');
   return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name, role:normalizeRoleName_(user.Role_Name || user.Role_ID)} };
 }
@@ -484,7 +486,8 @@ function apiLoginWithGoogleCredential(idToken) {
   if (role === 'Administrator' && !isAdmin) return { success:false, error:'Administrator access requires a trusted Google account.' };
   const bearer = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+  const sessionRecord = { Session_ID:'', Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord);
   writeAuditLog_({email:email,fullName:user.Full_Name,user:{email:email,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'GOOGLE_OAUTH'}, 'Google OAuth login');
   return { success:true, token:bearer, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name,role:role,isAdmin:isAdmin} };
 }
@@ -603,13 +606,12 @@ function writeAuditLog_(userCtx, action, moduleName, recordId, prevVal, newVal, 
     (userCtx && userCtx.email) || Session.getActiveUser().getEmail() || 'unknown';
   const actorName = (userCtx && userCtx.user && userCtx.user.fullName) ||
     (userCtx && userCtx.fullName) || actorEmail;
-  const auditId = generateNextId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5);
-  insertRecord_(DB_CONFIG.TABS.AUDIT_LOGS, {
-    Audit_ID: auditId, Timestamp: getNowTimestamp_(), User_Email: actorEmail,
+  const auditRecord = { Audit_ID: '', Timestamp: getNowTimestamp_(), User_Email: actorEmail,
     User_Name: actorName, Action: action, Module_Name: moduleName,
     Record_ID: recordId || '',
     Previous_Value: prevVal !== undefined && prevVal !== null ? JSON.stringify(prevVal) : '',
     Updated_Value: newVal !== undefined && newVal !== null ? JSON.stringify(newVal) : '',
     Reason_For_Change: reason || ''
-  });
+  };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord);
 }
