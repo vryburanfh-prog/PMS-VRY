@@ -3876,7 +3876,7 @@ button, input, select, textarea { min-height: 2.25rem; }
       const mainOpts = '<option value="">-- Optional Main WBS --</option>' +
         st.mainWbs.map(m => `<option value="${escapeHtmlSafe_(m.id)}">${escapeHtmlSafe_(m.id)}: ${escapeHtmlSafe_(m.name)}</option>`).join('');
       const subOpts = '<option value="">-- Optional Sub WBS --</option>' +
-        st.subWbs.map(s => `<option value="${s.id}">${s.id}: ${s.name}</option>`).join('');
+        st.subWbs.map(s => `<option value="${escapeHtmlSafe_(s.id)}">${escapeHtmlSafe_(s.id)}: ${escapeHtmlSafe_(s.name)}</option>`).join('');
 
       container.innerHTML = `
         <div class="space-y-6 text-xs">
@@ -3983,7 +3983,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <!-- Table 1: Assignments on Current Project -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <h3 class="font-bold text-slate-900">Assignments in Active Project (${st.projectId})</h3>
+              <h3 class="font-bold text-slate-900">Assignments in Active Project (${escapeHtmlSafe_(st.projectId)})</h3>
               <button onclick="openTeamWorkloadModule()" class="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-[11px] font-medium">
                 ↻ Refresh Utilization
               </button>
@@ -4066,13 +4066,13 @@ button, input, select, textarea { min-height: 2.25rem; }
         return `
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-mono text-slate-600">${escapeHtmlSafe_(w.Assignment_ID) }</td>
-            <td class="py-2 px-3 font-semibold text-slate-900">${w.Employee_Name} <span class="text-[10px] font-mono text-slate-400">${w.Employee_ID ? '(' + w.Employee_ID + ')' : ''}</span></td>
-            <td class="py-2 px-3">${[w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-'}</td>
-            <td class="py-2 px-3 font-mono text-[11px]">${wbsStr}</td>
-            <td class="py-2 px-3 max-w-xs truncate" title="${w.Main_Scope_Of_Responsibility || ''}">${w.Main_Scope_Of_Responsibility || '-'}</td>
-            <td class="py-2 px-3 font-bold text-indigo-700">${w.Workload_Allocation_Pct || 0}%</td>
-            <td class="py-2 px-3 whitespace-nowrap">${dateStr}</td>
-            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${w.Assignment_Status || 'Active'}</span></td>
+            <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(w.Employee_Name)} <span class="text-[10px] font-mono text-slate-400">${w.Employee_ID ? '(' + escapeHtmlSafe_(w.Employee_ID) + ')' : ''}</span></td>
+            <td class="py-2 px-3">${escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')}</td>
+            <td class="py-2 px-3 font-mono text-[11px]">${escapeHtmlSafe_(wbsStr)}</td>
+            <td class="py-2 px-3 max-w-xs truncate" title="${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '')}">${escapeHtmlSafe_(w.Main_Scope_Of_Responsibility || '-')}</td>
+            <td class="py-2 px-3 font-bold text-indigo-700">${escapeHtmlSafe_(w.Workload_Allocation_Pct || 0)}%</td>
+            <td class="py-2 px-3 whitespace-nowrap">${escapeHtmlSafe_(dateStr)}</td>
+            <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(w.Assignment_Status || 'Active')}</span></td>
             <td class="py-2 px-3 text-right space-x-2 whitespace-nowrap">${viewBtn}${editBtn}${delBtn}</td>
           </tr>
         `;
@@ -4113,7 +4113,7 @@ button, input, select, textarea { min-height: 2.25rem; }
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(r.employeeName)} <span class="text-[10px] font-mono text-slate-400">${r.employeeId !== '-' ? '(' + escapeHtmlSafe_(r.employeeId) + ')' : ''}</span></td>
             <td class="py-2 px-3">${[r.position, r.department].filter(Boolean).join(' • ') || '-'}</td>
-            <td class="py-2 px-3">${r.activeProjectsSummary || '<span class="text-slate-400">None active</span>'}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(r.activeProjectsSummary || 'None active')}</td>
             <td class="py-2 px-3 font-bold ${pct > 100 ? 'text-rose-700' : 'text-slate-900'}">${pct}%</td>
             <td class="py-2 px-3">${statusBadge}</td>
           </tr>
