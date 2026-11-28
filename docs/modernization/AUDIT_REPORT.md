@@ -118,3 +118,15 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - Call-site inventory found the current bulk helper use is for `Project_Assignments`, which is not in the cacheable-table list; no current cacheable-table caller was identified.
 - **Remediation:** `insertRecords_` now calls `invalidateTableCache_(tabName)` after the successful bulk write, preventing stale cache if future bulk callers use a cacheable table.
 - Added a regression test in the PR workflow. This is a preventive fix; the initial observation was not confirmed as a current user-impacting defect.
+
+
+### Direct project-record deletion — remediation in PR #100
+- Targeted source inventory identified five API deletion paths using `sheet.deleteRow(existing._rowIndex)` after a prior table read: registry records, weekly reports, team workload, procurement, and financial records.
+- This pattern could act on a stale row index if concurrent operations shift rows between the read and delete, and it bypassed the shared locking/cache invalidation helper.
+- **Remediation:** all five paths now call `deleteRecordsByIds_`, which locates rows by ID under a script lock and invalidates applicable caches. A regression test asserts these APIs use the shared helper instead of row-index deletion.
+- Audit log writes remain after the deletion and are not part of a cross-sheet transaction; that limitation remains.
+
+### General ID allocation — confirmed broader Phase 1 finding
+- Source inventory found 14 `generateNextId_` call occurrences in `Code.gs` (13 call sites plus the helper definition occurrence count depends on search method; creation paths include user, project, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial records).
+- `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
+- **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
