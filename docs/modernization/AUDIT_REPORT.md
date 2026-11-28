@@ -171,6 +171,6 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 
 
 ### Additional concurrency findings for Phase 1 follow-up
-- **Dependency cycle race:** activity predecessor-cycle validation and dependency synchronization are not yet one serialized transaction. Concurrent dependency edits may bypass the cycle check; runtime test plan includes simultaneous edge creation that would form a cycle.
-- **Progress rollup race/partial state:** progress log, activity actual-progress update, and WBS rollup are multiple writes. They need a transaction-like lock and rollback strategy or explicit idempotent recovery.
-- **Status:** these are open high-priority integrity findings; PR #101 does not claim to solve them.
+- **Dependency-cycle race — remediated in PR #101:** activity predecessor validation, activity writes, and dependency synchronization now run under one ScriptLock. Failed dependency synchronization attempts roll back the activity and dependency rows. Live concurrent-request verification remains pending.
+- **Progress rollup race/partial state — open:** progress log, activity actual-progress update, and WBS rollup are multiple writes. They need a transaction-like lock and rollback strategy or explicit idempotent recovery.
+- **Status:** progress rollup concurrency remains a high-priority integrity finding; runtime testing is still required for the dependency-cycle fix.
