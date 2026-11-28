@@ -2544,7 +2544,7 @@ function apiSaveFinancialItem(projectId, payload) {
   const budget = Math.max(0, Number(payload.Budget_Amount) || 0);
   const committed = Math.max(0, Number(payload.Committed_Amount) || 0);
   const actual = Math.max(0, Number(payload.Actual_Spend) || 0);
-  const finId = isUpdate ? rawId : generateNextId_(finTab, 'Financial_ID', 'FIN', 4);
+  let finId = isUpdate ? rawId : '';
 
   const record = {
     Financial_ID: finId,
@@ -2566,7 +2566,7 @@ function apiSaveFinancialItem(projectId, payload) {
     updateRecordById_(finTab, 'Financial_ID', finId, record);
     writeAuditLog_(ctx, 'UPDATE_FINANCIAL', finTab, finId, prevClean, record, 'Updated financial monitoring item');
   } else {
-    insertRecord_(finTab, record);
+    finId = insertRecordWithGeneratedId_(finTab, 'Financial_ID', 'FIN', 4, record);
     writeAuditLog_(ctx, 'CREATE_FINANCIAL', finTab, finId, null, record, 'Created financial monitoring item');
   }
 
