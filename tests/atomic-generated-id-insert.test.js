@@ -445,3 +445,27 @@ test('audit-log and portfolio rollup tables escape sheet-backed values', () => {
     assert.ok(html.includes('escapeHtmlSafe_(r.' + field + ')'), 'portfolio rollup must escape ' + field);
   }
 });
+
+
+test('generated-ID helper prepare callback runs under lock before row append', () => {
+  const dbSource = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
+  const start = dbSource.indexOf('function insertRecordWithGeneratedId_(');
+  const end = dbSource.indexOf('\nfunction ', start + 1);
+  const helper = dbSource.slice(start, end < 0 ? dbSource.length : end);
+  const headers = ['Baseline_ID','Project_ID','Revision_Number','Baseline_Name'];
+  const rows = [headers,['BL-001','PRJ-001',1,'Baseline Rev 1'],['BL-002','PRJ-001',2,'Baseline Rev 2']];
+  const events=[];
+  const sheet={getLastColumn:()=>headers.length,getLastRow:()=>rows.length,getRange(r,c,nr,nc){
+    if(r===1)return {getValues:()=>[headers.slice(c-1,c-1+nc)]};
+    return {getValues:()=>rows.slice(r-1,r-1+nr).map(row=>row.slice(c-1,c-1+nc)),setValues:v=>{rows.push(v[0]);events.push('append');}};
+  }};
+  const fn=vm.runInNewContext('('+helper+')',{LockService:{getScriptLock:()=>({waitLock:ms=>events.push('lock'),releaseLock:()=>events.push('unlock')})},getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),invalidateTableCache_:()=>events.push('invalidate'),String,Math,parseInt,Error});
+  const rec={Baseline_ID:'',Project_ID:'PRJ-001',Revision_Number:0,Baseline_Name:''};
+  const id=fn('Project_Baselines','Baseline_ID','BL',3,rec,(recordObj,headers,existingRows)=>{events.push('prepare');const p=headers.indexOf('Project_ID'),rev=headers.indexOf('Revision_Number');recordObj.Revision_Number=existingRows.reduce((max,row)=>row[p]==='PRJ-001'?Math.max(max,Number(row[rev])||0):max,0)+1;recordObj.Baseline_Name='Baseline Rev '+recordObj.Revision_Number;});
+  assert.equal(id,'BL-003');
+  assert.equal(rec.Revision_Number,3);
+  assert.equal(rec.Baseline_Name,'Baseline Rev 3');
+  assert.ok(events.indexOf('lock')<events.indexOf('prepare'));
+  assert.ok(events.indexOf('prepare')<events.indexOf('append'));
+  assert.ok(events.includes('unlock'));
+});
