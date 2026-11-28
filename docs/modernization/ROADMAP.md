@@ -7,6 +7,7 @@ Modernize the existing Google Apps Script + Google Sheets PMS-VRY in five phases
 **Status:** Audit underway; first targeted remediation PR is open and CI-validated in a mocked test environment. Runtime validation and broader remediation remain pending.
 - Complete source audit: Security.gs, Database.gs, Code.gs, index.html, Presentation.html and module/API cross-check (in progress).
 - Targeted remediation PR #100: PMO snapshot insertion lock/header-aware collision scan; five project deletion paths refactored to ID-based locked deletion; bulk cache invalidation after bulk insert. Static and mocked-runtime CI tests pass. Not merged or deployed.
+- Follow-up PR #102 (stacked on PR #100): generated-ID inventory, atomic ID-and-append helper, mocked-runtime tests, and pilot migration of baseline creation. CI validation pending.
 - Security: token/session lifecycle, Google ID-token validation, authorization coverage, least privilege, admin allowlist, credential storage, login rate limiting, direct API protection, public deck token access.
 - Data integrity: ID generation concurrency, uniqueness, foreign-key/project ownership, update field allowlists, deletion and audit snapshots, validation/normalization, formula preservation.
 - Reliability: consistent errors and API responses, structured logs, backup/restore testing, rollback strategy.
