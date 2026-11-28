@@ -1258,7 +1258,7 @@ function apiSaveActivity(payload) {
       updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', sameDependency.Dependency_ID, { Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays, Is_Active: 'TRUE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
     } else {
       const dependencyRecord = {
-        Dependency_ID: depId, Project_ID: record.Project_ID,
+        Dependency_ID: '', Project_ID: record.Project_ID,
         Predecessor_ID: selectedPredecessor, Successor_ID: actId,
         Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays,
         Is_Active: 'TRUE', Created_By: ctx.email, Created_At: getNowTimestamp_(),
