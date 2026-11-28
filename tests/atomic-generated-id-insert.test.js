@@ -1,0 +1,548 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const source = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
+const start = source.indexOf('function insertRecordWithGeneratedId_(');
+const end = source.indexOf('\nfunction ', start + 1);
+assert.notEqual(start, -1, 'atomic generated-ID insert helper must exist');
+const helperSource = source.slice(start, end === -1 ? source.length : end);
+
+function harness(existingIds, failWrite) {
+  const headers = ['Name', 'Project_ID', 'Baseline_ID', 'Remarks'];
+  const rows = [headers, ...existingIds.map(id => ['existing', 'P-1', id, ''])];
+  const events = [];
+  const sheet = {
+    getLastColumn: () => headers.length,
+    getLastRow: () => rows.length,
+    getRange(row, col, numRows, numCols) {
+      events.push('read:' + row + ':' + col);
+      return {
+        getValues() {
+          if (row === 1) return [headers.slice(col - 1, col - 1 + numCols)];
+          return rows.slice(row - 1, row - 1 + numRows).map(r => r.slice(col - 1, col - 1 + numCols));
+        },
+        setValues(values) {
+          events.push('write');
+          if (failWrite) throw new Error('mock write failure');
+          rows.push(values[0]);
+        }
+      };
+    }
+  };
+  const lock = { waitLock: ms => events.push('lock:' + ms), releaseLock: () => events.push('unlock') };
+  const sandbox = {
+    LockService: { getScriptLock: () => lock },
+    getMasterSpreadsheet_: () => ({ getSheetByName: () => sheet }),
+    invalidateTableCache_: tab => events.push('invalidate:' + tab),
+    String, Math, RegExp, Set, Error
+  };
+  const fn = vm.runInNewContext('(' + helperSource + ')', sandbox);
+  return { fn, rows, events };
+}
+
+test('generated ID and row insertion are performed under one lock; header mapping and collision retry work', () => {
+  const h = harness(['BL-001', 'BL-002'], false);
+  const record = { Name: 'Baseline', Project_ID: 'P-1', Remarks: 'test' };
+  const id = h.fn('Project_Baselines', 'Baseline_ID', 'BL', 3, record);
+  assert.equal(id, 'BL-003');
+  assert.equal(record.Baseline_ID, id);
+  assert.deepEqual(Array.from(h.rows.at(-1)), ['Baseline', 'P-1', 'BL-003', 'test']);
+  const lockAt = h.events.indexOf('lock:10000');
+  const readAt = h.events.findIndex(e => e.startsWith('read:'));
+  const writeAt = h.events.indexOf('write');
+  const unlockAt = h.events.indexOf('unlock');
+  const invalidateAt = h.events.indexOf('invalidate:Project_Baselines');
+  assert.ok(lockAt >= 0 && lockAt < readAt && readAt < writeAt && writeAt < unlockAt);
+  assert.ok(writeAt < invalidateAt && invalidateAt < unlockAt);
+});
+
+test('lock is released when insertion fails', () => {
+  const h = harness([], true);
+  assert.throws(() => h.fn('Project_Baselines', 'Baseline_ID', 'BL', 3, { Project_ID: 'P-1' }), /mock write failure/);
+  assert.ok(h.events.includes('unlock'));
+  assert.ok(!h.events.includes('invalidate:Project_Baselines'));
+});
+
+test('helper rejects a missing ID column before attempting a write and releases lock', () => {
+  const h = harness([], false);
+  assert.throws(() => h.fn('Project_Baselines', 'Missing_ID', 'BL', 3, {}), /Column "Missing_ID" not found/);
+  assert.ok(h.events.includes('unlock'));
+  assert.ok(!h.events.includes('write'));
+});
+
+
+test('user creation uses atomic generated-ID insert rather than split ID generation and append', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateUser(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser, function(recordObj, headers, rows)"));
+  assert.doesNotMatch(fn, /generateNextId_\(DB_CONFIG\.TABS\.USERS/);
+});
+
+
+test('weekly report create path uses atomic ID allocation while update path remains unchanged', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveWeeklyReport(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.WEEKLY_REPORTS"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS"));
+});
+
+test('team workload create path uses atomic ID allocation and preserves update path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveTeamWorkloadAssignment(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', 'WASG', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.TEAM_WORKLOAD"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD"));
+});
+
+
+test('procurement create path uses atomic ID insert while edit path stays intact', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProcurementItem(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(procTab, 'Procurement_ID', 'PRC', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(procTab"));
+  assert.ok(fn.includes("updateRecordById_(procTab, 'Procurement_ID'"));
+});
+
+
+test('financial item create path uses atomic ID insert and keeps update path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveFinancialItem(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(finTab, 'Financial_ID', 'FIN', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(finTab"));
+  assert.ok(fn.includes("updateRecordById_(finTab, 'Financial_ID'"));
+});
+
+
+test('progress log create path uses atomic ID insert and keeps update behavior', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProgressLog(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROGRESS_UPDATES"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID'"));
+});
+
+
+test('Main WBS create path uses atomic generated ID insert and retains edit path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveMainWbs(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.MAIN_WBS"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'"));
+});
+
+
+test('Sub WBS create path uses atomic generated ID insert and retains edit path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveSubWbs(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.SUB_WBS"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'"));
+});
+
+
+test('project-control registry create path uses configured atomic ID helper and update remains intact', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProjectControlRecord(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad, cleanRecord)"));
+  assert.ok(!fn.includes("generateNextId_(cfg.tab"));
+  assert.ok(fn.includes("updateRecordById_(cfg.tab, cfg.idCol, recordId, cleanRecord)"));
+});
+
+
+test('activity create path uses atomic ID insert while existing activity update path remains intact', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveActivity(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID'"));
+});
+
+
+test('activity dependency creation uses atomic ID insert', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveActivity(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependencyRecord)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.DEPENDENCIES"));
+  assert.ok(fn.includes("Dependency_ID: '', Project_ID: record.Project_ID"));
+});
+
+
+test('project creator assignment uses atomic generated-ID insert', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProject(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignmentRecord)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS"));
+  assert.ok(fn.includes("Assignment_ID: '',"));
+});
+
+
+test('provided-ID insert helper checks duplicates and appends under a single script lock', () => {
+  const dbSource = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
+  const start = dbSource.indexOf('function insertRecordWithProvidedId_(');
+  const end = dbSource.indexOf('\nfunction ', start + 1);
+  assert.notEqual(start, -1);
+  const helper = dbSource.slice(start, end < 0 ? dbSource.length : end);
+  // Isolated mock sheet for the caller-supplied-ID helper.
+  const headers = ['Name','Project_ID','Baseline_ID','Remarks'];
+  const rows = [headers,['existing','P-1','BL-001','']];
+  const sheet = {getLastColumn:()=>headers.length,getLastRow:()=>rows.length,getRange(row,col,numRows,numCols){return {getValues:()=>row===1?[headers.slice(col-1,col-1+numCols)]:rows.slice(row-1,row-1+numRows).map(r=>r.slice(col-1,col-1+numCols)),setValues:v=>rows.push(v[0])};}};
+  const testEvents=[];
+  const fn2=vm.runInNewContext('('+helper+')',{LockService:{getScriptLock:()=>({waitLock:ms=>testEvents.push('lock'),releaseLock:()=>testEvents.push('unlock')})},getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),invalidateTableCache_:()=>testEvents.push('invalidate'),String,Error});
+  const record={Name:'Caller ID record',Project_ID:'P-1',Remarks:'manual'};
+  assert.equal(fn2('Project_Baselines','Baseline_ID','BL-002',record),'BL-002');
+  assert.equal(record.Baseline_ID,'BL-002');
+  assert.deepEqual(rows.at(-1),['Caller ID record','P-1','BL-002','manual']);
+  assert.ok(testEvents.indexOf('lock') < testEvents.indexOf('invalidate'));
+  assert.ok(testEvents.includes('unlock'));
+  assert.throws(()=>fn2('Project_Baselines','Baseline_ID','BL-001',{}),/Duplicate ID/);
+});
+
+test('project creation uses atomic insert for generated IDs and locked duplicate-check insert for caller IDs', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProject(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3, record)"));
+  assert.ok(fn.includes("insertRecordWithProvidedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECTS"));
+});
+
+
+test('generated-ID inventory gate: no active legacy allocator call sites in Code.gs or Security.gs', () => {
+  for (const file of ['Code.gs', 'Security.gs']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const matches = source.match(/generateNextId_\s*\(/g) || [];
+    assert.equal(matches.length, 0, file + ' must not call the legacy unlocked allocator.');
+  }
+});
+
+
+
+test('Security generated-ID creation paths use atomic insert helpers', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  assert.ok(security.includes("insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values)"));
+  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows)"));
+  assert.equal((security.match(/insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord\)/g) || []).length, 2);
+  assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord)"));
+  assert.ok(security.includes("Credential_ID: ''"));
+  assert.ok(security.includes("Session_ID:''"));
+  assert.ok(security.includes("Audit_ID: ''"));
+  assert.ok(security.includes("values.Permission_ID = ''"));
+});
+
+
+test('password-login failure state increments atomically, locks at five, blocks further increments, and resets', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function updatePasswordLoginState_(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const helper = security.slice(start, end < 0 ? security.length : end);
+  const headers = ['Credential_ID','Failed_Attempts','Locked_Until','Updated_At'];
+  const row = ['CRD-00001',0,'',''];
+  const events = [];
+  const sheet = {
+    getLastColumn:()=>headers.length,
+    getLastRow:()=>2,
+    getRange(r,c,nr,nc) {
+      if(r===1) return {getValues:()=>[headers.slice(c-1,c-1+nc)]};
+      if(r===2 && c===1) return {getValues:()=>[[row[0]]]};
+      if(r===2) return {getValue:()=>row[c-1],setValue:v=>{row[c-1]=v;events.push('write:'+c);}};
+      return {getValues:()=>[]};
+    }
+  };
+  const fn=vm.runInNewContext('('+helper+')',{
+    LockService:{getScriptLock:()=>({waitLock:ms=>events.push('lock'),releaseLock:()=>events.push('unlock')})},
+    getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),
+    DB_CONFIG:{TABS:{AUTH_CREDENTIALS:'Auth_Credentials'}},
+    invalidateTableCache_:()=>events.push('invalidate'),
+    getNowTimestamp_:()=> '2026-11-28T00:00:00Z',
+    String,Number,Date,Error,Boolean
+  });
+  assert.equal(fn('CRD-00001','check').locked,false);
+  for(let i=0;i<4;i++) assert.equal(fn('CRD-00001','failure').attempts,i+1);
+  const fifth=fn('CRD-00001','failure');
+  assert.equal(fifth.attempts,5);
+  assert.equal(fifth.locked,true);
+  const blocked=fn('CRD-00001','failure');
+  assert.equal(blocked.attempts,5);
+  assert.equal(blocked.locked,true);
+  assert.equal(fn('CRD-00001','reset').attempts,0);
+  assert.equal(row[1],0);
+  assert.equal(row[2],'');
+  assert.ok(events.includes('unlock'));
+  assert.ok(events.includes('invalidate'));
+});
+
+
+test('project-controls registry rendering escapes untrusted text and restricts links to HTTP(S)', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function renderControlsRegistryShell(');
+  const end = html.indexOf('\nfunction ', start + 1);
+  const shell = html.slice(start, end < 0 ? html.length : end);
+  assert.ok(shell.includes("escapeHtmlSafe_(s.id)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(f.label)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(o)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(s)"));
+  assert.ok(shell.includes("safeJsArg_(st.key)"));
+  const tableStart = html.indexOf('function renderControlsRegistryTable(');
+  const tableEnd = html.indexOf('\nfunction ', tableStart + 1);
+  const table = html.slice(tableStart, tableEnd < 0 ? html.length : tableEnd);
+  assert.ok(table.includes("const safeVal = escapeHtmlSafe_(val)"));
+  assert.ok(table.includes('${safeVal}</span></td>'));
+  assert.ok(table.includes('${safeVal}</td>'));
+  assert.ok(table.includes("const safeLinkUrl = /^https?:"));
+  assert.ok(table.includes(".test(rawUrl)"));
+  assert.ok(table.includes("rel=\"noopener noreferrer\""));
+});
+
+
+test('inline JavaScript in index.html parses after registry rendering changes', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = [];
+  let cursor = 0;
+  while (cursor < html.length) {
+    const open = html.indexOf('<script', cursor);
+    if (open < 0) break;
+    const openEnd = html.indexOf('>', open);
+    const close = html.indexOf('</script>', openEnd);
+    if (openEnd < 0 || close < 0) break;
+    scripts.push(html.slice(openEnd + 1, close));
+    cursor = close + 9;
+  }
+  const nonEmpty = scripts.filter(source => source.trim());
+  assert.ok(nonEmpty.length > 0);
+  nonEmpty.forEach((source, i) => {
+    const sanitized = source.replace("<?!= JSON.stringify(googleClientId || '') ?>", "''");
+    assert.doesNotThrow(() => new vm.Script(sanitized), 'inline script ' + i + ' must parse');
+  });
+});
+
+
+
+test('WBS, baseline, portfolio, project register, and filter renderers escape dynamic sheet values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const required = [
+    "escapeHtmlSafe_(m.Main_WBS_ID)",
+    "escapeHtmlSafe_(m.WBS_Weight || 0)",
+    "escapeHtmlSafe_(s.WBS_Weight || 0)",
+    "escapeHtmlSafe_(a.Activity_Weight || 0)",
+    "escapeHtmlSafe_(d.Lag_Or_Lead_Days || 0)",
+    "escapeHtmlSafe_(b.Approved_By || '-')",
+    "escapeHtmlSafe_(b.Remarks || '-')",
+    "escapeHtmlSafe_(p.Client || '-')",
+    "escapeHtmlSafe_(p.Project_Manager || '-')",
+    "escapeHtmlSafe_(p.Project_Status || '-')",
+    "escapeHtmlSafe_(mod)",
+    "escapeHtmlSafe_(m)",
+    "escapeHtmlSafe_(c)"
+  ];
+  required.forEach(fragment => assert.ok(html.includes(fragment), 'missing escape in rendering path: ' + fragment));
+  assert.ok(html.includes("startEditProject(JSON.parse("));
+});
+
+
+test('remaining Gantt and registry labels escape dynamic values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(html.includes("escapeHtmlSafe_(proj.Overall_Planned_Progress || 0)"));
+  assert.ok(html.includes("escapeHtmlSafe_(proj.Overall_Actual_Progress || 0)"));
+  assert.ok(html.includes("escapeHtmlSafe_(r.bStart)"));
+  assert.ok(html.includes("escapeHtmlSafe_(r.bEnd)"));
+  assert.ok(html.includes("Loading ${escapeHtmlSafe_(registryKey)} registry"));
+  assert.ok(html.includes("Total ${escapeHtmlSafe_(st.key)}"));
+});
+
+
+test('progress-log table escapes data fields and notes attribute', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function renderDailyLogsTable(');
+  const end = html.indexOf('\nfunction ', start + 1);
+  const fn = html.slice(start, end < 0 ? html.length : end);
+  for (const field of ['Log_Date','Quantity_Accomplished','Reported_Progress_Pct','Submitted_By','Notes']) {
+    assert.ok(fn.includes('escapeHtmlSafe_(l.' + field), 'progress table must escape ' + field);
+  }
+  assert.ok(fn.includes('escapeHtmlSafe_(scopeLabel)'));
+  assert.ok(fn.includes('escapeHtmlSafe_(status)'));
+});
+
+
+test('weekly-report cards and printable export escape user-controlled narrative fields', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['Accomplishments','Ongoing_Activities','Pending_Activities','Next_Steps','Issues_Encountered','Mitigation_Measures','Management_Support_Needed','Responsible_Team_Lead','Remarks']) {
+    assert.ok(html.includes('escapeHtmlSafe_(r.' + field), 'weekly-report output must escape ' + field);
+  }
+  for (const field of ['Log_ID','Log_Date','Activity_ID','Submitted_By','Approval_Status','Notes']) {
+    assert.ok(html.includes('escapeHtmlSafe_(l.' + field), 'printable progress export must escape ' + field);
+  }
+  assert.ok(html.includes('escapeHtmlSafe_(proj.Project_Name || \'\')'));
+});
+
+
+test('team workload assignment renderer escapes all sheet-backed fields', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function renderProjectWorkloadTable(');
+  const end = html.indexOf('\nfunction ', start + 1);
+  const fn = html.slice(start, end < 0 ? html.length : end);
+  for (const field of ['Employee_Name','Employee_ID','Main_Scope_Of_Responsibility','Workload_Allocation_Pct','Assignment_Status']) {
+    assert.ok(fn.includes('escapeHtmlSafe_(w.' + field), 'workload renderer must escape ' + field);
+  }
+  assert.ok(fn.includes("escapeHtmlSafe_([w.Position, w.Department_Or_Team].filter(Boolean).join(' • ') || '-')"));
+  assert.ok(fn.includes('escapeHtmlSafe_(wbsStr)'));
+  assert.ok(fn.includes('escapeHtmlSafe_(dateStr)'));
+});
+
+
+test('procurement and financial tables escape all text fields', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['PO_Or_Reference','Item_Description','Vendor_Or_Carrier','Quantity','Expected_Delivery_Date','Delivery_Status']) {
+    assert.ok(html.includes('escapeHtmlSafe_(p.' + field), 'procurement output must escape ' + field);
+  }
+  for (const field of ['Cost_Category','Line_Item_Description','Burn_Pct']) {
+    assert.ok(html.includes('escapeHtmlSafe_(f.' + field), 'financial output must escape ' + field);
+  }
+  assert.ok(html.includes('safeJsArg_(activeSub)'));
+});
+
+
+test('team workload rollup escapes position and department values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(html.includes("escapeHtmlSafe_([r.position, r.department].filter(Boolean).join(' • ') || '-')"));
+});
+
+
+test('audit-log and portfolio rollup tables escape sheet-backed values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['ts','actor','action','entity','note']) {
+    assert.ok(html.includes('escapeHtmlSafe_(' + field + ')'), 'audit log must escape ' + field);
+  }
+  for (const field of ['Project_ID','Project_Name','Status','Latest_Progress','Overallocated_Resources']) {
+    assert.ok(html.includes('escapeHtmlSafe_(r.' + field + ')'), 'portfolio rollup must escape ' + field);
+  }
+});
+
+
+test('generated-ID helper prepare callback runs under lock before row append', () => {
+  const dbSource = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
+  const start = dbSource.indexOf('function insertRecordWithGeneratedId_(');
+  const end = dbSource.indexOf('\nfunction ', start + 1);
+  const helper = dbSource.slice(start, end < 0 ? dbSource.length : end);
+  const headers = ['Baseline_ID','Project_ID','Revision_Number','Baseline_Name'];
+  const rows = [headers,['BL-001','PRJ-001',1,'Baseline Rev 1'],['BL-002','PRJ-001',2,'Baseline Rev 2']];
+  const events=[];
+  const sheet={getLastColumn:()=>headers.length,getLastRow:()=>rows.length,getRange(r,c,nr,nc){
+    if(r===1)return {getValues:()=>[headers.slice(c-1,c-1+nc)]};
+    return {getValues:()=>rows.slice(r-1,r-1+nr).map(row=>row.slice(c-1,c-1+nc)),setValues:v=>{rows.push(v[0]);events.push('append');}};
+  }};
+  const fn=vm.runInNewContext('('+helper+')',{LockService:{getScriptLock:()=>({waitLock:ms=>events.push('lock'),releaseLock:()=>events.push('unlock')})},getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),invalidateTableCache_:()=>events.push('invalidate'),String,Math,parseInt,Error});
+  const rec={Baseline_ID:'',Project_ID:'PRJ-001',Revision_Number:0,Baseline_Name:''};
+  const id=fn('Project_Baselines','Baseline_ID','BL',3,rec,(recordObj,headers,existingRows)=>{events.push('prepare');const p=headers.indexOf('Project_ID'),rev=headers.indexOf('Revision_Number');recordObj.Revision_Number=existingRows.reduce((max,row)=>row[p]==='PRJ-001'?Math.max(max,Number(row[rev])||0):max,0)+1;recordObj.Baseline_Name='Baseline Rev '+recordObj.Revision_Number;});
+  assert.equal(id,'BL-003');
+  assert.equal(rec.Revision_Number,3);
+  assert.equal(rec.Baseline_Name,'Baseline Rev 3');
+  assert.ok(events.indexOf('lock')<events.indexOf('prepare'));
+  assert.ok(events.indexOf('prepare')<events.indexOf('append'));
+  assert.ok(events.includes('unlock'));
+});
+
+
+test('baseline snapshot helper reads project-filtered tables and active dependencies from live sheets', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function buildProjectBaselineSnapshotUnderLock_(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const helper = code.slice(start, end < 0 ? code.length : end);
+  const sheets = {
+    Main_WBS: [['Main_WBS_ID','Project_ID','Module_Name'],['MWBS-001','PRJ-001','Main One'],['MWBS-002','PRJ-002','Other Project']],
+    Sub_WBS: [['Sub_WBS_ID','Project_ID','Task_Name'],['SWBS-001','PRJ-001','Sub One']],
+    Activities_Schedule: [['Activity_ID','Project_ID','Activity_Name'],['ACT-0001','PRJ-001','Activity One']],
+    Schedule_Dependencies: [['Dependency_ID','Project_ID','Status'],['DEP-0001','PRJ-001','Active'],['DEP-0002','PRJ-001','Inactive'],['DEP-0003','PRJ-002','Active']]
+  };
+  const sheetObjs={};
+  Object.entries(sheets).forEach(([name,rows])=>{
+    sheetObjs[name]={getLastColumn:()=>rows[0].length,getLastRow:()=>rows.length,getRange(r,c,nr,nc){return {getValues:()=>rows.slice(r-1,r-1+nr).map(row=>row.slice(c-1,c-1+nc))};}};
+  });
+  const fn=vm.runInNewContext('('+helper+')',{getMasterSpreadsheet_:()=>({getSheetByName:name=>sheetObjs[name]}),DB_CONFIG:{TABS:{MAIN_WBS:'Main_WBS',SUB_WBS:'Sub_WBS',ACTIVITIES:'Activities_Schedule',DEPENDENCIES:'Schedule_Dependencies'}},getNowTimestamp_:()=> '2026-11-28T00:00:00Z',isActiveDependencyRecord_:r=>r.Status==='Active',String,Error});
+  const snapshot=fn('PRJ-001');
+  assert.equal(snapshot.capturedAt,'2026-11-28T00:00:00Z');
+  assert.equal(snapshot.mainWbs.length,1);
+  assert.equal(snapshot.subWbs.length,1);
+  assert.equal(snapshot.activities.length,1);
+  assert.equal(snapshot.dependencies.length,1);
+  assert.equal(snapshot.dependencies[0].Dependency_ID,'DEP-0001');
+});
+
+test('baseline API captures snapshot and calculates revision inside the atomic prepare callback', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProjectBaseline(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record, function(recordObj, headers, rows)"));
+  assert.ok(fn.includes("recordObj.Revision_Number = nextRev"));
+  assert.ok(fn.includes("recordObj.Snapshot_JSON = JSON.stringify(buildProjectBaselineSnapshotUnderLock_(pid))"));
+  assert.ok(!fn.includes("getTableRecords_(DB_CONFIG.TABS.MAIN_WBS"));
+});
+
+
+test('CSV export neutralizes formula-like text while preserving numeric negative values', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function convertRecordsToCsv_(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const helper = code.slice(start, end < 0 ? code.length : end);
+  const fn = vm.runInNewContext('(' + helper + ')', {String,Object,RegExp});
+  const csv = fn([
+    {TextFormula:'=HYPERLINK("https://example.invalid","click")',AtFormula:'  @SUM(1,2)',NumericNegative:-25,Quoted:'a,b'}
+  ]);
+  assert.ok(csv.includes("'=HYPERLINK"));
+  assert.ok(csv.includes("'  @SUM"));
+  assert.ok(csv.includes(',-25,'));
+  assert.ok(csv.includes('"a,b"'));
+});
+
+
+test('Google ID token login safely handles malformed claims and validates audience, azp, subject, and time bounds', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function apiLoginWithGoogleCredential(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const fn = security.slice(start, end < 0 ? security.length : end);
+  assert.ok(fn.includes('try { claims = JSON.parse(response.getContentText() || \'{}\'); } catch (e)'));
+  assert.ok(fn.includes('authorizedParty && authorizedParty !== clientId'));
+  assert.ok(fn.includes('!subject'));
+  assert.ok(fn.includes('issuedAt > nowSeconds + 60'));
+  assert.ok(fn.includes('nowSeconds - issuedAt > 3600'));
+});
+
+
+test('password credential username uniqueness is checked inside atomic insertion lock', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function createPasswordCredential_(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const fn = security.slice(start, end < 0 ? security.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows)"));
+  assert.ok(fn.includes("rows.some(row => String(row[usernameIndex] || '').trim().toLowerCase() === normalized)"));
+  assert.ok(!fn.includes("getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS)"));
+});

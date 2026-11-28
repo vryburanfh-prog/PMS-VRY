@@ -280,8 +280,8 @@ function applyManagementViewAllPagesPolicy_() {
         }
       });
     } else {
-      values.Permission_ID = generateNextId_(tabName, 'Permission_ID', 'PRM', 4);
-      insertRecord_(tabName, values);
+      values.Permission_ID = '';
+      insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values);
       added++;
     }
   });
@@ -409,11 +409,16 @@ function hashPassword_(password, salt) {
 function createPasswordCredential_(userId, username, password) {
   ensureHybridAuthTables_();
   const normalized = String(username || '').trim().toLowerCase();
-  const all = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  if (all.some(r => String(r.Username || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
   const salt = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, authRandomToken_(), Utilities.Charset.UTF_8));
-  insertRecord_(DB_CONFIG.TABS.AUTH_CREDENTIALS, { Credential_ID: generateNextId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5), User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() });
+  const credentialRecord = { Credential_ID: '', User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows) {
+    const usernameIndex = headers.indexOf('Username');
+    if (usernameIndex < 0) throw new Error('Credential Username column is missing.');
+    if (rows.some(row => String(row[usernameIndex] || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
+    recordObj.Username = normalized;
+  });
 }
+
 function findValidAuthSession_(token) {
   const raw = String(token || '').trim();
   if (!raw) return null;
@@ -437,6 +442,58 @@ function findValidAuthSession_(token) {
   return record;
 }
 
+/**
+ * Reads or updates password-login failure state from the credential sheet
+ * under one script lock, so simultaneous failed logins cannot lose increments.
+ * mode: check | failure | reset
+ */
+function updatePasswordLoginState_(credentialId, mode) {
+  const action = String(mode || '').trim().toLowerCase();
+  if (['check', 'failure', 'reset'].indexOf(action) === -1) throw new Error('Invalid password-login state operation.');
+  const id = String(credentialId || '').trim();
+  if (!id) throw new Error('Credential_ID is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+    if (!sheet) throw new Error('Authentication credentials table is missing.');
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
+    const idCol = headers.indexOf('Credential_ID') + 1;
+    const attemptsCol = headers.indexOf('Failed_Attempts') + 1;
+    const lockedCol = headers.indexOf('Locked_Until') + 1;
+    const updatedCol = headers.indexOf('Updated_At') + 1;
+    if (!idCol || !attemptsCol || !lockedCol || !updatedCol) throw new Error('Password-login state columns are missing.');
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) throw new Error('Credential not found.');
+    const ids = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
+    let rowNumber = -1;
+    for (let i = 0; i < ids.length; i++) if (String(ids[i][0] || '').trim() === id) { rowNumber = i + 2; break; }
+    if (rowNumber < 0) throw new Error('Credential not found.');
+    const attempts = Number(sheet.getRange(rowNumber, attemptsCol).getValue()) || 0;
+    const lockedUntil = String(sheet.getRange(rowNumber, lockedCol).getValue() || '');
+    const locked = lockedUntil && new Date(lockedUntil).getTime() > Date.now();
+    if (action === 'check') return { locked: Boolean(locked), lockedUntil: lockedUntil, attempts: attempts };
+    if (action === 'failure') {
+      if (locked) return { locked: true, lockedUntil: lockedUntil, attempts: attempts };
+      const nextAttempts = attempts + 1;
+      const nextLockedUntil = nextAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : '';
+      sheet.getRange(rowNumber, attemptsCol).setValue(nextAttempts);
+      sheet.getRange(rowNumber, lockedCol).setValue(nextLockedUntil);
+      sheet.getRange(rowNumber, updatedCol).setValue(getNowTimestamp_());
+      invalidateTableCache_(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+      return { locked: Boolean(nextLockedUntil), lockedUntil: nextLockedUntil, attempts: nextAttempts };
+    }
+    sheet.getRange(rowNumber, attemptsCol).setValue(0);
+    sheet.getRange(rowNumber, lockedCol).setValue('');
+    sheet.getRange(rowNumber, updatedCol).setValue(getNowTimestamp_());
+    invalidateTableCache_(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+    return { locked: false, lockedUntil: '', attempts: 0 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function apiLoginWithPassword(username, password) {
   ensureHybridAuthTables_();
   const name = String(username || '').trim().toLowerCase();
@@ -445,19 +502,20 @@ function apiLoginWithPassword(username, password) {
   const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
   const cred = creds.find(r => String(r.Username || '').toLowerCase() === name && isTruthySheetFlag_(r.Is_Active));
   if (!cred) { Utilities.sleep(500); return { success:false, error:'Invalid username or password.' }; }
-  if (cred.Locked_Until && new Date(cred.Locked_Until).getTime() > Date.now()) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
+  const loginState = updatePasswordLoginState_(cred.Credential_ID, 'check');
+  if (loginState.locked) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.User_ID) === String(cred.User_ID));
   if (!user || !isTruthySheetFlag_(user.Is_Active) || normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') return { success:false, error:'This account is inactive or not eligible for password login.' };
   const candidate = hashPassword_(pass, cred.Password_Salt);
   if (candidate !== String(cred.Password_Hash || '')) {
-    const attempts = Number(cred.Failed_Attempts || 0) + 1;
-    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts: attempts, Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '', Updated_At: getNowTimestamp_() });
+    updatePasswordLoginState_(cred.Credential_ID, 'failure');
     Utilities.sleep(500); return { success:false, error:'Invalid username or password.' };
   }
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
+  updatePasswordLoginState_(cred.Credential_ID, 'reset');
   const token = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+  const sessionRecord = { Session_ID:'', Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord);
   writeAuditLog_({email:'username:'+name,fullName:user.Full_Name,user:{email:'username:'+name,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'PASSWORD'}, 'Password login');
   return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name, role:normalizeRoleName_(user.Role_Name || user.Role_ID)} };
 }
@@ -469,12 +527,18 @@ function apiLoginWithGoogleCredential(idToken) {
   if (!token || token.length > 10000) return { success:false, error:'Invalid Google sign-in response.' };
   const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions:true });
   if (response.getResponseCode() !== 200) return { success:false, error:'Google could not verify this sign-in. Please try again.' };
-  const claims = JSON.parse(response.getContentText() || '{}');
+  let claims;
+  try { claims = JSON.parse(response.getContentText() || '{}'); } catch (e) { return { success:false, error:'Google identity verification failed.' }; }
+  if (!claims || typeof claims !== 'object') return { success:false, error:'Google identity verification failed.' };
   const email = String(claims.email || '').trim().toLowerCase();
   const issuer = String(claims.iss || '');
   const expires = Number(claims.exp || 0);
+  const issuedAt = Number(claims.iat || 0);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const subject = String(claims.sub || '').trim();
+  const authorizedParty = String(claims.azp || '').trim();
   const verified = String(claims.email_verified || '').toLowerCase() === 'true';
-  if (String(claims.aud || '') !== clientId || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
+  if (String(claims.aud || '') !== clientId || (authorizedParty && authorizedParty !== clientId) || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || !subject || expires <= nowSeconds || issuedAt <= 0 || issuedAt > nowSeconds + 60 || nowSeconds - issuedAt > 3600) {
     return { success:false, error:'Google identity verification failed.' };
   }
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.Email || '').trim().toLowerCase() === email);
@@ -484,7 +548,8 @@ function apiLoginWithGoogleCredential(idToken) {
   if (role === 'Administrator' && !isAdmin) return { success:false, error:'Administrator access requires a trusted Google account.' };
   const bearer = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+  const sessionRecord = { Session_ID:'', Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord);
   writeAuditLog_({email:email,fullName:user.Full_Name,user:{email:email,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'GOOGLE_OAUTH'}, 'Google OAuth login');
   return { success:true, token:bearer, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name,role:role,isAdmin:isAdmin} };
 }
@@ -603,13 +668,12 @@ function writeAuditLog_(userCtx, action, moduleName, recordId, prevVal, newVal, 
     (userCtx && userCtx.email) || Session.getActiveUser().getEmail() || 'unknown';
   const actorName = (userCtx && userCtx.user && userCtx.user.fullName) ||
     (userCtx && userCtx.fullName) || actorEmail;
-  const auditId = generateNextId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5);
-  insertRecord_(DB_CONFIG.TABS.AUDIT_LOGS, {
-    Audit_ID: auditId, Timestamp: getNowTimestamp_(), User_Email: actorEmail,
+  const auditRecord = { Audit_ID: '', Timestamp: getNowTimestamp_(), User_Email: actorEmail,
     User_Name: actorName, Action: action, Module_Name: moduleName,
     Record_ID: recordId || '',
     Previous_Value: prevVal !== undefined && prevVal !== null ? JSON.stringify(prevVal) : '',
     Updated_Value: newVal !== undefined && newVal !== null ? JSON.stringify(newVal) : '',
     Reason_For_Change: reason || ''
-  });
+  };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord);
 }

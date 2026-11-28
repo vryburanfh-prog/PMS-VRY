@@ -268,6 +268,88 @@ function deleteRecordById_(tabName, idColumn, recordId) {
   }
 }
 
+/**
+ * Allocates a generated ID and appends the record while holding one script lock.
+ * This prevents concurrent create requests from choosing the same ID.
+ * The record object is updated with the generated ID and returned.
+ */
+function insertRecordWithGeneratedId_(tabName, idColumn, prefix, padLength, recordObj, prepareRecordFn) {
+  if (!recordObj || typeof recordObj !== 'object') throw new Error('A record object is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
+    if (!sheet) throw new Error('Database table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf(idColumn);
+    if (idIndex < 0) throw new Error('Column "' + idColumn + '" not found in ' + tabName);
+    const lastRow = sheet.getLastRow();
+    const dataRows = lastRow > 1 && typeof prepareRecordFn === 'function'
+      ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues()
+      : [];
+    const existingIds = lastRow > 1
+      ? (typeof prepareRecordFn === 'function'
+          ? dataRows.map(r => String(r[idIndex] || '').trim())
+          : sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().map(r => String(r[0] || '').trim()))
+      : [];
+    if (typeof prepareRecordFn === 'function') prepareRecordFn(recordObj, headers, dataRows);
+    const regex = new RegExp('^' + String(prefix) + '-(\\d+)$');
+    let maxNum = 0;
+    existingIds.forEach(function(id) {
+      const match = id.match(regex);
+      if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10) || 0);
+    });
+    let candidate;
+    do {
+      maxNum++;
+      candidate = String(prefix) + '-' + String(maxNum).padStart(padLength || 3, '0');
+    } while (existingIds.indexOf(candidate) !== -1);
+    recordObj[idColumn] = candidate;
+    const row = headers.map(header => recordObj[header] !== undefined ? recordObj[header] : '');
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
+    invalidateTableCache_(tabName);
+    return candidate;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Inserts a record with a caller-supplied ID while holding a script lock.
+ * The ID uniqueness check and append are performed in one critical section.
+ */
+function insertRecordWithProvidedId_(tabName, idColumn, providedId, recordObj) {
+  const id = String(providedId || '').trim();
+  if (!id) throw new Error('A caller-supplied ID is required.');
+  if (!recordObj || typeof recordObj !== 'object') throw new Error('A record object is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
+    if (!sheet) throw new Error('Database table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf(idColumn);
+    if (idIndex < 0) throw new Error('Column "' + idColumn + '" not found in ' + tabName);
+    const lastRow = sheet.getLastRow();
+    const existingIds = lastRow > 1
+      ? sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().map(r => String(r[0] || '').trim())
+      : [];
+    if (existingIds.indexOf(id) !== -1) throw new Error('Duplicate ID "' + id + '" in ' + tabName);
+    recordObj[idColumn] = id;
+    const row = headers.map(header => recordObj[header] !== undefined ? recordObj[header] : '');
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
+    invalidateTableCache_(tabName);
+    return id;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
 function generateNextId_(tabName, idColumn, prefix, padLength) {
   const records = getTableRecords_(tabName);
   let maxNum = 0;

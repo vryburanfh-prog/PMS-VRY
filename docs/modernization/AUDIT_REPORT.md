@@ -22,10 +22,13 @@ The code has useful foundations: a server-side role permission ceiling, project 
 **Severity:** High pending crypto validation.
 
 ### P1 — High: Login throttling may be bypassable / lacks global controls
-**Evidence:** Password login tracks Failed_Attempts per credential and applies a 15-minute lock at 5 attempts, with 500 ms sleep on failures. Need inspect locking/atomicity, reset behavior, unknown-user timing, and whether attacker can trigger simultaneous requests to race counters.
-**Impact:** Credential guessing or denial of service by locking legitimate accounts.
-**Recommendation:** Add atomic failure counters, progressive backoff, global/IP-independent controls available in Apps Script, administrator recovery, audit for lockout events, and equalized failure responses/timing where practical.
-**Severity:** High pending validation.
+**Original finding:** Failed_Attempts was read from a cached record and updated separately, so simultaneous failures could lose increments and undercount lockouts.
+
+**Remediated in PR #102:** `updatePasswordLoginState_` now reads, checks, increments, locks, and resets password failure state under a script lock using the credential sheet row. It applies the five-failure/15-minute policy atomically and invalidates the credential cache after writes. A mocked-runtime regression test verifies increment, threshold lock, blocked further increments, reset, and lock release.
+
+**Additional remediation in PR #102:** credential usernames and user emails are now checked for duplicates inside the atomic insert lock; if credential creation fails after a new user row is inserted, that user row is rolled back. Google ID-token claims now safely parse and validate audience, authorized party, subject, issuer, email verification, expiry, and issued-at bounds. **Still open:** global throttling across accounts, IP-independent controls unavailable in Apps Script, admin recovery flow, lockout auditing, unknown-user timing, and live concurrent-runtime verification.
+**Severity:** High residual risk until broader controls and runtime validation are complete.
+
 
 ### P1 — High: Google token validation and network error handling needs hardening
 **Evidence:** Google sign-in validates token via tokeninfo endpoint, checks audience, issuer, email_verified and expiry. It uses UrlFetchApp.fetch with muteHttpExceptions, then JSON.parse after 200. Need verify timeout/error behavior, claim validation (including subject), and token handling/redirect URI context.
@@ -61,9 +64,14 @@ The code has useful foundations: a server-side role permission ceiling, project 
 **Recommendation:** Centralize mutations, invalidate affected caches, and use short TTL for permission/configuration caches or bypass caches for security-sensitive decisions.
 
 ### P2 — Medium: UI rendering uses innerHTML extensively
-**Evidence:** index.html dynamically builds module HTML with innerHTML. Many paths use escapeHtmlSafe_, but complete taint tracing and safe-JS argument validation are not finished.
-**Impact:** XSS if unescaped database/API values reach markup, attributes, event handlers, URLs, or script contexts.
-**Recommendation:** Audit every dynamic insertion, use context-specific encoding, avoid inline handler construction with untrusted values, validate URLs and use DOM text APIs for plain text. Add XSS regression payload tests.
+**Evidence:** index.html dynamically builds module HTML with innerHTML. Targeted review identified raw sheet-backed fields in Project Controls Registry, WBS/Schedule, Project Register/Portfolio, Progress Logs, Weekly Reports and their printable exports, Team Workload, Procurement, Financials, Governance Audit Logs, and portfolio roll-up views.
+
+**Remediated in PR #102:** dynamic text in those reviewed tables/cards/exports is escaped; project register edit payloads are passed through a safe JS argument helper; registry links are restricted to HTTP(S), escaped, and rendered with `noopener noreferrer`. Tests assert the escape points and parse inline JavaScript after replacing the Apps Script template directive.
+
+**Still open:** full taint tracing across the remaining innerHTML paths, especially other modules and export surfaces, plus browser-based XSS verification.
+**Impact:** XSS remains possible in any unreviewed rendering path.
+**Severity:** Medium residual risk.
+
 
 ### P2 — Medium: Google Sheets is the current datastore and needs scale controls
 **Evidence:** Database helpers read full table ranges; getTableRecords_ materializes all rows and columns. The project data is spreadsheet-backed.
@@ -126,19 +134,10 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - **Remediation:** all five paths now call `deleteRecordsByIds_`, which locates rows by ID under a script lock and invalidates applicable caches. A regression test asserts these APIs use the shared helper instead of row-index deletion.
 - Audit log writes remain after the deletion and are not part of a cross-sheet transaction; that limitation remains.
 
-### General ID allocation — confirmed broader Phase 1 finding
-- Source inventory found 14 `generateNextId_` call sites in `Code.gs`, covering user, project, assignment, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial record creation.
-- `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
-- **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
+### General ID allocation — confirmed and remediated in PR #102
+- Source inventory identified 14 `generateNextId_` call sites in `Code.gs` across 13 API/function paths.
+- The unlocked allocator was replaced at every active call site by `insertRecordWithGeneratedId_`, which holds the script lock while reading IDs, allocating, header-mapping, appending, and invalidating cache. Caller-supplied project IDs use `insertRecordWithProvidedId_`, which performs duplicate checking and append under one lock.
+- **Status:** all 14 inventoried call sites are migrated on PR #102. A static test gate asserts that no active `generateNextId_` calls remain in `Code.gs`. Consolidated Node CI passed on commit `5ff95f3d61c0e86bd70e9937a9e65bbbeb7e641b`; the subsequent creator-assignment placeholder correction is also covered by the successful CI run.
+- **Still pending:** live Apps Script concurrent-create/runtime validation in an isolated non-production spreadsheet. Multi-table operations and audit writes are not transactional.
 
 
-### General ID allocation — remediation design and acceptance criteria
-
-**Proposed safe remediation (separate targeted PR):**
-1. Add a database helper that acquires the script lock, reads the ID column directly from the sheet (not from cache), computes the next ID, assigns it to the record, and performs the append while retaining the same lock.
-2. Make the helper release the lock in `finally`, including failures in ID calculation or append.
-3. Refactor create-only paths first, then mixed create/update handlers individually. Preserve caller-provided IDs only where the existing API intentionally supports them; validate uniqueness under the lock before write.
-4. Keep existing update paths unchanged and preserve permission checks, project ownership validation, field allowlists, and audit events.
-5. Add mocked-runtime tests for concurrent requests, duplicate/collision detection, lock release on write failure, header mapping, and custom-ID handling. Include static inventory coverage so every generated-ID creation path uses the atomic helper.
-
-**Acceptance criteria:** all generated IDs are unique under concurrent create calls; allocation and write occur under one lock; failure releases the lock; all 14 generation call sites are accounted for; API behavior and ID formats remain compatible; full CI passes. Apps Script runtime testing remains a separate required gate.
