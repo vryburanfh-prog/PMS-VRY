@@ -381,7 +381,7 @@ test('remaining Gantt and registry labels escape dynamic values', () => {
 
 test('progress-log table escapes data fields and notes attribute', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const start = html.indexOf('function renderProgressTable(');
+  const start = html.indexOf('function renderDailyLogsTable(');
   const end = html.indexOf('\nfunction ', start + 1);
   const fn = html.slice(start, end < 0 ? html.length : end);
   for (const field of ['Log_Date','Quantity_Accomplished','Reported_Progress_Pct','Submitted_By','Notes']) {
@@ -406,7 +406,7 @@ test('weekly-report cards and printable export escape user-controlled narrative 
 
 test('team workload assignment renderer escapes all sheet-backed fields', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const start = html.indexOf('function renderTeamWorkloadTable(');
+  const start = html.indexOf('function renderProjectWorkloadTable(');
   const end = html.indexOf('\nfunction ', start + 1);
   const fn = html.slice(start, end < 0 ? html.length : end);
   for (const field of ['Employee_Name','Employee_ID','Position','Department_Or_Team','Main_Scope_Of_Responsibility','Workload_Allocation_Pct','Assignment_Status']) {
