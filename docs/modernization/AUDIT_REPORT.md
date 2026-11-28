@@ -130,3 +130,15 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - Source inventory found 14 `generateNextId_` call sites in `Code.gs`, covering user, project, assignment, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial record creation.
 - `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
 - **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
+
+
+### General ID allocation — remediation design and acceptance criteria
+
+**Proposed safe remediation (separate targeted PR):**
+1. Add a database helper that acquires the script lock, reads the ID column directly from the sheet (not from cache), computes the next ID, assigns it to the record, and performs the append while retaining the same lock.
+2. Make the helper release the lock in `finally`, including failures in ID calculation or append.
+3. Refactor create-only paths first, then mixed create/update handlers individually. Preserve caller-provided IDs only where the existing API intentionally supports them; validate uniqueness under the lock before write.
+4. Keep existing update paths unchanged and preserve permission checks, project ownership validation, field allowlists, and audit events.
+5. Add mocked-runtime tests for concurrent requests, duplicate/collision detection, lock release on write failure, header mapping, and custom-ID handling. Include static inventory coverage so every generated-ID creation path uses the atomic helper.
+
+**Acceptance criteria:** all generated IDs are unique under concurrent create calls; allocation and write occur under one lock; failure releases the lock; all 14 generation call sites are accounted for; API behavior and ID formats remain compatible; full CI passes. Apps Script runtime testing remains a separate required gate.
