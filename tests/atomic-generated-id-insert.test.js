@@ -338,6 +338,9 @@ test('inline JavaScript in index.html parses after registry rendering changes', 
   }
   const nonEmpty = scripts.filter(source => source.trim());
   assert.ok(nonEmpty.length > 0);
-  nonEmpty.forEach((source, i) => assert.doesNotThrow(() => new vm.Script(source), 'inline script ' + i + ' must parse'));
+  nonEmpty.forEach((source, i) => {
+    const sanitized = source.replace("<?!= JSON.stringify(googleClientId || '') ?>", "''");
+    assert.doesNotThrow(() => new vm.Script(sanitized), 'inline script ' + i + ' must parse');
+  });
 });
 
