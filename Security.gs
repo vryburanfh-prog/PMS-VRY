@@ -409,12 +409,16 @@ function hashPassword_(password, salt) {
 function createPasswordCredential_(userId, username, password) {
   ensureHybridAuthTables_();
   const normalized = String(username || '').trim().toLowerCase();
-  const all = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  if (all.some(r => String(r.Username || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
   const salt = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, authRandomToken_(), Utilities.Charset.UTF_8));
   const credentialRecord = { Credential_ID: '', User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() };
-  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord);
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows) {
+    const usernameIndex = headers.indexOf('Username');
+    if (usernameIndex < 0) throw new Error('Credential Username column is missing.');
+    if (rows.some(row => String(row[usernameIndex] || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
+    recordObj.Username = normalized;
+  });
 }
+
 function findValidAuthSession_(token) {
   const raw = String(token || '').trim();
   if (!raw) return null;
