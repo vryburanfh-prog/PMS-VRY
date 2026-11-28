@@ -189,6 +189,7 @@ test('activity dependency creation uses atomic ID insert', () => {
   const fn = code.slice(start, end < 0 ? code.length : end);
   assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependencyRecord)"));
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.DEPENDENCIES"));
+  assert.ok(fn.includes("Dependency_ID: '', Project_ID: record.Project_ID"));
 });
 
 
