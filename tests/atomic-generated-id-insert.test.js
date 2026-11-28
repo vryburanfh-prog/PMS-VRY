@@ -257,3 +257,45 @@ test('Security generated-ID creation paths use atomic insert helpers', () => {
   assert.ok(security.includes("Audit_ID: ''"));
   assert.ok(security.includes("values.Permission_ID = ''"));
 });
+
+
+test('password-login failure state increments atomically, locks at five, blocks further increments, and resets', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function updatePasswordLoginState_(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const helper = security.slice(start, end < 0 ? security.length : end);
+  const headers = ['Credential_ID','Failed_Attempts','Locked_Until','Updated_At'];
+  const row = ['CRD-00001',0,'',''];
+  const events = [];
+  const sheet = {
+    getLastColumn:()=>headers.length,
+    getLastRow:()=>2,
+    getRange(r,c,nr,nc) {
+      if(r===1) return {getValues:()=>[headers.slice(c-1,c-1+nc)]};
+      if(r===2 && c===1) return {getValues:()=>[[row[0]]]};
+      if(r===2) return {getValue:()=>row[c-1],setValue:v=>{row[c-1]=v;events.push('write:'+c);}};
+      return {getValues:()=>[]};
+    }
+  };
+  const fn=vm.runInNewContext('('+helper+')',{
+    LockService:{getScriptLock:()=>({waitLock:ms=>events.push('lock'),releaseLock:()=>events.push('unlock')})},
+    getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),
+    DB_CONFIG:{TABS:{AUTH_CREDENTIALS:'Auth_Credentials'}},
+    invalidateTableCache_:()=>events.push('invalidate'),
+    getNowTimestamp_:()=> '2026-11-28T00:00:00Z',
+    String,Number,Date,Error,Boolean
+  });
+  assert.equal(fn('CRD-00001','check').locked,false);
+  for(let i=0;i<4;i++) assert.equal(fn('CRD-00001','failure').attempts,i+1);
+  const fifth=fn('CRD-00001','failure');
+  assert.equal(fifth.attempts,5);
+  assert.equal(fifth.locked,true);
+  const blocked=fn('CRD-00001','failure');
+  assert.equal(blocked.attempts,5);
+  assert.equal(blocked.locked,true);
+  assert.equal(fn('CRD-00001','reset').attempts,0);
+  assert.equal(row[1],0);
+  assert.equal(row[2],'');
+  assert.ok(events.includes('unlock'));
+  assert.ok(events.includes('invalidate'));
+});
