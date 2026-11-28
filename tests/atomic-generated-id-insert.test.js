@@ -114,3 +114,14 @@ test('procurement create path uses atomic ID insert while edit path stays intact
   assert.ok(!fn.includes("generateNextId_(procTab"));
   assert.ok(fn.includes("updateRecordById_(procTab, 'Procurement_ID'"));
 });
+
+
+test('financial item create path uses atomic ID insert and keeps update path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveFinancialItem(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(finTab, 'Financial_ID', 'FIN', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(finTab"));
+  assert.ok(fn.includes("updateRecordById_(finTab, 'Financial_ID'"));
+});
