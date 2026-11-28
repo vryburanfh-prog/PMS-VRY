@@ -1060,7 +1060,7 @@ function apiSaveSubWbs(payload) {
     ? Number(payload.Actual_Duration)
     : calculateDurationDays_(payload.Actual_Start_Date, payload.Actual_Finish_Date, false);
 
-  const subWbsId = isUpdate ? String(payload.Sub_WBS_ID).trim() : generateNextId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3);
+  let subWbsId = isUpdate ? String(payload.Sub_WBS_ID).trim() : '';
   const subWbsCode = String(payload.WBS_Code || subWbsId).trim();
   if (!subWbsCode) throw new Error('Sub WBS Code is required.');
   if ((getTableRecords_(DB_CONFIG.TABS.SUB_WBS) || []).some(function (x) {
@@ -1103,7 +1103,7 @@ function apiSaveSubWbs(payload) {
     const res = updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', record.Sub_WBS_ID, record);
     writeAuditLog_(ctx, 'UPDATE_SUB_WBS', 'WBS_Schedule', record.Sub_WBS_ID, res.previous, res.updated, 'Updated Sub WBS');
   } else {
-    insertRecord_(DB_CONFIG.TABS.SUB_WBS, record);
+    subWbsId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3, record);
     writeAuditLog_(ctx, 'CREATE_SUB_WBS', 'WBS_Schedule', record.Sub_WBS_ID, null, record, 'Created Sub WBS');
   }
 
