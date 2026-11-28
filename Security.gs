@@ -523,12 +523,18 @@ function apiLoginWithGoogleCredential(idToken) {
   if (!token || token.length > 10000) return { success:false, error:'Invalid Google sign-in response.' };
   const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions:true });
   if (response.getResponseCode() !== 200) return { success:false, error:'Google could not verify this sign-in. Please try again.' };
-  const claims = JSON.parse(response.getContentText() || '{}');
+  let claims;
+  try { claims = JSON.parse(response.getContentText() || '{}'); } catch (e) { return { success:false, error:'Google identity verification failed.' }; }
+  if (!claims || typeof claims !== 'object') return { success:false, error:'Google identity verification failed.' };
   const email = String(claims.email || '').trim().toLowerCase();
   const issuer = String(claims.iss || '');
   const expires = Number(claims.exp || 0);
+  const issuedAt = Number(claims.iat || 0);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const subject = String(claims.sub || '').trim();
+  const authorizedParty = String(claims.azp || '').trim();
   const verified = String(claims.email_verified || '').toLowerCase() === 'true';
-  if (String(claims.aud || '') !== clientId || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
+  if (String(claims.aud || '') !== clientId || (authorizedParty && authorizedParty !== clientId) || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || !subject || expires <= nowSeconds || issuedAt <= 0 || issuedAt > nowSeconds + 60 || nowSeconds - issuedAt > 3600) {
     return { success:false, error:'Google identity verification failed.' };
   }
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.Email || '').trim().toLowerCase() === email);
