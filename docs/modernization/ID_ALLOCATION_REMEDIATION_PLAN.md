@@ -46,13 +46,12 @@ Do not use a helper that only locks ID generation and then releases before inser
 
 ## Safe rollout sequence
 
-- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated IDs, lock/read/write ordering, lock release on write failure, caller-supplied-ID duplicate rejection, and static migration coverage. Consolidated CI passed on commit `5ff95f3d61c0e86bd70e9937a9e65bbbeb7e641b` (run [46097687120](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46097687120)). A real concurrent Apps Script runtime test remains to be performed.
-- **Stage A migrations:** all 14 inventory call sites now use atomic ID-and-insert. `apiCreateProject` generated IDs use the generated-ID helper, while caller-supplied Project_IDs use the locked duplicate-check helper. Baseline revision number is still calculated outside the lock and is a separate concurrency issue. Baseline revision number is still calculated outside the lock and is a separate concurrency issue. User creation still has multi-step side effects (credential creation, admin email registration, project assignment sync) that are not transactional.
-- **Stage B — create-only handlers:** create-only paths are mostly covered by pilots; continue with create branches of mixed handlers, keeping update paths unchanged.
-- **Stage C — mixed create/update handlers:** refactor each handler's create branch only; keep update paths unchanged. Preserve permission checks, ownership checks, validation, field allowlists, audit actions, response shape, and ID formats.
-- **Stage D — multi-record/multi-table paths:** handle project creation/creator assignment and activity/dependency creation separately. These operations currently span multiple writes and are not transactionally atomic; the ID race fix must not imply transaction guarantees.
-- **Stage E — inventory gate:** implemented static coverage proving no active `generateNextId_` call sites remain in `Code.gs`. Run all regression tests and review diffs before requesting merge.
-- **Stage F — Apps Script runtime test:** validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
+- **Stage A — helper + harness:** completed. Both generated-ID and caller-supplied-ID insert helpers are implemented. Tests cover ID-column/header mapping, generated ID assignment, lock/read/write ordering, duplicate supplied-ID rejection, and lock release after write failure.
+- **Stage B — create-only handlers:** completed. User and project baseline create-only paths migrated.
+- **Stage C — mixed create/update handlers:** completed. Weekly report, team workload, procurement, financial, progress log, Main WBS, Sub WBS, project-control registry, and activity create branches migrated; update paths remain unchanged.
+- **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. These multi-write operations remain non-transactional across tables.
+- **Stage E — inventory gate:** completed. Static test confirms no active `generateNextId_` call sites remain in `Code.gs`; the legacy allocator declaration remains in `Database.gs` for compatibility but is no longer used by the API paths.
+- **Stage F — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
 
 ## Acceptance criteria
 
