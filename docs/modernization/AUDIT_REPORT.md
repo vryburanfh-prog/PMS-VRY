@@ -168,3 +168,9 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - Business writes and audit-log inserts are not a cross-sheet transaction; an audit-log failure after a business write may cause an API error while the business record remains persisted.
 - Database reset/import are backup-first and locked, but replacement is not transactional across sheets. Restore procedure and rehearsal are required before production use.
 - **Status:** these gaps are documented in the Phase 1 runtime test plan and remain acceptance blockers; do not claim atomic cross-sheet transactions.
+
+
+### Additional concurrency findings for Phase 1 follow-up
+- **Dependency cycle race:** activity predecessor-cycle validation and dependency synchronization are not yet one serialized transaction. Concurrent dependency edits may bypass the cycle check; runtime test plan includes simultaneous edge creation that would form a cycle.
+- **Progress rollup race/partial state:** progress log, activity actual-progress update, and WBS rollup are multiple writes. They need a transaction-like lock and rollback strategy or explicit idempotent recovery.
+- **Status:** these are open high-priority integrity findings; PR #101 does not claim to solve them.
