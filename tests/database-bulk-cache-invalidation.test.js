@@ -14,5 +14,5 @@ test('bulk database insert invalidates table cache after successful write', () =
   const invalidateIndex = helper.indexOf('invalidateTableCache_(tabName)');
   assert.notEqual(writeIndex, -1, 'bulk insert must write rows');
   assert.ok(invalidateIndex > writeIndex, 'cache invalidation must occur after successful write');
-  assert.match(database, /DB_CACHEABLE_TABS_\\s*=\\s*\\['Role_Permissions',\\s*'System_Settings'\\]/);
+  assert.match(database, /DB_CACHEABLE_TABS_\s*=\s*\['Role_Permissions',\s*'System_Settings'\]/);
 });
