@@ -12,8 +12,8 @@ The code has useful foundations: a server-side role permission ceiling, project 
 ### P1 — High: ID allocation is not atomic with insertion
 **Evidence:** generateNextId_ in Database.gs scans current table records and computes max+1. API handlers commonly call this separately from insertRecord_, whose script lock protects the append but not the earlier ID calculation. Concurrent requests can allocate the same ID before either append occurs.
 **Impact:** Duplicate record identifiers, overwrite/update ambiguity, failed links or corrupted audit/reference relationships.
-**Recommendation:** Create a lock-protected allocate-and-insert operation (or a dedicated ID counter per table) and migrate creation handlers to use it. Add concurrent-create test; ensure uniqueness is enforced at server-side insertion.
-**Severity:** High (integrity risk; practical exposure depends on concurrent usage).
+**Original recommendation — remediated in PR #101:** introduce a lock-protected allocate-and-insert operation and migrate generated-ID create paths. PR #101 inventories and refactors the legacy generated-ID callsites in Code.gs and Security.gs to the shared helper; source-level regression coverage guards the migration. **Residual validation:** true concurrent creation still needs Apps Script runtime testing. The helper tests are sequential/mock-based and do not prove real GAS contention behavior.
+**Severity:** High historical finding; implementation remediation is in review, runtime evidence pending.
 
 ### P1 — High: Password credential hashing uses a custom PBKDF2-like implementation
 **Evidence:** hashPassword_ manually iterates HMAC-SHA256 120,000 times, and the source labels it PBKDF2-like. Review exact byte handling, correctness against standard PBKDF2 test vectors, and performance/DoS implications.
@@ -30,8 +30,8 @@ The code has useful foundations: a server-side role permission ceiling, project 
 ### P1 — High: Google token validation and network error handling needs hardening
 **Evidence:** Google sign-in validates token via tokeninfo endpoint, checks audience, issuer, email_verified and expiry. It uses UrlFetchApp.fetch with muteHttpExceptions, then JSON.parse after 200. Need verify timeout/error behavior, claim validation (including subject), and token handling/redirect URI context.
 **Impact:** Authentication failures, edge-case acceptance risks or unhandled exceptions if response is malformed.
-**Recommendation:** Add strict JSON/error handling and verify standard claims; validate sub and nonce if applicable to the client flow, use Google-supported verification approach, add timeout where available, audit invalid auth attempts without logging tokens.
-**Severity:** High review priority; no confirmed token-validation bypass in this targeted inspection.
+**Remediation evidence in PR #101:** Google sign-in now validates audience, issuer, verified email, expiry, and required subject (`sub`) claim; regression assertions cover those checks. This addresses the claim-validation gap noted above. Remaining follow-up: harden tokeninfo fetch/error/timeout behavior and assess nonce/flow requirements; no live Google-auth integration test is included.
+**Severity:** High review priority; claim-validation gap addressed in source, network/flow hardening and live verification remain open.
 
 ### P1 — High: Direct API guard coverage and public endpoints require complete inventory
 **Evidence:** Dispatcher allowlist and wrapper install exist. Public deck endpoints are explicitly handled in doGet; comments say they remain outside dashboard private API. A complete inventory is needed to confirm every exported callable API is guarded and every public endpoint has narrowly scoped, expiring token access.
