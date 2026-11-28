@@ -299,3 +299,22 @@ test('password-login failure state increments atomically, locks at five, blocks 
   assert.ok(events.includes('unlock'));
   assert.ok(events.includes('invalidate'));
 });
+
+
+test('project-controls registry rendering escapes untrusted text and restricts links to HTTP(S)', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function renderControlsRegistryShell(');
+  const end = html.indexOf('\nfunction ', start + 1);
+  const shell = html.slice(start, end < 0 ? html.length : end);
+  assert.ok(shell.includes("escapeHtmlSafe_(s.id)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(f.label)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(o)"));
+  assert.ok(shell.includes("escapeHtmlSafe_(s)"));
+  assert.ok(shell.includes("safeJsArg_(st.key)"));
+  const tableStart = html.indexOf('function renderControlsRegistryTable(');
+  const tableEnd = html.indexOf('\nfunction ', tableStart + 1);
+  const table = html.slice(tableStart, tableEnd < 0 ? html.length : tableEnd);
+  assert.ok(table.includes("const safeVal = escapeHtmlSafe_(val)"));
+  assert.ok(table.includes("/^https?:\\/\\//i.test(rawUrl)"));
+  assert.ok(table.includes("rel=\"noopener noreferrer\""));
+});
