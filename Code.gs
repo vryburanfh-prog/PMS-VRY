@@ -790,8 +790,7 @@ function apiCreateProject(payload) {
   insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
 
   // Assign creator automatically if not global admin/management
-  const assignId = generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4);
-  insertRecord_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, {
+  const assignmentRecord = {
     Assignment_ID: assignId,
     Project_ID: newId,
     User_ID: ctx.user.userId || '',
@@ -804,7 +803,8 @@ function apiCreateProject(payload) {
     Assignment_Date: nowDate,
     Last_Updated: nowTs,
     Is_Active: 'TRUE'
-  });
+  };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignmentRecord);
 
   writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
   return { success: true, project: record };
