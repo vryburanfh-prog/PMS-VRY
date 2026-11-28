@@ -4112,7 +4112,7 @@ button, input, select, textarea { min-height: 2.25rem; }
         return `
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(r.employeeName)} <span class="text-[10px] font-mono text-slate-400">${r.employeeId !== '-' ? '(' + escapeHtmlSafe_(r.employeeId) + ')' : ''}</span></td>
-            <td class="py-2 px-3">${[r.position, r.department].filter(Boolean).join(' • ') || '-'}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_([r.position, r.department].filter(Boolean).join(' • ') || '-')}</td>
             <td class="py-2 px-3">${escapeHtmlSafe_(r.activeProjectsSummary || 'None active')}</td>
             <td class="py-2 px-3 font-bold ${pct > 100 ? 'text-rose-700' : 'text-slate-900'}">${pct}%</td>
             <td class="py-2 px-3">${statusBadge}</td>
