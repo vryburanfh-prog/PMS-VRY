@@ -2468,7 +2468,7 @@ function apiSaveProcurementItem(projectId, payload) {
     ? Math.max(0, Number(payload.Total_Cost) || 0)
     : Number((qty * unitCost).toFixed(2));
 
-  const procId = isUpdate ? rawId : generateNextId_(procTab, 'Procurement_ID', 'PRC', 4);
+  let procId = isUpdate ? rawId : '';
 
   const record = {
     Procurement_ID: procId,
@@ -2492,7 +2492,7 @@ function apiSaveProcurementItem(projectId, payload) {
     updateRecordById_(procTab, 'Procurement_ID', procId, record);
     writeAuditLog_(ctx, 'UPDATE_PROCUREMENT', procTab, procId, prevClean, record, 'Updated procurement/logistics item');
   } else {
-    insertRecord_(procTab, record);
+    procId = insertRecordWithGeneratedId_(procTab, 'Procurement_ID', 'PRC', 4, record);
     writeAuditLog_(ctx, 'CREATE_PROCUREMENT', procTab, procId, null, record, 'Created procurement/logistics item');
   }
 
