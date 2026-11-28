@@ -1852,6 +1852,9 @@ function apiGetProgressAndWeeklyReports(projectId) {
 function apiSaveProgressLog(projectId, payload, applyToSchedule) {
   if (!projectId) throw new Error('Project_ID is required.');
   const pid = String(projectId).trim();
+  const progressSaveLock = LockService.getScriptLock();
+  progressSaveLock.waitLock(10000);
+  try {
 
   const rawId = String(payload.Log_ID || '').trim();
   const existing = rawId ? findRecordRowById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', rawId) : null;
@@ -1978,6 +1981,9 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
   }
 
   return { success: true, log: record, rollupSummary: rollupSummary };
+  } finally {
+    progressSaveLock.releaseLock();
+  }
 }
 
 /**
@@ -1987,6 +1993,9 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
 function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
   if (!projectId || !logId) throw new Error('Project_ID and Log_ID are required.');
   const pid = String(projectId).trim();
+  const progressReviewLock = LockService.getScriptLock();
+  progressReviewLock.waitLock(10000);
+  try {
   const ctx = assertPermission_('Progress', 'approve', pid);
 
   const normalized = String(decision || '').trim();
@@ -2037,6 +2046,9 @@ function apiReviewProgressLog(projectId, logId, decision, applyToSchedule) {
   }
 
   return { success: true, log: updatedClean, rollupSummary: rollupSummary };
+  } finally {
+    progressReviewLock.releaseLock();
+  }
 }
 
 /**
