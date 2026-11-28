@@ -190,3 +190,13 @@ test('activity dependency creation uses atomic ID insert', () => {
   assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependencyRecord)"));
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.DEPENDENCIES"));
 });
+
+
+test('project creator assignment uses atomic generated-ID insert', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProject(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignmentRecord)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS"));
+});
