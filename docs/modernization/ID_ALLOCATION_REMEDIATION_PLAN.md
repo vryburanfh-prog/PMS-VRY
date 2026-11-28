@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Inventory completed against `pms-modernization/phase-1-snapshot-integrity-fix` (PR #100 head, 2026-11-28).  
+**Status:** Inventory completed; Stage A helper and first create-only migration are implemented on this follow-up branch. CI validation pending.  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -46,7 +46,8 @@ Do not use a helper that only locks ID generation and then releases before inser
 
 ## Safe rollout sequence
 
-- **Stage A — helper + harness:** implement the database helper and mocked-runtime tests for ID-column/header mapping, collision detection, concurrent create simulation, lock release on failure, and custom IDs.
+- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated ID, lock/read/write ordering, and lock release on write failure. CI validation is pending. Additional concurrent-request and custom-ID behavior tests remain to be added.
+- **Stage A pilot migration:** `apiCreateProjectBaseline` now uses the atomic helper for baseline ID generation and append. The baseline revision number is still calculated outside the lock and is a separate concurrency issue to address.
 - **Stage B — create-only handlers:** migrate create-only API paths first, where behavior is easiest to isolate.
 - **Stage C — mixed create/update handlers:** refactor each handler's create branch only; keep update paths unchanged. Preserve permission checks, ownership checks, validation, field allowlists, audit actions, response shape, and ID formats.
 - **Stage D — multi-record/multi-table paths:** handle project creation/creator assignment and activity/dependency creation separately. These operations currently span multiple writes and are not transactionally atomic; the ID race fix must not imply transaction guarantees.
