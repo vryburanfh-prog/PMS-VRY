@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Inventory completed; Stage A helper and first create-only migration are implemented on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
+**Status:** Inventory completed; atomic helper implemented and two create-only handlers (project baseline and user creation) migrated on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -46,8 +46,8 @@ Do not use a helper that only locks ID generation and then releases before inser
 
 ## Safe rollout sequence
 
-- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated ID, lock/read/write ordering, and lock release on write failure. CI validation is pending. Additional concurrent-request and custom-ID behavior tests remain to be added.
-- **Stage A pilot migration:** `apiCreateProjectBaseline` now uses the atomic helper for baseline ID generation and append. The baseline revision number is still calculated outside the lock and is a separate concurrency issue to address.
+- **Stage A — helper + harness:** `insertRecordWithGeneratedId_` is implemented. Mocked-runtime tests cover ID-column/header mapping, generated ID, lock/read/write ordering, and lock release on write failure. CI validation is pending. Additional concurrent-request and custom-ID behavior tests remain to be added. User creation migration has a static regression test added; CI is currently running on the latest commit.
+- **Stage A pilot migrations:** `apiCreateProjectBaseline` and `apiCreateUser` now use the atomic helper for generated ID and append. Baseline revision number is still calculated outside the lock and is a separate concurrency issue. User creation still has multi-step side effects (credential creation, admin email registration, project assignment sync) that are not transactional.
 - **Stage B — create-only handlers:** migrate create-only API paths first, where behavior is easiest to isolate.
 - **Stage C — mixed create/update handlers:** refactor each handler's create branch only; keep update paths unchanged. Preserve permission checks, ownership checks, validation, field allowlists, audit actions, response shape, and ID formats.
 - **Stage D — multi-record/multi-table paths:** handle project creation/creator assignment and activity/dependency creation separately. These operations currently span multiple writes and are not transactionally atomic; the ID race fix must not imply transaction guarantees.
