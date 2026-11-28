@@ -252,4 +252,8 @@ test('Security generated-ID creation paths use atomic insert helpers', () => {
   assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord)"));
   assert.equal((security.match(/insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.AUTH_SESSIONS, 'Session_ID', 'SES', 6, sessionRecord\)/g) || []).length, 2);
   assert.ok(security.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord)"));
+  assert.ok(security.includes("Credential_ID: ''"));
+  assert.ok(security.includes("Session_ID:''"));
+  assert.ok(security.includes("Audit_ID: ''"));
+  assert.ok(security.includes("values.Permission_ID = ''"));
 });
