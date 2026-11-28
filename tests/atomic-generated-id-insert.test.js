@@ -344,3 +344,25 @@ test('inline JavaScript in index.html parses after registry rendering changes', 
   });
 });
 
+
+
+test('WBS, baseline, portfolio, project register, and filter renderers escape dynamic sheet values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const required = [
+    "escapeHtmlSafe_(m.Main_WBS_ID)",
+    "escapeHtmlSafe_(m.WBS_Weight || 0)",
+    "escapeHtmlSafe_(s.WBS_Weight || 0)",
+    "escapeHtmlSafe_(a.Activity_Weight || 0)",
+    "escapeHtmlSafe_(d.Lag_Or_Lead_Days || 0)",
+    "escapeHtmlSafe_(b.Approved_By || '-')",
+    "escapeHtmlSafe_(b.Remarks || '-')",
+    "escapeHtmlSafe_(p.Client || '-')",
+    "escapeHtmlSafe_(p.Project_Manager || '-')",
+    "escapeHtmlSafe_(p.Project_Status || '-')",
+    "escapeHtmlSafe_(mod)",
+    "escapeHtmlSafe_(m)",
+    "escapeHtmlSafe_(c)"
+  ];
+  required.forEach(fragment => assert.ok(html.includes(fragment), 'missing escape in rendering path: ' + fragment));
+  assert.ok(html.includes("startEditProject(JSON.parse("));
+});
