@@ -113,7 +113,8 @@ This update remains a targeted static review; it does not substitute for executi
 The remediation is narrowly scoped and does not establish that other table IDs are protected from concurrent allocation. The broader ID-generation finding remains open until creation handlers are inventoried and tested.
 
 
-### Additional targeted finding — bulk insert cache invalidation
-- `insertRecord_` invalidates the cache for cacheable tables after insertion, while `insertRecords_` does not currently call the invalidation helper after its write.
-- Cacheable tables are limited to `Role_Permissions` and `System_Settings`; stale cached values could persist up to the cache TTL if the bulk helper is used for either table.
-- **Status:** observed in helper source; caller/usage inventory and impact confirmation remain pending. Do not classify as confirmed user-visible defect until call sites are checked.
+### Bulk insert cache invalidation — remediated in PR #100
+- The initial observation was that `insertRecords_` did not invalidate cacheable-table caches after bulk writes.
+- Call-site inventory found the current bulk helper use is for `Project_Assignments`, which is not in the cacheable-table list; no current cacheable-table caller was identified.
+- **Remediation:** `insertRecords_` now calls `invalidateTableCache_(tabName)` after the successful bulk write, preventing stale cache if future bulk callers use a cacheable table.
+- Added a regression test in the PR workflow. This is a preventive fix; the initial observation was not confirmed as a current user-impacting defect.
