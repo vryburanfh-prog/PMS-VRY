@@ -37,6 +37,8 @@ For each create path below, create at least two records and confirm IDs are uniq
 - [ ] Audit logs
 
 **Concurrency:** Use two separate browser sessions or independent test clients to create the same class of records concurrently. Verify no duplicate generated IDs, no duplicate custom project IDs, and no duplicate Main/Sub WBS codes. Repeat with baselines and verify revision numbers are sequential.
+- [ ] Dependency-cycle race: concurrently create/update dependency edges that individually pass pre-checks but together would form a cycle; verify the graph remains acyclic (known open remediation).
+- [ ] Progress race: concurrently submit progress logs for the same activity; verify actual progress and WBS rollups remain consistent (known open remediation).
 
 ## 3. Authorization and project ownership
 
