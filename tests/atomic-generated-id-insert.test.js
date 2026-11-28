@@ -415,3 +415,15 @@ test('team workload assignment renderer escapes all sheet-backed fields', () => 
   assert.ok(fn.includes('escapeHtmlSafe_(wbsStr)'));
   assert.ok(fn.includes('escapeHtmlSafe_(dateStr)'));
 });
+
+
+test('procurement and financial tables escape all text fields', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['PO_Or_Reference','Item_Description','Vendor_Or_Carrier','Quantity','Expected_Delivery_Date','Delivery_Status']) {
+    assert.ok(html.includes('escapeHtmlSafe_(p.' + field), 'procurement output must escape ' + field);
+  }
+  for (const field of ['Cost_Category','Line_Item_Description','Burn_Pct']) {
+    assert.ok(html.includes('escapeHtmlSafe_(f.' + field), 'financial output must escape ' + field);
+  }
+  assert.ok(html.includes('safeJsArg_(activeSub)'));
+});
