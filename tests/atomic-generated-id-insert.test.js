@@ -469,3 +469,40 @@ test('generated-ID helper prepare callback runs under lock before row append', (
   assert.ok(events.indexOf('prepare')<events.indexOf('append'));
   assert.ok(events.includes('unlock'));
 });
+
+
+test('baseline snapshot helper reads project-filtered tables and active dependencies from live sheets', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function buildProjectBaselineSnapshotUnderLock_(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const helper = code.slice(start, end < 0 ? code.length : end);
+  const sheets = {
+    Main_WBS: [['Main_WBS_ID','Project_ID','Module_Name'],['MWBS-001','PRJ-001','Main One'],['MWBS-002','PRJ-002','Other Project']],
+    Sub_WBS: [['Sub_WBS_ID','Project_ID','Task_Name'],['SWBS-001','PRJ-001','Sub One']],
+    Activities_Schedule: [['Activity_ID','Project_ID','Activity_Name'],['ACT-0001','PRJ-001','Activity One']],
+    Schedule_Dependencies: [['Dependency_ID','Project_ID','Status'],['DEP-0001','PRJ-001','Active'],['DEP-0002','PRJ-001','Inactive'],['DEP-0003','PRJ-002','Active']]
+  };
+  const sheetObjs={};
+  Object.entries(sheets).forEach(([name,rows])=>{
+    sheetObjs[name]={getLastColumn:()=>rows[0].length,getLastRow:()=>rows.length,getRange(r,c,nr,nc){return {getValues:()=>rows.slice(r-1,r-1+nr).map(row=>row.slice(c-1,c-1+nc))};}};
+  });
+  const fn=vm.runInNewContext('('+helper+')',{getMasterSpreadsheet_:()=>({getSheetByName:name=>sheetObjs[name]}),DB_CONFIG:{TABS:{MAIN_WBS:'Main_WBS',SUB_WBS:'Sub_WBS',ACTIVITIES:'Activities_Schedule',DEPENDENCIES:'Schedule_Dependencies'}},getNowTimestamp_:()=> '2026-11-28T00:00:00Z',isActiveDependencyRecord_:r=>r.Status==='Active',String,Error});
+  const snapshot=fn('PRJ-001');
+  assert.equal(snapshot.capturedAt,'2026-11-28T00:00:00Z');
+  assert.equal(snapshot.mainWbs.length,1);
+  assert.equal(snapshot.subWbs.length,1);
+  assert.equal(snapshot.activities.length,1);
+  assert.equal(snapshot.dependencies.length,1);
+  assert.equal(snapshot.dependencies[0].Dependency_ID,'DEP-0001');
+});
+
+test('baseline API captures snapshot and calculates revision inside the atomic prepare callback', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProjectBaseline(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record, function(recordObj, headers, rows)"));
+  assert.ok(fn.includes("recordObj.Revision_Number = nextRev"));
+  assert.ok(fn.includes("recordObj.Snapshot_JSON = JSON.stringify(buildProjectBaselineSnapshotUnderLock_(pid))"));
+  assert.ok(!fn.includes("getTableRecords_(DB_CONFIG.TABS.MAIN_WBS"));
+});
