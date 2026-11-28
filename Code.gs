@@ -1817,7 +1817,7 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
     assertPermission_('Progress', 'approve', pid);
   }
 
-  const logId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4);
+  let logId = isUpdate ? rawId : '';
 
   const record = {
     Log_ID: logId,
@@ -1845,7 +1845,7 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
     updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', logId, record);
     writeAuditLog_(ctx, 'UPDATE_PROGRESS_LOG', 'Progress', logId, prevClean, record, 'Updated daily progress log');
   } else {
-    insertRecord_(DB_CONFIG.TABS.PROGRESS_UPDATES, record);
+    logId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4, record);
     writeAuditLog_(ctx, 'CREATE_PROGRESS_LOG', 'Progress', logId, null, record, 'Submitted daily progress log');
   }
 
