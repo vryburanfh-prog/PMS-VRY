@@ -2734,7 +2734,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       const mainOpts = '<option value="">-- Optional Main WBS --</option>' +
         st.mainWbs.map(m => `<option value="${escapeHtmlSafe_(m.id)}">${escapeHtmlSafe_(m.id)}: ${escapeHtmlSafe_(m.name)}</option>`).join('');
       const subOpts = '<option value="">-- Optional Sub WBS --</option>' +
-        st.subWbs.map(s => `<option value="${s.id}">${s.id}: ${s.name}</option>`).join('');
+        st.subWbs.map(s => `<option value="${escapeHtmlSafe_(s.id)}">${escapeHtmlSafe_(s.id)}: ${escapeHtmlSafe_(s.name)}</option>`).join('');
 
       const formFieldsHtml = schema.fields.map(f => {
         const spanClass = f.span === 2 ? 'md:col-span-2' : '';
@@ -2746,7 +2746,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         } else if (f.type === 'sub_wbs') {
           control = `<select id="reg-f-${escapeHtmlSafe_(f.name)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">${subOpts}</select>`;
         } else if (f.type === 'select') {
-          const opts = f.options.map(o => `<option value="${o}">${o}</option>`).join('');
+          const opts = f.options.map(o => `<option value="${escapeHtmlSafe_(o)}">${escapeHtmlSafe_(o)}</option>`).join('');
           control = `<select id="reg-f-${escapeHtmlSafe_(f.name)}" class="w-full border border-slate-300 rounded px-2.5 py-1.5 bg-white">${opts}</select>`;
         } else {
           const employeeField = /^(Requesting_Person|Requestor)$/i.test(f.name);
@@ -2755,7 +2755,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
         return `
           <div class="${spanClass}">
-            <label class="block text-[11px] font-semibold text-slate-600 mb-1">${f.label}</label>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">${escapeHtmlSafe_(f.label)}</label>
             ${control}
           </div>
         `;
@@ -2763,7 +2763,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
 
       const uniqueStatuses = [...new Set(st.records.map(r => String(r[schema.statusField] || '').trim()).filter(Boolean))];
       const statusFilterOpts = '<option value="ALL">All Statuses</option>' +
-        uniqueStatuses.map(s => `<option value="${s}">${s}</option>`).join('');
+        uniqueStatuses.map(s => `<option value="${escapeHtmlSafe_(s)}">${escapeHtmlSafe_(s)}</option>`).join('');
 
       const canWrite = st.permissions.create || st.permissions.edit;
 
@@ -2779,7 +2779,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           ${canWrite ? `
             <div class="p-4 rounded-lg border border-slate-200 bg-slate-50/70">
               <div class="flex items-center justify-between mb-3">
-                <h3 id="reg-form-title" class="font-bold text-slate-900">+ Add New ${schema.singular}</h3>
+                <h3 id="reg-form-title" class="font-bold text-slate-900">+ Add New ${escapeHtmlSafe_(schema.singular)}</h3>
                 <button type="button" onclick="resetControlsRegistryForm()" class="text-slate-500 hover:text-slate-800">Clear Form</button>
               </div>
               <form id="controls-registry-form" onsubmit="submitControlsRegistryForm(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -2788,29 +2788,29 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                 <div class="md:col-span-4 flex justify-end gap-2 pt-1">
                   <button type="button" onclick="resetControlsRegistryForm()" class="px-3 py-1.5 rounded border border-slate-300 bg-white">Reset</button>
                   <button type="submit" id="btn-save-reg" class="px-5 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">
-                    Save ${schema.singular}
+                    Save ${escapeHtmlSafe_(schema.singular)}
                   </button>
                 </div>
               </form>
             </div>
           ` : `
             <div class="p-3 rounded bg-slate-50 border border-slate-200 text-slate-500">
-              View-only mode: your role does not have create/edit permissions for <strong>${st.key}</strong>.
+              View-only mode: your role does not have create/edit permissions for <strong>${escapeHtmlSafe_(st.key)}</strong>.
             </div>
           `}
 
           <!-- Search & Filter Bar -->
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex flex-wrap items-center gap-2 flex-1">
-              <input type="text" id="reg-search" oninput="renderControlsRegistryTable()" placeholder="Search ${st.key.toLowerCase()}..."
+              <input type="text" id="reg-search" oninput="renderControlsRegistryTable()" placeholder="Search ${escapeHtmlSafe_(st.key.toLowerCase())}..."
                 class="border border-slate-300 rounded px-3 py-1.5 w-64 bg-white">
               <select id="reg-status-filter" onchange="renderControlsRegistryTable()"
                 class="border border-slate-300 rounded px-2.5 py-1.5 bg-white">
                 ${statusFilterOpts}
               </select>
             </div>
-            <button onclick="openControlsRegistryModule('${st.key}')" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
-              ↻ Reload ${st.key}
+            <button onclick="openControlsRegistryModule(${safeJsArg_(st.key)})" class="px-3 py-1.5 rounded border border-slate-300 bg-white hover:bg-slate-50 font-medium">
+              ↻ Reload ${escapeHtmlSafe_(st.key)}
             </button>
           </div>
 
@@ -2819,7 +2819,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
-                  ${schema.columns.map(c => `<th class="py-2 px-3">${c.label}</th>`).join('')}
+                  ${schema.columns.map(c => `<th class="py-2 px-3">${escapeHtmlSafe_(c.label)}</th>`).join('')}
                   <th class="py-2 px-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -2954,9 +2954,12 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         const recId = rec[st.idCol];
         const cells = schema.columns.map(col => {
           const val = rec[col.key] || '-';
+          const safeVal = escapeHtmlSafe_(val);
           if (col.isLink) {
-            return val !== '-'
-              ? `<td class="py-2 px-3"><a href="${val}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
+            const rawUrl = String(val || '').trim();
+            const safeLinkUrl = /^https?:\\/\\//i.test(rawUrl) ? escapeHtmlSafe_(rawUrl) : '';
+            return safeLinkUrl
+              ? `<td class="py-2 px-3"><a href="${safeLinkUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
               : `<td class="py-2 px-3 text-slate-400">-</td>`;
           }
           if (col.riskBadge) {
@@ -2965,13 +2968,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
               : s.includes('High') ? 'bg-amber-100 text-amber-800'
               : s.includes('Medium') ? 'bg-yellow-100 text-yellow-800'
               : 'bg-emerald-100 text-emerald-800';
-            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-bold ${cls}">${val}</span></td>`;
+            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-bold ${cls}">${safeVal}</span></td>`;
           }
           if (col.badge) {
             return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${val}</span></td>`;
           }
           const cls = col.mono ? 'font-mono text-slate-600' : col.bold ? 'font-semibold text-slate-900' : '';
-          return `<td class="py-2 px-3 ${cls}">${val}</td>`;
+          return `<td class="py-2 px-3 ${cls}">${safeVal}</td>`;
         }).join('');
 
         const viewBtn = `<button onclick="viewControlsRegistryRecord(${safeJsArg_(recId)})" class="text-indigo-600 hover:underline font-medium">View</button>`;
