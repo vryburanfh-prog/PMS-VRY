@@ -1320,10 +1320,8 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   if (!projectId) throw new Error('Project_ID is required.');
 
   const pid = String(projectId).trim();
-  const existingBaselines = getTableRecords_(DB_CONFIG.TABS.BASELINES)
-    .filter(b => String(b.Project_ID).trim() === pid);
+  let nextRev = 0;
 
-  const nextRev = existingBaselines.reduce((max, b) => Math.max(max, Number(b.Revision_Number) || 0), 0) + 1;
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   const mainWbs = getTableRecords_(DB_CONFIG.TABS.MAIN_WBS).filter(r => String(r.Project_ID).trim() === pid);
@@ -1343,14 +1341,21 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
     Baseline_ID: '',
     Project_ID: pid,
     Revision_Number: nextRev,
-    Baseline_Name: String(baselineName || ('Baseline Rev ' + nextRev)).trim(),
+    Baseline_Name: String(baselineName || '').trim(),
     Approved_By: ctx.user.fullName + ' (' + ctx.user.email + ')',
     Approved_Date: todayStr,
     Snapshot_JSON: JSON.stringify(snapshot),
     Remarks: String(remarks || '').trim()
   };
 
-  const baselineId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record);
+  const baselineId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record, function(recordObj, headers, rows) {
+    const projectIndex = headers.indexOf('Project_ID');
+    const revisionIndex = headers.indexOf('Revision_Number');
+    if (projectIndex < 0 || revisionIndex < 0) throw new Error('Baseline project/revision columns are missing.');
+    nextRev = rows.reduce((max, row) => String(row[projectIndex] || '').trim() === pid ? Math.max(max, Number(row[revisionIndex]) || 0) : max, 0) + 1;
+    recordObj.Revision_Number = nextRev;
+    recordObj.Baseline_Name = String(baselineName || ('Baseline Rev ' + nextRev)).trim();
+  });
   writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
 
   return { success: true, baseline: record };
