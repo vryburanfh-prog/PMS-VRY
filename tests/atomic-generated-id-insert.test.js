@@ -158,3 +158,14 @@ test('Sub WBS create path uses atomic generated ID insert and retains edit path'
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.SUB_WBS"));
   assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'"));
 });
+
+
+test('project-control registry create path uses configured atomic ID helper and update remains intact', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProjectControlRecord(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad, cleanRecord)"));
+  assert.ok(!fn.includes("generateNextId_(cfg.tab"));
+  assert.ok(fn.includes("updateRecordById_(cfg.tab, cfg.idCol, recordId, cleanRecord)"));
+});
