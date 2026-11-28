@@ -82,3 +82,14 @@ test('user creation uses atomic generated-ID insert rather than split ID generat
   assert.match(fn, /insertRecordWithGeneratedId_\(DB_CONFIG\.TABS\.USERS, 'User_ID', 'USR', 3, newUser\)/);
   assert.doesNotMatch(fn, /generateNextId_\(DB_CONFIG\.TABS\.USERS/);
 });
+
+
+test('weekly report create path uses atomic ID allocation while update path remains unchanged', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveWeeklyReport(');
+  const end = code.indexOf('\\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.match(fn, /insertRecordWithGeneratedId_\\(DB_CONFIG\\.TABS\\.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4, record\\)/);
+  assert.doesNotMatch(fn, /generateNextId_\\(DB_CONFIG\\.TABS\\.WEEKLY_REPORTS/);
+  assert.match(fn, /updateRecordById_\\(DB_CONFIG\\.TABS\\.WEEKLY_REPORTS/);
+});
