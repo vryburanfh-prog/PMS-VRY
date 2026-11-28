@@ -200,6 +200,7 @@ test('project creator assignment uses atomic generated-ID insert', () => {
   const fn = code.slice(start, end < 0 ? code.length : end);
   assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignmentRecord)"));
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS"));
+  assert.ok(fn.includes("Assignment_ID: '',"));
 });
 
 
