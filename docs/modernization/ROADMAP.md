@@ -4,7 +4,7 @@
 Modernize the existing Google Apps Script + Google Sheets PMS-VRY in five phases while preserving current functionality. Work is performed on feature branches, validated, and proposed through pull requests. No changes are applied to production/main without review and approval. Do not migrate platform or rewrite the UI until reliability/security and performance evidence justifies it.
 
 ## Phase 1 — Stabilization, audit, security, data integrity
-**Status:** Audit/remediation in progress. PR #100 and draft PR #101 are open and CI-validated in mocked tests (latest PR #101 run: 40 passed, 0 failed; branch consolidated to one commit). Apps Script runtime validation, true concurrency testing, and backup/restore rehearsal remain pending.
+**Status:** Audit/remediation in progress. PR #100 and draft PR #101 are open and CI-validated in mocked tests (latest PR #101 run: 41 passed, 0 failed at head `c74e72d`). Apps Script runtime validation, true concurrency testing, and backup/restore rehearsal remain pending.
 - Complete source audit: Security.gs, Database.gs, Code.gs, index.html, Presentation.html and module/API cross-check (in progress).
 - Targeted remediation PR #100: PMO snapshot insertion lock/header-aware collision scan; five project deletion paths refactored to ID-based locked deletion; bulk cache invalidation after bulk insert. Static and mocked-runtime CI tests pass. Not merged or deployed.
 - Atomic generated-ID remediation PR #101: all 14 `Code.gs` ID-allocation callsites refactored to lock-protected allocate-and-insert helper, including WBS default-code derivation, activities/dependencies, reports/logs, workload, procurement and financial records. Mocked/static CI passes; not merged or deployed.
