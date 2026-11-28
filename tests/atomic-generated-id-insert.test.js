@@ -506,3 +506,19 @@ test('baseline API captures snapshot and calculates revision inside the atomic p
   assert.ok(fn.includes("recordObj.Snapshot_JSON = JSON.stringify(buildProjectBaselineSnapshotUnderLock_(pid))"));
   assert.ok(!fn.includes("getTableRecords_(DB_CONFIG.TABS.MAIN_WBS"));
 });
+
+
+test('CSV export neutralizes formula-like text while preserving numeric negative values', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function convertRecordsToCsv_(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const helper = code.slice(start, end < 0 ? code.length : end);
+  const fn = vm.runInNewContext('(' + helper + ')', {String,Object,RegExp});
+  const csv = fn([
+    {TextFormula:'=HYPERLINK("https://example.invalid","click")',AtFormula:'  @SUM(1,2)',NumericNegative:-25,Quoted:'a,b'}
+  ]);
+  assert.ok(csv.includes("'=HYPERLINK"));
+  assert.ok(csv.includes("'  @SUM"));
+  assert.ok(csv.includes(',-25,'));
+  assert.ok(csv.includes('"a,b"'));
+});
