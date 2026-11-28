@@ -225,7 +225,7 @@ function apiCreateUser(userPayload) {
   });
 
   const newUser = {
-    User_ID: generateNextId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3),
+    User_ID: '',
     Email: email,
     Full_Name: fullName,
     Position: posVal,
@@ -238,9 +238,32 @@ function apiCreateUser(userPayload) {
     Updated_At: getNowTimestamp_()
   };
 
-  insertRecord_(DB_CONFIG.TABS.USERS, newUser);
+  const userCreationLock = LockService.getScriptLock();
+  userCreationLock.waitLock(10000);
+  try {
+    const latestUsers = getTableRecords_(DB_CONFIG.TABS.USERS) || [];
+    if (email && latestUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) {
+      throw new Error('A user with email "' + email + '" already exists.');
+    }
+    if (wantsPasswordLogin) {
+      ensureHybridAuthTables_();
+      const latestCredentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+      if (latestCredentials.some(r => String(r.Username || '').trim().toLowerCase() === username)) throw new Error('Username is already registered.');
+    }
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser);
+    if (wantsPasswordLogin) {
+      try {
+        createPasswordCredential_(newUser.User_ID, username, initialPassword);
+      } catch (credentialError) {
+        deleteRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', newUser.User_ID);
+        newUser.User_ID = '';
+        throw credentialError;
+      }
+    }
+  } finally {
+    userCreationLock.releaseLock();
+  }
   if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
-  if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
   const assignedProjectIds = syncUserProjectAssignments_(newUser, userPayload.assignedProjectIds || [], ctx);
   writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
 
@@ -745,13 +768,15 @@ function apiCreateProject(payload) {
     throw new Error('Project Name is required.');
   }
 
-  const newId = payload.Project_ID && String(payload.Project_ID).trim()
+  let newId = payload.Project_ID && String(payload.Project_ID).trim()
     ? String(payload.Project_ID).trim()
-    : generateNextId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3);
+    : '';
 
-  const existing = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId);
-  if (existing) {
-    throw new Error('A project with Project_ID "' + newId + '" already exists.');
+  if (newId) {
+    const existing = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId);
+    if (existing) {
+      throw new Error('A project with Project_ID "' + newId + '" already exists.');
+    }
   }
 
   const nowDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -787,24 +812,45 @@ function apiCreateProject(payload) {
     Updated_At: nowTs
   };
 
-  insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
+  // Serialize project ID validation/insertion and the creator assignment together.
+  const projectCreateLock = LockService.getScriptLock();
+  projectCreateLock.waitLock(10000);
+  try {
+    if (newId) {
+      invalidateTableCache_(DB_CONFIG.TABS.PROJECTS);
+      const existingUnderLock = findRecordRowById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId);
+      if (existingUnderLock) throw new Error('A project with Project_ID "' + newId + '" already exists.');
+      insertRecord_(DB_CONFIG.TABS.PROJECTS, record);
+    } else {
+      insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3, record);
+      newId = record.Project_ID;
+    }
 
-  // Assign creator automatically if not global admin/management
-  const assignId = generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4);
-  insertRecord_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, {
-    Assignment_ID: assignId,
-    Project_ID: newId,
-    User_ID: ctx.user.userId || '',
-    User_Email: ctx.user.email,
-    Project_Role: ctx.role || 'Project Lead',
-    Assigned_Role: ctx.role || 'Project Lead',
-    Assignment_Status: 'Active',
-    Assigned_By: ctx.user.email,
-    Assigned_At: nowDate,
-    Assignment_Date: nowDate,
-    Last_Updated: nowTs,
-    Is_Active: 'TRUE'
-  });
+    // Assign creator automatically if not global admin/management
+    const assignment = {
+      Assignment_ID: '',
+      Project_ID: newId,
+      User_ID: ctx.user.userId || '',
+      User_Email: ctx.user.email,
+      Project_Role: ctx.role || 'Project Lead',
+      Assigned_Role: ctx.role || 'Project Lead',
+      Assignment_Status: 'Active',
+      Assigned_By: ctx.user.email,
+      Assigned_At: nowDate,
+      Assignment_Date: nowDate,
+      Last_Updated: nowTs,
+      Is_Active: 'TRUE'
+    };
+    try {
+      insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignment);
+    } catch (assignmentError) {
+      deleteRecordById_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId);
+      record.Project_ID = '';
+      throw assignmentError;
+    }
+  } finally {
+    projectCreateLock.releaseLock();
+  }
 
   writeAuditLog_(ctx, 'CREATE_PROJECT', 'Projects', newId, null, record, 'Created project record');
   return { success: true, project: record };
@@ -988,14 +1034,17 @@ function apiSaveMainWbs(payload) {
     ? Number(payload.Actual_Duration)
     : calculateDurationDays_(payload.Actual_Start_Date, payload.Actual_Finish_Date, false);
 
-  const mainWbsId = isUpdate ? String(payload.Main_WBS_ID).trim() : generateNextId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3);
-  const mainWbsCode = String(payload.WBS_Code || mainWbsId).trim();
-  if (!mainWbsCode) throw new Error('Main WBS Code is required.');
-  if ((getTableRecords_(DB_CONFIG.TABS.MAIN_WBS) || []).some(function (x) {
-    return String(x.Project_ID) === String(payload.Project_ID) &&
-      String(x.WBS_Code || x.Main_WBS_ID || '').trim().toLowerCase() === mainWbsCode.toLowerCase() &&
-      String(x.Main_WBS_ID) !== mainWbsId && !isTruthySheetFlag_(x.Is_Archived);
-  })) throw new Error('Duplicate Main WBS Code in this project.');
+  let mainWbsId = isUpdate ? String(payload.Main_WBS_ID).trim() : '';
+  let mainWbsCode = String(payload.WBS_Code || mainWbsId).trim();
+  const checkDuplicateMainWbsCode = function(code, id) {
+    if (!code) throw new Error('Main WBS Code is required.');
+    if ((getTableRecords_(DB_CONFIG.TABS.MAIN_WBS) || []).some(function (x) {
+      return String(x.Project_ID) === String(payload.Project_ID) &&
+        String(x.WBS_Code || x.Main_WBS_ID || '').trim().toLowerCase() === code.toLowerCase() &&
+        String(x.Main_WBS_ID) !== id && !isTruthySheetFlag_(x.Is_Archived);
+    })) throw new Error('Duplicate Main WBS Code in this project.');
+  };
+  if (isUpdate) checkDuplicateMainWbsCode(mainWbsCode, mainWbsId);
   const now = getNowTimestamp_();
   const record = {
     Main_WBS_ID: mainWbsId,
@@ -1023,10 +1072,24 @@ function apiSaveMainWbs(payload) {
   };
 
   if (isUpdate) {
-    const res = updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', record.Main_WBS_ID, record);
+    const wbsUpdateLock = LockService.getScriptLock();
+    wbsUpdateLock.waitLock(10000);
+    let res;
+    try {
+      invalidateTableCache_(DB_CONFIG.TABS.MAIN_WBS);
+      checkDuplicateMainWbsCode(mainWbsCode, record.Main_WBS_ID);
+      res = updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', record.Main_WBS_ID, record);
+    } finally {
+      wbsUpdateLock.releaseLock();
+    }
     writeAuditLog_(ctx, 'UPDATE_MAIN_WBS', 'WBS_Schedule', record.Main_WBS_ID, res.previous, res.updated, 'Updated Main WBS');
   } else {
-    insertRecord_(DB_CONFIG.TABS.MAIN_WBS, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3, record, function(id, assignedRecord) {
+      assignedRecord.WBS_Code = mainWbsCode || id;
+      mainWbsCode = assignedRecord.WBS_Code;
+      checkDuplicateMainWbsCode(mainWbsCode, id);
+    });
+    mainWbsId = record.Main_WBS_ID;
     writeAuditLog_(ctx, 'CREATE_MAIN_WBS', 'WBS_Schedule', record.Main_WBS_ID, null, record, 'Created Main WBS');
   }
 
@@ -1060,15 +1123,18 @@ function apiSaveSubWbs(payload) {
     ? Number(payload.Actual_Duration)
     : calculateDurationDays_(payload.Actual_Start_Date, payload.Actual_Finish_Date, false);
 
-  const subWbsId = isUpdate ? String(payload.Sub_WBS_ID).trim() : generateNextId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3);
-  const subWbsCode = String(payload.WBS_Code || subWbsId).trim();
-  if (!subWbsCode) throw new Error('Sub WBS Code is required.');
-  if ((getTableRecords_(DB_CONFIG.TABS.SUB_WBS) || []).some(function (x) {
-    return String(x.Project_ID) === String(payload.Project_ID) &&
-      String(x.Parent_Main_WBS_ID) === String(payload.Parent_Main_WBS_ID) &&
-      String(x.WBS_Code || x.Sub_WBS_ID || '').trim().toLowerCase() === subWbsCode.toLowerCase() &&
-      String(x.Sub_WBS_ID) !== subWbsId && !isTruthySheetFlag_(x.Is_Archived);
-  })) throw new Error('Duplicate Sub WBS Code under this Main WBS.');
+  let subWbsId = isUpdate ? String(payload.Sub_WBS_ID).trim() : '';
+  let subWbsCode = String(payload.WBS_Code || subWbsId).trim();
+  const checkDuplicateSubWbsCode = function(code, id) {
+    if (!code) throw new Error('Sub WBS Code is required.');
+    if ((getTableRecords_(DB_CONFIG.TABS.SUB_WBS) || []).some(function (x) {
+      return String(x.Project_ID) === String(payload.Project_ID) &&
+        String(x.Parent_Main_WBS_ID) === String(payload.Parent_Main_WBS_ID) &&
+        String(x.WBS_Code || x.Sub_WBS_ID || '').trim().toLowerCase() === code.toLowerCase() &&
+        String(x.Sub_WBS_ID) !== id && !isTruthySheetFlag_(x.Is_Archived);
+    })) throw new Error('Duplicate Sub WBS Code under this Main WBS.');
+  };
+  if (isUpdate) checkDuplicateSubWbsCode(subWbsCode, subWbsId);
   const now = getNowTimestamp_();
   const record = {
     Sub_WBS_ID: subWbsId,
@@ -1100,10 +1166,24 @@ function apiSaveSubWbs(payload) {
   };
 
   if (isUpdate) {
-    const res = updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', record.Sub_WBS_ID, record);
+    const wbsUpdateLock = LockService.getScriptLock();
+    wbsUpdateLock.waitLock(10000);
+    let res;
+    try {
+      invalidateTableCache_(DB_CONFIG.TABS.SUB_WBS);
+      checkDuplicateSubWbsCode(subWbsCode, record.Sub_WBS_ID);
+      res = updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', record.Sub_WBS_ID, record);
+    } finally {
+      wbsUpdateLock.releaseLock();
+    }
     writeAuditLog_(ctx, 'UPDATE_SUB_WBS', 'WBS_Schedule', record.Sub_WBS_ID, res.previous, res.updated, 'Updated Sub WBS');
   } else {
-    insertRecord_(DB_CONFIG.TABS.SUB_WBS, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3, record, function(id, assignedRecord) {
+      assignedRecord.WBS_Code = subWbsCode || id;
+      subWbsCode = assignedRecord.WBS_Code;
+      checkDuplicateSubWbsCode(subWbsCode, id);
+    });
+    subWbsId = record.Sub_WBS_ID;
     writeAuditLog_(ctx, 'CREATE_SUB_WBS', 'WBS_Schedule', record.Sub_WBS_ID, null, record, 'Created Sub WBS');
   }
 
@@ -1199,9 +1279,7 @@ function apiSaveActivity(payload) {
   const refFinish = payload.Actual_Finish_Date || payload.Forecast_Finish_Date || '';
   const varianceDays = calculateScheduleVarianceDays_(payload.Baseline_Finish_Date, refFinish);
 
-  const actId = isUpdate
-    ? String(payload.Activity_ID).trim()
-    : generateNextId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4);
+  let actId = isUpdate ? String(payload.Activity_ID).trim() : '';
 
   const record = {
     Activity_ID: actId,
@@ -1238,7 +1316,8 @@ function apiSaveActivity(payload) {
     const res = updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, record);
     writeAuditLog_(ctx, 'UPDATE_ACTIVITY', 'WBS_Schedule', actId, res.previous, res.updated, 'Updated schedule activity');
   } else {
-    insertRecord_(DB_CONFIG.TABS.ACTIVITIES, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4, record);
+    actId = record.Activity_ID;
     writeAuditLog_(ctx, 'CREATE_ACTIVITY', 'WBS_Schedule', actId, null, record, 'Created schedule activity');
   }
 
@@ -1259,14 +1338,14 @@ function apiSaveActivity(payload) {
     if (sameDependency) {
       updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', sameDependency.Dependency_ID, { Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays, Is_Active: 'TRUE', Updated_By: ctx.email, Updated_At: getNowTimestamp_() });
     } else {
-      const depId = generateNextId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4);
-      insertRecord_(DB_CONFIG.TABS.DEPENDENCIES, {
-        Dependency_ID: depId, Project_ID: record.Project_ID,
+      const dependency = {
+        Dependency_ID: '', Project_ID: record.Project_ID,
         Predecessor_ID: selectedPredecessor, Successor_ID: actId,
         Dependency_Type: dependencyType, Lag_Or_Lead_Days: lagDays,
         Is_Active: 'TRUE', Created_By: ctx.email, Created_At: getNowTimestamp_(),
         Updated_By: ctx.email, Updated_At: getNowTimestamp_(), Remarks: 'Linked via WBS & Schedule'
-      });
+      };
+      insertRecordWithGeneratedId_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', 'DEP', 4, dependency);
     }
   }
 
@@ -1322,11 +1401,7 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   if (!projectId) throw new Error('Project_ID is required.');
 
   const pid = String(projectId).trim();
-  const existingBaselines = getTableRecords_(DB_CONFIG.TABS.BASELINES)
-    .filter(b => String(b.Project_ID).trim() === pid);
-
-  const nextRev = existingBaselines.reduce((max, b) => Math.max(max, Number(b.Revision_Number) || 0), 0) + 1;
-  const baselineId = generateNextId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3);
+  const baselineId = '';
   const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   const mainWbs = getTableRecords_(DB_CONFIG.TABS.MAIN_WBS).filter(r => String(r.Project_ID).trim() === pid);
@@ -1345,16 +1420,22 @@ function apiCreateProjectBaseline(projectId, baselineName, remarks) {
   const record = {
     Baseline_ID: baselineId,
     Project_ID: pid,
-    Revision_Number: nextRev,
-    Baseline_Name: String(baselineName || ('Baseline Rev ' + nextRev)).trim(),
+    Revision_Number: 0,
+    Baseline_Name: String(baselineName || '').trim(),
     Approved_By: ctx.user.fullName + ' (' + ctx.user.email + ')',
     Approved_Date: todayStr,
     Snapshot_JSON: JSON.stringify(snapshot),
     Remarks: String(remarks || '').trim()
   };
 
-  insertRecord_(DB_CONFIG.TABS.BASELINES, record);
-  writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', baselineId, null, { Baseline_ID: baselineId, Project_ID: pid, Revision_Number: nextRev }, record.Baseline_Name);
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.BASELINES, 'Baseline_ID', 'BL', 3, record, function() {
+    invalidateTableCache_(DB_CONFIG.TABS.BASELINES);
+    const existingBaselines = getTableRecords_(DB_CONFIG.TABS.BASELINES)
+      .filter(b => String(b.Project_ID).trim() === pid);
+    record.Revision_Number = existingBaselines.reduce((max, b) => Math.max(max, Number(b.Revision_Number) || 0), 0) + 1;
+    if (!record.Baseline_Name) record.Baseline_Name = 'Baseline Rev ' + record.Revision_Number;
+  });
+  writeAuditLog_(ctx, 'CREATE_BASELINE', 'WBS_Schedule', record.Baseline_ID, null, { Baseline_ID: record.Baseline_ID, Project_ID: pid, Revision_Number: record.Revision_Number }, record.Baseline_Name);
 
   return { success: true, baseline: record };
 }
@@ -1580,13 +1661,9 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
 
   const ctx = assertPermission_(cfg.module, isUpdate ? 'edit' : 'create', pid);
 
-  const recordId = isUpdate
-    ? rawId
-    : generateNextId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad);
-
   const cleanRecord = Object.assign({}, payload);
   delete cleanRecord._rowIndex;
-  cleanRecord[cfg.idCol] = recordId;
+  cleanRecord[cfg.idCol] = isUpdate ? rawId : '';
   cleanRecord.Project_ID = pid;
 
   // Automatic Risk Matrix score calculation
@@ -1604,11 +1681,13 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
   }
 
   if (isUpdate) {
+    const recordId = rawId;
     const res = updateRecordById_(cfg.tab, cfg.idCol, recordId, cleanRecord);
     writeAuditLog_(ctx, 'UPDATE_' + cfg.module.toUpperCase(), cfg.module, recordId, res.previous, res.updated, 'Updated ' + registryKey + ' record');
     return { success: true, record: res.updated };
   } else {
-    insertRecord_(cfg.tab, cleanRecord);
+    insertRecordWithGeneratedId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad, cleanRecord);
+    const recordId = cleanRecord[cfg.idCol];
     writeAuditLog_(ctx, 'CREATE_' + cfg.module.toUpperCase(), cfg.module, recordId, null, cleanRecord, 'Created ' + registryKey + ' record');
     return { success: true, record: cleanRecord };
   }
@@ -1818,7 +1897,7 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
     assertPermission_('Progress', 'approve', pid);
   }
 
-  const logId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4);
+  let logId = isUpdate ? rawId : '';
 
   const record = {
     Log_ID: logId,
@@ -1846,7 +1925,8 @@ function apiSaveProgressLog(projectId, payload, applyToSchedule) {
     updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', logId, record);
     writeAuditLog_(ctx, 'UPDATE_PROGRESS_LOG', 'Progress', logId, prevClean, record, 'Updated daily progress log');
   } else {
-    insertRecord_(DB_CONFIG.TABS.PROGRESS_UPDATES, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4, record);
+    logId = record.Log_ID;
     writeAuditLog_(ctx, 'CREATE_PROGRESS_LOG', 'Progress', logId, null, record, 'Submitted daily progress log');
   }
 
@@ -1967,7 +2047,7 @@ function apiSaveWeeklyReport(projectId, payload) {
     ? Number(payload.Overall_Actual_Progress) || 0
     : defaultActual;
 
-  const reportId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4);
+  let reportId = isUpdate ? rawId : '';
 
   const record = {
     Report_ID: reportId,
@@ -2007,7 +2087,8 @@ function apiSaveWeeklyReport(projectId, payload) {
     updateRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId, record);
     writeAuditLog_(ctx, 'UPDATE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, record, 'Updated weekly project report');
   } else {
-    insertRecord_(DB_CONFIG.TABS.WEEKLY_REPORTS, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4, record);
+    reportId = record.Report_ID;
     writeAuditLog_(ctx, 'CREATE_WEEKLY_REPORT', 'Weekly_Reports', reportId, null, record, 'Created weekly project report');
   }
 
@@ -2234,7 +2315,7 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
     ? Math.max(0, Number(payload.Workload_Allocation_Pct) || 0)
     : 0;
 
-  const assignmentId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', 'WASG', 4);
+  let assignmentId = isUpdate ? rawId : '';
 
   const record = {
     Assignment_ID: assignmentId,
@@ -2264,7 +2345,8 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
     updateRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId, record);
     writeAuditLog_(ctx, 'UPDATE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, record, 'Updated team workload assignment');
   } else {
-    insertRecord_(DB_CONFIG.TABS.TEAM_WORKLOAD, record);
+    insertRecordWithGeneratedId_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', 'WASG', 4, record);
+    assignmentId = record.Assignment_ID;
     writeAuditLog_(ctx, 'CREATE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, null, record, 'Created team workload assignment');
   }
 
@@ -2469,7 +2551,7 @@ function apiSaveProcurementItem(projectId, payload) {
     ? Math.max(0, Number(payload.Total_Cost) || 0)
     : Number((qty * unitCost).toFixed(2));
 
-  const procId = isUpdate ? rawId : generateNextId_(procTab, 'Procurement_ID', 'PRC', 4);
+  let procId = isUpdate ? rawId : '';
 
   const record = {
     Procurement_ID: procId,
@@ -2493,7 +2575,8 @@ function apiSaveProcurementItem(projectId, payload) {
     updateRecordById_(procTab, 'Procurement_ID', procId, record);
     writeAuditLog_(ctx, 'UPDATE_PROCUREMENT', procTab, procId, prevClean, record, 'Updated procurement/logistics item');
   } else {
-    insertRecord_(procTab, record);
+    insertRecordWithGeneratedId_(procTab, 'Procurement_ID', 'PRC', 4, record);
+    procId = record.Procurement_ID;
     writeAuditLog_(ctx, 'CREATE_PROCUREMENT', procTab, procId, null, record, 'Created procurement/logistics item');
   }
 
@@ -2545,7 +2628,7 @@ function apiSaveFinancialItem(projectId, payload) {
   const budget = Math.max(0, Number(payload.Budget_Amount) || 0);
   const committed = Math.max(0, Number(payload.Committed_Amount) || 0);
   const actual = Math.max(0, Number(payload.Actual_Spend) || 0);
-  const finId = isUpdate ? rawId : generateNextId_(finTab, 'Financial_ID', 'FIN', 4);
+  let finId = isUpdate ? rawId : '';
 
   const record = {
     Financial_ID: finId,
@@ -2567,7 +2650,8 @@ function apiSaveFinancialItem(projectId, payload) {
     updateRecordById_(finTab, 'Financial_ID', finId, record);
     writeAuditLog_(ctx, 'UPDATE_FINANCIAL', finTab, finId, prevClean, record, 'Updated financial monitoring item');
   } else {
-    insertRecord_(finTab, record);
+    insertRecordWithGeneratedId_(finTab, 'Financial_ID', 'FIN', 4, record);
+    finId = record.Financial_ID;
     writeAuditLog_(ctx, 'CREATE_FINANCIAL', finTab, finId, null, record, 'Created financial monitoring item');
   }
 
@@ -3655,24 +3739,30 @@ function apiSaveDigestTriggerConfig(payload, activeProjectId) {
     projectId: targetPid
   };
 
-  PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
+  var configLock = LockService.getScriptLock();
+  configLock.waitLock(10000);
+  try {
+    PropertiesService.getScriptProperties().setProperty(PHASE17_PROP_KEY_, JSON.stringify(nextCfg));
 
-  // Clear existing triggers for this handler before recreating
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
-      ScriptApp.deleteTrigger(t);
-    }
-  });
+    // Clear existing triggers for this handler before recreating
+    var triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(function(t) {
+      if (t.getHandlerFunction && t.getHandlerFunction() === PHASE17_TRIGGER_HANDLER_) {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
 
-  if (enabled) {
-    var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
-    if (frequency === 'DAILY') {
-      builder.everyDays(1).atHour(hourOfDay);
-    } else {
-      builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+    if (enabled) {
+      var builder = ScriptApp.newTrigger(PHASE17_TRIGGER_HANDLER_).timeBased();
+      if (frequency === 'DAILY') {
+        builder.everyDays(1).atHour(hourOfDay);
+      } else {
+        builder.everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(hourOfDay);
+      }
+      builder.create();
     }
-    builder.create();
+  } finally {
+    configLock.releaseLock();
   }
 
   if (typeof writeAuditLog_ === 'function') {
@@ -3752,18 +3842,25 @@ function resolvePhase18TabName_() {
 }
 
 function ensurePhase18Sheet_() {
-  var ss = getMasterSpreadsheet_();
-  var tabName = resolvePhase18TabName_();
-  var sheet = ss.getSheetByName(tabName);
-  if (!sheet) {
-    sheet = ss.insertSheet(tabName);
-    sheet.getRange(1, 1, 1, PHASE18_HEADERS_.length).setValues([PHASE18_HEADERS_]);
+  var lock = LockService.getScriptLock();
+  var ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    var ss = getMasterSpreadsheet_();
+    var tabName = resolvePhase18TabName_();
+    var sheet = ss.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      sheet.getRange(1, 1, 1, PHASE18_HEADERS_.length).setValues([PHASE18_HEADERS_]);
+      return sheet;
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, PHASE18_HEADERS_.length).setValues([PHASE18_HEADERS_]);
+    }
     return sheet;
+  } finally {
+    if (ownsLock) lock.releaseLock();
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, PHASE18_HEADERS_.length).setValues([PHASE18_HEADERS_]);
-  }
-  return sheet;
 }
 
 function readPhase18RowsSafe_() {
@@ -3871,80 +3968,86 @@ function apiUpsertEscalationItem(payload, activeProjectId) {
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
   var title = String(p.Title || '').trim();
-  if (!title) {
-    throw new Error('Escalation title is required.');
-  }
+  if (!title) throw new Error('Escalation title is required.');
 
-  var sheet = ensurePhase18Sheet_();
-  var lastRow = sheet.getLastRow();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var colIdx = {};
-  headers.forEach(function(h, i) { colIdx[String(h).trim()] = i + 1; });
-
-  var nowIso = new Date().toISOString();
-  var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
-  var escId = String(p.Escalation_ID || '').trim();
-
-  var existingRowIndex = -1;
-  if (escId && lastRow >= 2 && colIdx['Escalation_ID']) {
-    var ids = sheet.getRange(2, colIdx['Escalation_ID'], lastRow - 1, 1).getValues();
-    for (var r = 0; r < ids.length; r++) {
-      if (String(ids[r][0]).trim() === escId) {
-        existingRowIndex = r + 2;
-        break;
-      }
-    }
-  }
-
-  var record = {
-    Escalation_ID: escId || ('ESC-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'UTC', 'yyyyMMdd-HHmmss') + '-' + Math.floor(100 + Math.random() * 900)),
-    Project_ID: targetPid || 'PORTFOLIO',
-    Source_Type: String(p.Source_Type || 'MANUAL').trim().toUpperCase(),
-    Severity: String(p.Severity || 'HIGH').trim().toUpperCase(),
-    Title: title,
-    Owner_Email: String(p.Owner_Email || actor).trim(),
-    Status: String(p.Status || 'OPEN').trim().toUpperCase(),
-    Notes: String(p.Notes || '').trim(),
-    Created_By: actor,
-    Created_At: nowIso,
-    Updated_At: nowIso
-  };
-
-  if (existingRowIndex > 0) {
-    if (colIdx['Created_By']) {
-      record.Created_By = sheet.getRange(existingRowIndex, colIdx['Created_By']).getValue() || actor;
-    }
-    if (colIdx['Created_At']) {
-      record.Created_At = sheet.getRange(existingRowIndex, colIdx['Created_At']).getValue() || nowIso;
-    }
-    Object.keys(record).forEach(function(k) {
-      if (colIdx[k]) {
-        sheet.getRange(existingRowIndex, colIdx[k]).setValue(record[k]);
+  var tabName = resolvePhase18TabName_();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var record;
+  var previousRecord = null;
+  var isUpdate = false;
+  try {
+    var sheet = ensurePhase18Sheet_();
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var idIndex = headers.indexOf('Escalation_ID');
+    if (idIndex < 0) throw new Error('Escalation_ID header is missing.');
+    var lastRow = sheet.getLastRow();
+    var rows = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues() : [];
+    var requestedId = String(p.Escalation_ID || '').trim();
+    var existing = null;
+    var existingMatches = 0;
+    rows.forEach(function(row) {
+      if (requestedId && String(row[idIndex] || '').trim() === requestedId) {
+        existingMatches++;
+        existing = {};
+        headers.forEach(function(h, col) { existing[h] = row[col]; });
       }
     });
-  } else {
-    var newRowValues = headers.map(function(h) {
-      var key = String(h).trim();
-      return record[key] !== undefined ? record[key] : '';
-    });
-    sheet.appendRow(newRowValues);
+    if (existingMatches > 1) throw new Error('Duplicate Escalation_ID rows detected; refusing ambiguous update.');
+    isUpdate = Boolean(existing);
+    previousRecord = existing ? Object.assign({}, existing) : null;
+    if (existing && String(existing.Project_ID || '').trim() !== (targetPid || 'PORTFOLIO')) {
+      throw new Error('Escalation does not belong to the target project; project ownership cannot be changed.');
+    }
+    var nowIso = new Date().toISOString();
+    var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
+    var escId = requestedId;
+    if (!escId) {
+      var existingIds = rows.map(function(row) { return String(row[idIndex] || '').trim(); });
+      var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'UTC', 'yyyyMMdd-HHmmss');
+      do {
+        escId = 'ESC-' + stamp + '-' + Math.floor(100 + Math.random() * 900);
+      } while (existingIds.indexOf(escId) !== -1);
+    }
+
+    record = {
+      Escalation_ID: escId,
+      Project_ID: targetPid || 'PORTFOLIO',
+      Source_Type: String(p.Source_Type || 'MANUAL').trim().toUpperCase(),
+      Severity: String(p.Severity || 'HIGH').trim().toUpperCase(),
+      Title: title,
+      Owner_Email: String(p.Owner_Email || actor).trim(),
+      Status: String(p.Status || 'OPEN').trim().toUpperCase(),
+      Notes: String(p.Notes || '').trim(),
+      Created_By: existing ? (existing.Created_By || actor) : actor,
+      Created_At: existing ? (existing.Created_At || nowIso) : nowIso,
+      Updated_At: nowIso
+    };
+
+    if (existing) {
+      updateRecordById_(tabName, 'Escalation_ID', escId, record);
+    } else {
+      insertRecord_(tabName, record);
+    }
+  } finally {
+    lock.releaseLock();
   }
 
   if (typeof writeAuditLog_ === 'function') {
     writeAuditLog_(
       ctx,
-      existingRowIndex > 0 ? 'UPDATE_ESCALATION' : 'CREATE_ESCALATION',
+      isUpdate ? 'UPDATE_ESCALATION' : 'CREATE_ESCALATION',
       'Escalations',
-      record.Project_ID,
-      null,
+      record.Escalation_ID,
+      previousRecord,
       record,
-      (existingRowIndex > 0 ? 'Updated' : 'Created') + ' escalation ' + record.Escalation_ID
+      (isUpdate ? 'Updated' : 'Created') + ' escalation ' + record.Escalation_ID
     );
   }
 
   return apiGetEscalationsData(activeProjectId);
 }
-
 // ============================================================================
 // PHASE 19: SNAPSHOT ARCHIVING & REPORTING TEMPLATES
 // ============================================================================
@@ -3971,18 +4074,25 @@ function resolvePhase19TabName_() {
 }
 
 function ensurePhase19Sheet_() {
-  var ss = getMasterSpreadsheet_();
-  var tabName = resolvePhase19TabName_();
-  var sheet = ss.getSheetByName(tabName);
-  if (!sheet) {
-    sheet = ss.insertSheet(tabName);
-    sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
+  var lock = LockService.getScriptLock();
+  var ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    var ss = getMasterSpreadsheet_();
+    var tabName = resolvePhase19TabName_();
+    var sheet = ss.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
+      return sheet;
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
+    }
     return sheet;
+  } finally {
+    if (ownsLock) lock.releaseLock();
   }
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, PHASE19_HEADERS_.length).setValues([PHASE19_HEADERS_]);
-  }
-  return sheet;
 }
 
 function readPhase19RowsSafe_() {
@@ -4118,35 +4228,37 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   assertPrivilegedManagementRole_(targetPid || null);
   var ctx = assertPermission_('Projects', 'edit', targetPid || null);
 
-  var sheet = ensurePhase19Sheet_();
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var metrics = computePhase19CurrentMetrics_(targetPid);
-
-  var now = new Date();
-  var tz = Session.getScriptTimeZone() || 'UTC';
-  var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
-  var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
-
-  var record = {
-    Snapshot_ID: '',
-    Project_ID: targetPid || 'PORTFOLIO',
-    Label: label,
-    Captured_By: actor,
-    Captured_At: now.toISOString(),
-    Total_Budget: metrics.totalBudget,
-    Total_Committed: metrics.totalCommitted,
-    Total_Actual: metrics.totalActual,
-    Budget_Variance: metrics.budgetVariance,
-    Open_Escalations: metrics.openEscalations,
-    Overdue_Items: metrics.overdueItems,
-    High_Alerts: metrics.highAlerts,
-    Notes: String(p.Notes || '').trim()
-  };
-
-  // Serialize ID allocation and append so concurrent captures cannot reuse an ID.
+  // Hold the global mutation lock across metric capture and append so the
+  // archived snapshot represents one consistent point in the database.
   var snapshotLock = LockService.getScriptLock();
   snapshotLock.waitLock(30000);
+  var record;
   try {
+    var sheet = ensurePhase19Sheet_();
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var metrics = computePhase19CurrentMetrics_(targetPid);
+
+    var now = new Date();
+    var tz = Session.getScriptTimeZone() || 'UTC';
+    var actor = String((ctx && (ctx.userEmail || ctx.email)) || getSafeActiveUserEmail_() || 'system');
+    var label = String(p.Label || '').trim() || ('Snapshot ' + Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'));
+
+    record = {
+      Snapshot_ID: '',
+      Project_ID: targetPid || 'PORTFOLIO',
+      Label: label,
+      Captured_By: actor,
+      Captured_At: now.toISOString(),
+      Total_Budget: metrics.totalBudget,
+      Total_Committed: metrics.totalCommitted,
+      Total_Actual: metrics.totalActual,
+      Budget_Variance: metrics.budgetVariance,
+      Open_Escalations: metrics.openEscalations,
+      Overdue_Items: metrics.overdueItems,
+      High_Alerts: metrics.highAlerts,
+      Notes: String(p.Notes || '').trim()
+    };
+
     var idPrefix = 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-';
     var snapshotIdColumn = headers.map(function(h) { return String(h).trim(); }).indexOf('Snapshot_ID') + 1;
     if (snapshotIdColumn < 1) throw new Error('PMO snapshot sheet is missing Snapshot_ID header.');
@@ -4186,11 +4298,6 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
 
   return apiGetSnapshotsAndTemplatesData(activeProjectId);
 }
-
-// ============================================================================
-// PHASE 20: INTERACTIVE WBS, GANTT & CROSS-MODULE DRILL-DOWNS
-// ============================================================================
-
 function parsePhase20DateSafe_(val) {
   if (!val) return null;
   if (Object.prototype.toString.call(val) === '[object Date]' && !isNaN(val.getTime())) {
@@ -4676,16 +4783,24 @@ const CLIENT_DECKS_HEADERS_ = [
 ];
 
 function ensureClientPresentationsSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName(CLIENT_DECKS_SHEET_);
-  if (!sh) {
-    sh = ss.insertSheet(CLIENT_DECKS_SHEET_);
-    sh.getRange(1, 1, 1, CLIENT_DECKS_HEADERS_.length).setValues([CLIENT_DECKS_HEADERS_]);
-    sh.setFrozenRows(1);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = getMasterSpreadsheet_();
+    let sh = ss.getSheetByName(CLIENT_DECKS_SHEET_);
+    if (!sh) {
+      sh = ss.insertSheet(CLIENT_DECKS_SHEET_);
+      sh.getRange(1, 1, 1, CLIENT_DECKS_HEADERS_.length).setValues([CLIENT_DECKS_HEADERS_]);
+      sh.setFrozenRows(1);
+    } else if (sh.getLastRow() === 0) {
+      sh.getRange(1, 1, 1, CLIENT_DECKS_HEADERS_.length).setValues([CLIENT_DECKS_HEADERS_]);
+      sh.setFrozenRows(1);
+    }
+    return sh;
+  } finally {
+    lock.releaseLock();
   }
-  return sh;
 }
-
 function readSheetObjectsSafe_(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sh = ss.getSheetByName(sheetName);
@@ -4900,13 +5015,15 @@ function apiGenerateClientPresentation(config) {
   const deckTitle = String(cfg.deckTitle || aiDeck.deckTitle || `${project.Project_Name} — Client Status Update`).trim();
 
   const sh = ensureClientPresentationsSheet_();
-  const deckId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let deckId;
   const shareToken = Utilities.getUuid().replace(/-/g, '');
   const nowIso = new Date().toISOString();
   const actor = ctx.user.email;
 
   const fullDeckPayload = {
-    deckId: deckId,
+    deckId: '',
     deckTitle: deckTitle,
     subtitle: aiDeck.subtitle || `${project.Client || 'Client'} | ${focusScope} Briefing`,
     project: factPacket.project,
@@ -4918,21 +5035,38 @@ function apiGenerateClientPresentation(config) {
     rawMetrics: factPacket
   };
 
-  sh.appendRow([
-    deckId,
-    pid,
-    deckTitle,
-    focusScope,
-    JSON.stringify(selectedWbsIds),
-    audienceTone,
-    customPrompt,
-    JSON.stringify(fullDeckPayload),
-    shareToken,
-    actor,
-    nowIso,
-    nowIso,
-    'PUBLISHED'
-  ]);
+  try {
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf('Deck_ID');
+    if (idIndex < 0) throw new Error('Client presentations sheet is missing Deck_ID header.');
+    const lastRow = sh.getLastRow();
+    const existingIds = lastRow > 1 ? sh.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().map(row => String(row[0] || '').trim()) : [];
+    const baseId = 'DECK-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss');
+    deckId = baseId;
+    var suffix = 0;
+    while (existingIds.indexOf(deckId) !== -1) {
+      suffix++;
+      deckId = baseId + '-' + String(suffix).padStart(3, '0');
+    }
+    fullDeckPayload.deckId = deckId;
+    insertRecord_(CLIENT_DECKS_SHEET_, {
+      Deck_ID: deckId,
+      Project_ID: pid,
+      Deck_Title: deckTitle,
+      Focus_Scope: focusScope,
+      Selected_WBS_JSON: JSON.stringify(selectedWbsIds),
+      Audience_Tone: audienceTone,
+      Custom_Prompt: customPrompt,
+      Deck_JSON: JSON.stringify(fullDeckPayload),
+      Share_Token: shareToken,
+      Created_By: actor,
+      Created_At: nowIso,
+      Updated_At: nowIso,
+      Status: 'PUBLISHED'
+    });
+  } finally {
+    lock.releaseLock();
+  }
 
   return {
     success: true,
@@ -5187,13 +5321,19 @@ function apiStartFreshDatabase(confirmationText) {
 
 function apiCreateDatabaseBackupCopy() {
   var ctx = assertDatabaseTransferAdmin_();
-  var source = DriveApp.getFileById(getMasterSpreadsheetId_());
-  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
-  var copy = source.makeCopy('PMO_DATABASE_BACKUP_' + stamp);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  var copy;
+  try {
+    var source = DriveApp.getFileById(getMasterSpreadsheetId_());
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    copy = source.makeCopy('PMO_DATABASE_BACKUP_' + stamp);
+  } finally {
+    lock.releaseLock();
+  }
   if (typeof writeAuditLog_ === 'function') writeAuditLog_(ctx, 'DATABASE_EXPORT', 'Database', getMasterSpreadsheetId_(), null, { backupId: copy.getId() }, 'Created full Google Sheets database backup');
   return { success: true, id: copy.getId(), name: copy.getName(), url: copy.getUrl() };
 }
-
 function apiCreateDatabaseTemplateCopy() {
   assertDatabaseTransferAdmin_();
   var source = getMasterSpreadsheet_();

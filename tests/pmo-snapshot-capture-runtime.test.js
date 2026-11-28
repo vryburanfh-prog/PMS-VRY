@@ -38,8 +38,11 @@ function createHarness(existingId) {
     assertPrivilegedManagementRole_: () => events.push('privileged'),
     assertPermission_: () => ({userEmail: 'tester@example.com'}),
     ensurePhase19Sheet_: () => sheet,
-    computePhase19CurrentMetrics_: () => ({totalBudget: 1, totalCommitted: 2, totalActual: 3,
-      budgetVariance: 4, openEscalations: 5, overdueItems: 6, highAlerts: 7}),
+    computePhase19CurrentMetrics_: () => {
+      events.push('metrics');
+      return {totalBudget: 1, totalCommitted: 2, totalActual: 3,
+        budgetVariance: 4, openEscalations: 5, overdueItems: 6, highAlerts: 7};
+    },
     LockService: {getScriptLock: () => ({
       waitLock: ms => events.push('lock:' + ms),
       releaseLock: () => events.push('release')
@@ -54,7 +57,7 @@ function createHarness(existingId) {
   return {capture, rows, events, headers};
 }
 
-test('runtime mock: collision retry uses Snapshot_ID header position and lock protects append', () => {
+test('runtime mock: collision retry uses Snapshot_ID header position and lock protects metric capture plus append', () => {
   const existing = 'SNP-20261128-120000-280000';
   const h = createHarness(existing);
   const result = h.capture({Project_ID: 'P-1', Label: 'test'}, 'P-1');
@@ -62,7 +65,8 @@ test('runtime mock: collision retry uses Snapshot_ID header position and lock pr
   assert.equal(result.success, true);
   assert.equal(added[2], 'SNP-20261128-120000-370000', 'ID should retry collision using header-mapped column');
   assert.equal(added[0], 'P-1');
-  assert.ok(h.events.indexOf('lock:30000') < h.events.indexOf('append'));
+  assert.ok(h.events.indexOf('lock:30000') < h.events.indexOf('metrics'), 'lock begins before metric capture');
+  assert.ok(h.events.indexOf('metrics') < h.events.indexOf('append'), 'metrics are captured before append under lock');
   assert.ok(h.events.indexOf('append') < h.events.indexOf('release'));
   assert.ok(h.events.indexOf('release') < h.events.indexOf('audit:CAPTURE_SNAPSHOT'));
 });

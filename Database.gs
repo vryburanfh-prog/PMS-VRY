@@ -268,6 +268,40 @@ function deleteRecordById_(tabName, idColumn, recordId) {
   }
 }
 
+/** Allocates a table ID and inserts the record under one script lock. */
+function insertRecordWithGeneratedId_(tabName, idColumn, prefix, padLength, recordObj, onIdAssigned) {
+  if (!recordObj || typeof recordObj !== 'object') throw new Error('A record object is required.');
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(tabName);
+    if (!sheet) throw new Error('Database table not found: ' + tabName);
+    const lastCol = sheet.getLastColumn();
+    if (lastCol < 1) throw new Error('Database table has no header row: ' + tabName);
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+    const idIndex = headers.indexOf(idColumn);
+    if (idIndex < 0) throw new Error('Column "' + idColumn + '" not found in ' + tabName);
+    const lastRow = sheet.getLastRow();
+    let maxNum = 0;
+    const idPrefix = String(prefix) + '-';
+    if (lastRow > 1) {
+      sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().forEach(function(row) {
+        const val = String(row[0] || '').trim();
+        if (val.indexOf(idPrefix) !== 0) return;
+        const suffix = val.slice(idPrefix.length);
+        if (/^\d+$/.test(suffix)) maxNum = Math.max(maxNum, Number(suffix) || 0);
+      });
+    }
+    recordObj[idColumn] = idPrefix + String(maxNum + 1).padStart(padLength || 3, '0');
+    if (typeof onIdAssigned === 'function') onIdAssigned(recordObj[idColumn], recordObj);
+    insertRecord_(tabName, recordObj);
+    return recordObj;
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
+}
+
 function generateNextId_(tabName, idColumn, prefix, padLength) {
   const records = getTableRecords_(tabName);
   let maxNum = 0;

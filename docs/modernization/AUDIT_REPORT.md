@@ -126,10 +126,15 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 - **Remediation:** all five paths now call `deleteRecordsByIds_`, which locates rows by ID under a script lock and invalidates applicable caches. A regression test asserts these APIs use the shared helper instead of row-index deletion.
 - Audit log writes remain after the deletion and are not part of a cross-sheet transaction; that limitation remains.
 
-### General ID allocation — confirmed broader Phase 1 finding
-- Source inventory found 14 `generateNextId_` call sites in `Code.gs`, covering user, project, assignment, WBS, activity, dependency, baseline, registry, progress, weekly report, workload, procurement, and financial record creation.
-- `generateNextId_` reads the current maximum and returns the next identifier without holding a lock. Creation handlers then call a separately lock-protected insert helper. This leaves ID allocation and insertion non-atomic and permits duplicate IDs under concurrent creates.
-- **Status:** confirmed code-level risk. Snapshot capture has a targeted lock fix; general ID allocation remains open. Next remediation should be designed and tested before broad refactoring.
+### General ID allocation — remediation in progress (PR #101)
+- Initial source inventory identified 14 `generateNextId_` call sites in `Code.gs`.
+- **Refactored in PR #101:** all 14 `Code.gs` create paths now use `insertRecordWithGeneratedId_`, including users, projects, creator assignments, Main/Sub WBS, activities, dependencies, baselines, project-controls registries, progress logs, weekly reports, workload, procurement, and financial items. WBS default codes are assigned in the helper callback before append; duplicate-code checks for new WBS rows run inside the lock.
+- Helper behavior: ID column is header-mapped and read directly from the sheet; ID assignment and append are performed while holding ScriptLock; lock is released in `finally`; optional callback derives dependent fields before append.
+- **CI:** the six-test workflow passed on the latest recorded CI run for the current remediation branch. This is Node mocked/static validation, not Apps Script runtime or true multi-request concurrency testing.
+- **Security-layer remediation in PR #101:** permission IDs, password credential IDs, auth-session IDs, and audit-log IDs now use the same lock-protected helper. Credential username uniqueness is checked inside the helper's lock callback before insert.
+- **Repository callsite inventory:** no remaining callsites of `generateNextId_` were found in Code.gs, Security.gs, InitialSetup.gs, WbsDiagnostic.gs, index.html, or Presentation.html. The legacy function definition remains in Database.gs but is no longer called by the inspected source files.
+- **Baseline revision concurrency:** the baseline revision is now calculated inside the ID-allocation lock after invalidating the table cache, so concurrent baseline creates serialize their revision-number calculation and insert.
+- **Status:** generated-ID callsites remediated in draft PR #101. User/credential creation is serialized under one lock and rolls back the user row if credential creation fails. CI passed after the Security.gs refactor (`4d80e9f`), repository-wide legacy-callsite guard (`578363b`), and baseline revision concurrency refactor (`0d1ef8f`). Runtime Apps Script tests, true concurrent requests, baseline revision concurrency, and wider integrity checks remain open.
 
 
 ### General ID allocation — remediation design and acceptance criteria
@@ -142,3 +147,15 @@ The remediation is narrowly scoped and does not establish that other table IDs a
 5. Add mocked-runtime tests for concurrent requests, duplicate/collision detection, lock release on write failure, header mapping, and custom-ID handling. Include static inventory coverage so every generated-ID creation path uses the atomic helper.
 
 **Acceptance criteria:** all generated IDs are unique under concurrent create calls; allocation and write occur under one lock; failure releases the lock; all 14 generation call sites are accounted for; API behavior and ID formats remain compatible; full CI passes. Apps Script runtime testing remains a separate required gate.
+
+
+### Direct mutation audit — additional Phase 1 remediation (PR #101)
+- **Escalations:** upsert previously used direct `setValue` / `appendRow` with row-index updates. It now holds a ScriptLock, checks IDs under the lock, rejects ambiguous duplicate IDs, and uses shared ID-based insert/update helpers.
+- **Client presentations:** sheet/header initialization is serialized; deck ID collision check and insert are serialized; writes use `insertRecord_` instead of direct `appendRow`.
+- **Phase 18/19 headers:** reentrant locking added around sheet/header creation to avoid concurrent initialization races.
+- **Auth table headers:** credential/session sheet creation and missing-column initialization are serialized under a reentrant script lock.
+- **Database reset/import:** source inspection confirms destructive reset and import operations acquire a script lock and create a full backup before data-clearing/replacement writes. Backup restore testing and failure/rollback verification remain pending.
+- **Additional safeguards:** project creation/custom-ID validation and creator assignment are serialized; the project row is rolled back if assignment insertion fails. Main/Sub WBS update uniqueness checks are revalidated under lock. Password-login failed-attempt increments use refreshed credential state under lock and revalidate user/credential eligibility before session creation. Trusted-admin allowlist read-modify-write is serialized.
+- **Security verification:** Google ID-token login validates audience, issuer, verified email, expiry, and required subject claim. Password failed-attempt counters and trusted-admin allowlist updates are serialized.
+- **Runtime-mocked auth validation:** password login tests cover fifth-failure lockout, successful counter reset/session creation, and revalidation when the credential hash changes between reads. Google ID-token validation checks audience, issuer, verified email, expiry, and subject.
+- **Status:** targeted source changes and regression tests pass in CI on head `a020b58` (38 tests, 0 failures across the workflow). These are Node mocks/static tests, not Apps Script runtime testing or true concurrent-request validation.
