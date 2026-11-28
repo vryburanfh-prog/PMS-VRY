@@ -2233,7 +2233,7 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
     ? Math.max(0, Number(payload.Workload_Allocation_Pct) || 0)
     : 0;
 
-  const assignmentId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', 'WASG', 4);
+  let assignmentId = isUpdate ? rawId : '';
 
   const record = {
     Assignment_ID: assignmentId,
@@ -2263,7 +2263,7 @@ function apiSaveTeamWorkloadAssignment(projectId, payload) {
     updateRecordById_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', assignmentId, record);
     writeAuditLog_(ctx, 'UPDATE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, prevClean, record, 'Updated team workload assignment');
   } else {
-    insertRecord_(DB_CONFIG.TABS.TEAM_WORKLOAD, record);
+    assignmentId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.TEAM_WORKLOAD, 'Assignment_ID', 'WASG', 4, record);
     writeAuditLog_(ctx, 'CREATE_TEAM_WORKLOAD', 'Team_Workload', assignmentId, null, record, 'Created team workload assignment');
   }
 
