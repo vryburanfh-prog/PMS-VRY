@@ -48,7 +48,7 @@ function createHarness(existingId) {
     Session: {getScriptTimeZone: () => 'UTC'},
     writeAuditLog_: (...args) => events.push('audit:' + args[1]),
     apiGetSnapshotsAndTemplatesData: () => ({success: true}),
-    String, Date, Math: Object.assign({}, Math, {random: () => (randomCalls++ === 0 ? 0.2 : 0.3)}),
+    String, Date, Math: {floor: Math.floor, random: () => (randomCalls++ === 0 ? 0.2 : 0.3)},
   };
   const capture = vm.runInNewContext('(' + functionSource + ')', sandbox);
   return {capture, rows, events, headers};
