@@ -390,3 +390,15 @@ test('progress-log table escapes data fields and notes attribute', () => {
   assert.ok(fn.includes('escapeHtmlSafe_(scopeLabel)'));
   assert.ok(fn.includes('escapeHtmlSafe_(status)'));
 });
+
+
+test('weekly-report cards and printable export escape user-controlled narrative fields', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  for (const field of ['Accomplishments','Ongoing_Activities','Pending_Activities','Next_Steps','Issues_Encountered','Mitigation_Measures','Management_Support_Needed','Responsible_Team_Lead','Remarks']) {
+    assert.ok(html.includes('escapeHtmlSafe_(r.' + field), 'weekly-report output must escape ' + field);
+  }
+  for (const field of ['Log_ID','Log_Date','Activity_ID','Submitted_By','Approval_Status','Notes']) {
+    assert.ok(html.includes('escapeHtmlSafe_(l.' + field), 'printable progress export must escape ' + field);
+  }
+  assert.ok(html.includes('escapeHtmlSafe_(proj.Project_Name || \'\')'));
+});
