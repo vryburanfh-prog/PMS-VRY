@@ -377,3 +377,16 @@ test('remaining Gantt and registry labels escape dynamic values', () => {
   assert.ok(html.includes("Loading ${escapeHtmlSafe_(registryKey)} registry"));
   assert.ok(html.includes("Total ${escapeHtmlSafe_(st.key)}"));
 });
+
+
+test('progress-log table escapes data fields and notes attribute', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf('function renderProgressTable(');
+  const end = html.indexOf('\nfunction ', start + 1);
+  const fn = html.slice(start, end < 0 ? html.length : end);
+  for (const field of ['Log_Date','Quantity_Accomplished','Reported_Progress_Pct','Submitted_By','Notes']) {
+    assert.ok(fn.includes('escapeHtmlSafe_(l.' + field), 'progress table must escape ' + field);
+  }
+  assert.ok(fn.includes('escapeHtmlSafe_(scopeLabel)'));
+  assert.ok(fn.includes('escapeHtmlSafe_(status)'));
+});
