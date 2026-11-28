@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Inventory completed; atomic helper implemented and all fourteen generated-ID call sites migrated (including both project creation IDs and activity/dependency IDs); caller-supplied Project_ID insertion now also has lock-protected duplicate checking on this follow-up branch. CI passed on latest branch commit `d56022b3c8edfb0e6faa220db9db655de64672a0` (push and pull-request checks).  
+**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Code.gs-only CI passed; consolidated CI for the Security.gs expansion is pending.  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -55,7 +55,7 @@ Do not use a helper that only locks ID generation and then releases before inser
 - **Stage B — create-only handlers:** completed. User and project baseline create-only paths migrated.
 - **Stage C — mixed create/update handlers:** completed. Weekly report, team workload, procurement, financial, progress log, Main WBS, Sub WBS, project-control registry, and activity create branches migrated; update paths remain unchanged.
 - **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. These multi-write operations remain non-transactional across tables.
-- **Stage E — inventory gate:** completed. Static tests confirm no active `generateNextId_` call sites remain in `Code.gs` or `Security.gs`; the legacy allocator declaration remains in `Database.gs for compatibility.
+- **Stage E — inventory gate:** completed. Static tests confirm no active `generateNextId_` call sites remain in `Code.gs` or `Security.gs`; the legacy allocator declaration remains in `Database.gs` for compatibility.
 - **Stage F — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
 
 ## Acceptance criteria
