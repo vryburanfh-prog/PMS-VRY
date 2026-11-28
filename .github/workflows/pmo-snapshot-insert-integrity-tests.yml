@@ -7,6 +7,7 @@ on:
       - 'tests/pmo-snapshot-insert-integrity.test.js'
       - 'tests/api-auth-coverage.test.js'
       - 'tests/pmo-snapshot-capture-runtime.test.js'
+      - 'tests/database-bulk-cache-invalidation.test.js'
       - 'tests/project-delete-locking.test.js'
       - 'Database.gs'
       - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
