@@ -4156,10 +4156,12 @@ function apiCapturePmoSnapshot(payload, activeProjectId) {
   snapshotLock.waitLock(30000);
   try {
     var idPrefix = 'SNP-' + Utilities.formatDate(now, tz, 'yyyyMMdd-HHmmss') + '-';
+    var snapshotIdColumn = headers.map(function(h) { return String(h).trim(); }).indexOf('Snapshot_ID') + 1;
+    if (snapshotIdColumn < 1) throw new Error('PMO snapshot sheet is missing Snapshot_ID header.');
     var existingIds = [];
     var lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      existingIds = sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) {
+      existingIds = sheet.getRange(2, snapshotIdColumn, lastRow - 1, 1).getValues().map(function(r) {
         return String(r[0] || '').trim();
       });
     }
