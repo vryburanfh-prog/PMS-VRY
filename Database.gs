@@ -273,7 +273,7 @@ function deleteRecordById_(tabName, idColumn, recordId) {
  * This prevents concurrent create requests from choosing the same ID.
  * The record object is updated with the generated ID and returned.
  */
-function insertRecordWithGeneratedId_(tabName, idColumn, prefix, padLength, recordObj) {
+function insertRecordWithGeneratedId_(tabName, idColumn, prefix, padLength, recordObj, prepareRecordFn) {
   if (!recordObj || typeof recordObj !== 'object') throw new Error('A record object is required.');
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -286,9 +286,15 @@ function insertRecordWithGeneratedId_(tabName, idColumn, prefix, padLength, reco
     const idIndex = headers.indexOf(idColumn);
     if (idIndex < 0) throw new Error('Column "' + idColumn + '" not found in ' + tabName);
     const lastRow = sheet.getLastRow();
-    const existingIds = lastRow > 1
-      ? sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().map(r => String(r[0] || '').trim())
+    const dataRows = lastRow > 1 && typeof prepareRecordFn === 'function'
+      ? sheet.getRange(2, 1, lastRow - 1, lastCol).getValues()
       : [];
+    const existingIds = lastRow > 1
+      ? (typeof prepareRecordFn === 'function'
+          ? dataRows.map(r => String(r[idIndex] || '').trim())
+          : sheet.getRange(2, idIndex + 1, lastRow - 1, 1).getValues().map(r => String(r[0] || '').trim()))
+      : [];
+    if (typeof prepareRecordFn === 'function') prepareRecordFn(recordObj, headers, dataRows);
     const regex = new RegExp('^' + String(prefix) + '-(\\d+)$');
     let maxNum = 0;
     existingIds.forEach(function(id) {
