@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `2f364a269a8d52ab940ca18fdafb89e3cdc3cbc9` (run [46097947158](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46097947158)).  
+**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `6e3de458bb75c9e700382be2d694a255695bad57` (run [46098339210](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46098339210)).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
