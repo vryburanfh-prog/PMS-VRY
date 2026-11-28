@@ -6,6 +6,7 @@ on:
       - 'Security.gs'
       - 'tests/pmo-snapshot-insert-integrity.test.js'
       - 'tests/api-auth-coverage.test.js'
+      - 'tests/pmo-snapshot-capture-runtime.test.js'
       - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
   push:
     branches:
@@ -15,6 +16,7 @@ on:
       - 'Security.gs'
       - 'tests/pmo-snapshot-insert-integrity.test.js'
       - 'tests/api-auth-coverage.test.js'
+      - 'tests/pmo-snapshot-capture-runtime.test.js'
       - '.github/workflows/pmo-snapshot-insert-integrity-tests.yml'
 permissions:
   contents: read
@@ -29,4 +31,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node --test tests/pmo-snapshot-insert-integrity.test.js tests/api-auth-coverage.test.js
+      - run: node --test tests/pmo-snapshot-insert-integrity.test.js tests/api-auth-coverage.test.js tests/pmo-snapshot-capture-runtime.test.js
