@@ -546,3 +546,32 @@ test('activity dependency validation and synchronization are serialized with rol
   assert.ok(api.includes("updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, existing)"), 'failed update restores prior activity');
   assert.ok(api.includes("updateRecordById_(DB_CONFIG.TABS.DEPENDENCIES, 'Dependency_ID', previousDependency.Dependency_ID, previousDependency)"), 'failed dependency sync restores previous active links');
 });
+
+
+test('progress log save serializes log, activity, audit, and rollup writes under one lock', () => {
+  const start = code.indexOf('function apiSaveProgressLog');
+  const end = code.indexOf('\nfunction apiReviewProgressLog', start);
+  assert.ok(start >= 0 && end > start);
+  const api = code.slice(start, end);
+  const lock = api.indexOf('progressSaveLock.waitLock(10000)');
+  const logWrite = api.indexOf('insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROGRESS_UPDATES');
+  const audit = api.indexOf('writeAuditLog_(ctx');
+  const activityWrite = api.indexOf('updateRecordById_(DB_CONFIG.TABS.ACTIVITIES');
+  const rollup = api.indexOf('recalculateProjectProgressEngine_(pid)');
+  const release = api.indexOf('progressSaveLock.releaseLock()');
+  assert.ok(lock >= 0 && logWrite > lock && audit > lock && activityWrite > lock && rollup > lock && release > rollup, 'multi-sheet progress save and rollup remain within lock scope');
+});
+
+test('progress review serializes approval, audit, activity write, and rollup under one lock', () => {
+  const start = code.indexOf('function apiReviewProgressLog');
+  const end = code.indexOf('\nfunction apiSaveWeeklyReport', start);
+  assert.ok(start >= 0 && end > start);
+  const api = code.slice(start, end);
+  const lock = api.indexOf('progressReviewLock.waitLock(10000)');
+  const logUpdate = api.indexOf('updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES');
+  const audit = api.indexOf('writeAuditLog_(ctx');
+  const activityWrite = api.indexOf('updateRecordById_(DB_CONFIG.TABS.ACTIVITIES');
+  const rollup = api.indexOf('recalculateProjectProgressEngine_(pid)');
+  const release = api.indexOf('progressReviewLock.releaseLock()');
+  assert.ok(lock >= 0 && logUpdate > lock && audit > lock && activityWrite > lock && rollup > lock && release > rollup, 'multi-sheet approval and rollup remain within lock scope');
+});
