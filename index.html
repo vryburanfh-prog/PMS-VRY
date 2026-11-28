@@ -2957,7 +2957,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           const safeVal = escapeHtmlSafe_(val);
           if (col.isLink) {
             const rawUrl = String(val || '').trim();
-            const safeLinkUrl = /^https?:\\/\\//i.test(rawUrl) ? escapeHtmlSafe_(rawUrl) : '';
+            const safeLinkUrl = /^https?:\/\//i.test(rawUrl) ? escapeHtmlSafe_(rawUrl) : '';
             return safeLinkUrl
               ? `<td class="py-2 px-3"><a href="${safeLinkUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-semibold">Open Link ↗</a></td>`
               : `<td class="py-2 px-3 text-slate-400">-</td>`;
@@ -2971,7 +2971,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded font-bold ${cls}">${safeVal}</span></td>`;
           }
           if (col.badge) {
-            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${val}</span></td>`;
+            return `<td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${safeVal}</span></td>`;
           }
           const cls = col.mono ? 'font-mono text-slate-600' : col.bold ? 'font-semibold text-slate-900' : '';
           return `<td class="py-2 px-3 ${cls}">${safeVal}</td>`;
