@@ -816,7 +816,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
   } else {
     document.getElementById('ws-tab-content').innerHTML = `
       <div class="p-4 rounded bg-indigo-50/60 border border-indigo-100 text-xs text-slate-700">
-        <strong>${tabName}</strong> workspace is scoped exclusively to <strong>${proj.Project_ID} (${proj.Project_Name})</strong>.
+        <strong>${escapeHtmlSafe_(tabName)}</strong> workspace is scoped exclusively to <strong>${escapeHtmlSafe_(proj.Project_ID)} (${escapeHtmlSafe_(proj.Project_Name)})</strong>.
         Full interactive tools for this module will be activated in the upcoming implementation phases.
       </div>
     `;
@@ -1291,13 +1291,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <tr class="bg-indigo-50/40 font-semibold text-slate-900">
             <td class="py-2 px-3 font-mono">
               <button type="button" aria-label="${collapsed ? 'Expand' : 'Collapse'} Main WBS ${escapeHtmlSafe_(m.Main_WBS_ID)}" aria-expanded="${!collapsed}" title="${collapsed ? 'Expand' : 'Collapse'} Main WBS" onclick="toggleMainWbsCollapse(${safeJsArg_(m.Main_WBS_ID)})" class="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900">${collapsed ? '▸' : '▾'}</button>
-              ${m.Main_WBS_ID}
+              ${escapeHtmlSafe_(m.Main_WBS_ID)}
             </td>
             <td class="py-2 px-3">${escapeHtmlSafe_(m.Module_Name)}</td>
             <td class="py-2 px-3 font-normal">${escapeHtmlSafe_(m.Responsible_Team_Lead || '-')}</td>
-            <td class="py-2 px-3">${m.WBS_Weight || 0}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(m.WBS_Weight || 0)}</td>
             <td class="py-2 px-3 font-normal">${escapeHtmlSafe_(m.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(m.Baseline_Finish_Date || '-')}</td>
-            <td class="py-2 px-3 font-normal">${m.Baseline_Duration || 0}</td>
+            <td class="py-2 px-3 font-normal">${escapeHtmlSafe_(m.Baseline_Duration || 0)}</td>
             <td class="py-2 px-3 font-normal">-</td>
             <td class="py-2 px-3 font-normal">${escapeHtmlSafe_(m.Status || '-')}</td>
             <td class="py-2 px-3 text-right whitespace-nowrap">${APP_STATE.wbsData.canManageWbs ? `<button type="button" onclick="editMainWbs(${safeJsArg_(m.Main_WBS_ID)})" class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Edit</button> <button type="button" onclick="archiveWbsRecord_('main', ${safeJsArg_(m.Main_WBS_ID)}, true)" class="px-2 py-1 rounded border border-amber-300 text-amber-700 hover:bg-amber-50">Archive</button> <button type="button" onclick="deleteWbsRecord_('main', ${safeJsArg_(m.Main_WBS_ID)})" class="px-2 py-1 rounded border border-rose-300 text-rose-700 hover:bg-rose-50">Delete</button>` : '<span class="text-slate-400">View only</span>'}</td>
@@ -1309,7 +1309,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           const directMainActs = activities.filter(a => String(a.Main_WBS_ID) === String(m.Main_WBS_ID) && !a.Sub_WBS_ID);
           directMainActs.forEach(a => {
             const critBadge = String(a.Is_Critical).toUpperCase() === 'TRUE' ? '<span class="ml-1 px-1.5 py-0.2 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">CP</span>' : '';
-            html += `<tr class="bg-slate-50/50"><td class="py-1.5 px-3 pl-8 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td><td class="py-1.5 px-3">${a.Activity_Weight || 0}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td><td class="py-1.5 px-3">${a.Baseline_Duration || 0}</td><td class="py-1.5 px-3">${a.Schedule_Variance_Days || 0}d</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td><td class="py-1.5 px-3 text-right">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border">Edit</button>` : 'View only'}${APP_STATE.wbsData.canManageWbs ? ` <button type="button" onclick="archiveWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)}, true)" class="px-2 py-1 rounded border border-amber-300 text-amber-700">Archive</button> <button type="button" onclick="deleteWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border border-rose-300 text-rose-700">Delete</button>` : ''}</td></tr>`;
+            html += `<tr class="bg-slate-50/50"><td class="py-1.5 px-3 pl-8 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Weight || 0)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Duration || 0)}</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Schedule_Variance_Days || 0)}d</td><td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td><td class="py-1.5 px-3 text-right">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border">Edit</button>` : 'View only'}${APP_STATE.wbsData.canManageWbs ? ` <button type="button" onclick="archiveWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)}, true)" class="px-2 py-1 rounded border border-amber-300 text-amber-700">Archive</button> <button type="button" onclick="deleteWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border border-rose-300 text-rose-700">Delete</button>` : ''}</td></tr>`;
           });
           const childSubs = subWbs.filter(s => String(s.Parent_Main_WBS_ID) === String(m.Main_WBS_ID));
           childSubs.forEach(s => {
@@ -1319,9 +1319,9 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                 <td class="py-1.5 px-3 pl-8 font-mono text-slate-600"><button type="button" aria-label="${subCollapsed ? 'Expand' : 'Collapse'} Sub WBS ${escapeHtmlSafe_(s.Sub_WBS_ID)}" aria-expanded="${!subCollapsed}" title="${subCollapsed ? 'Expand' : 'Collapse'} Sub WBS" onclick="toggleSubWbsCollapse(${safeJsArg_(s.Sub_WBS_ID)})" class="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900">${subCollapsed ? '▸' : '▾'}</button>↳ ${escapeHtmlSafe_(s.Sub_WBS_ID)}</td>
                 <td class="py-1.5 px-3 font-medium">${escapeHtmlSafe_(s.Task_Name)}</td>
                 <td class="py-1.5 px-3">${escapeHtmlSafe_(s.Responsible_Person || '-')}</td>
-                <td class="py-1.5 px-3">${s.WBS_Weight || 0}</td>
+                <td class="py-1.5 px-3">${escapeHtmlSafe_(s.WBS_Weight || 0)}</td>
                 <td class="py-1.5 px-3">${escapeHtmlSafe_(s.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(s.Baseline_Finish_Date || '-')}</td>
-                <td class="py-1.5 px-3">${s.Baseline_Duration || 0}</td>
+                <td class="py-1.5 px-3">${escapeHtmlSafe_(s.Baseline_Duration || 0)}</td>
                 <td class="py-1.5 px-3">-</td>
                 <td class="py-1.5 px-3">${escapeHtmlSafe_(s.Status || '-')}</td>
                 <td class="py-1.5 px-3 text-right whitespace-nowrap">${APP_STATE.wbsData.canManageWbs ? `<button type="button" onclick="editSubWbs(${safeJsArg_(s.Sub_WBS_ID)})" class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Edit</button> <button type="button" onclick="archiveWbsRecord_('sub', ${safeJsArg_(s.Sub_WBS_ID)}, true)" class="px-2 py-1 rounded border border-amber-300 text-amber-700 hover:bg-amber-50">Archive</button> <button type="button" onclick="deleteWbsRecord_('sub', ${safeJsArg_(s.Sub_WBS_ID)})" class="px-2 py-1 rounded border border-rose-300 text-rose-700 hover:bg-rose-50">Delete</button>` : '<span class="text-slate-400">View only</span>'}</td>
@@ -1337,10 +1337,10 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
                   <td class="py-1.5 px-3 pl-14 font-mono text-slate-500">• ${escapeHtmlSafe_(a.Activity_ID)}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Name)}${critBadge}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Responsible_Person || '-')}</td>
-                  <td class="py-1.5 px-3">${a.Activity_Weight || 0}</td>
+                  <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Activity_Weight || 0)}</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Start_Date || '-')} → ${escapeHtmlSafe_(a.Baseline_Finish_Date || '-')}</td>
-                  <td class="py-1.5 px-3">${a.Baseline_Duration || 0}</td>
-                  <td class="py-1.5 px-3 ${Number(a.Schedule_Variance_Days) > 0 ? 'text-rose-600 font-semibold' : ''}">${a.Schedule_Variance_Days || 0}d</td>
+                  <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Baseline_Duration || 0)}</td>
+                  <td class="py-1.5 px-3 ${Number(a.Schedule_Variance_Days) > 0 ? 'text-rose-600 font-semibold' : ''}">${escapeHtmlSafe_(a.Schedule_Variance_Days || 0)}d</td>
                   <td class="py-1.5 px-3">${escapeHtmlSafe_(a.Status || '-')}</td>
                   <td class="py-1.5 px-3 text-right whitespace-nowrap">${canEditScheduleActivity_(a) ? `<button type="button" onclick="editActivity(${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50">Edit</button>` : '<span class="text-slate-400">View only</span>'}${APP_STATE.wbsData.canManageWbs ? ` <button type="button" onclick="archiveWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)}, true)" class="px-2 py-1 rounded border border-amber-300 text-amber-700">Archive</button> <button type="button" onclick="deleteWbsRecord_('activity', ${safeJsArg_(a.Activity_ID)})" class="px-2 py-1 rounded border border-rose-300 text-rose-700">Delete</button>` : ''}</td>
                 </tr>
@@ -1387,7 +1387,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <td class="py-1.5 px-3 font-mono">${escapeHtmlSafe_(d.Predecessor_ID)}</td>
           <td class="py-1.5 px-3 font-mono">${escapeHtmlSafe_(d.Successor_ID)}</td>
           <td class="py-1.5 px-3 font-semibold">${escapeHtmlSafe_(d.Dependency_Type)}</td>
-          <td class="py-1.5 px-3">${d.Lag_Or_Lead_Days || 0}</td>
+          <td class="py-1.5 px-3">${escapeHtmlSafe_(d.Lag_Or_Lead_Days || 0)}</td>
         </tr>
       `).join('');
     }
@@ -1797,11 +1797,11 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
       tbody.innerHTML = baselines.map(b => `
         <tr>
           <td class="py-1.5 px-3 font-mono">${escapeHtmlSafe_(b.Baseline_ID)}</td>
-          <td class="py-1.5 px-3 font-bold">Rev ${b.Revision_Number}</td>
+          <td class="py-1.5 px-3 font-bold">Rev ${escapeHtmlSafe_(b.Revision_Number)}</td>
           <td class="py-1.5 px-3 font-medium">${escapeHtmlSafe_(b.Baseline_Name)}</td>
-          <td class="py-1.5 px-3">${b.Approved_By || '-'}</td>
-          <td class="py-1.5 px-3">${b.Approved_Date || '-'}</td>
-          <td class="py-1.5 px-3">${b.Remarks || '-'}</td>
+          <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_By || '-')}</td>
+          <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Approved_Date || '-')}</td>
+          <td class="py-1.5 px-3">${escapeHtmlSafe_(b.Remarks || '-')}</td>
         </tr>
       `).join('');
     }
@@ -2187,12 +2187,12 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
         <tr class="hover:bg-slate-50">
           <td class="py-2 px-3 font-mono">${escapeHtmlSafe_(p.Project_ID)}</td>
           <td class="py-2 px-3 font-semibold text-slate-900">${escapeHtmlSafe_(p.Project_Name)}</td>
-          <td class="py-2 px-3">${p.Client || '-'}</td>
-          <td class="py-2 px-3">${p.Project_Manager || '-'}</td>
-          <td class="py-2 px-3">${p.Overall_Planned_Progress || 0}%</td>
-          <td class="py-2 px-3 font-semibold">${p.Overall_Actual_Progress || 0}%</td>
-          <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${p.Project_Status || '-'}</span></td>
-          <td class="py-2 px-3">${p.Project_Health || '-'}</td>
+          <td class="py-2 px-3">${escapeHtmlSafe_(p.Client || '-')}</td>
+          <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Manager || '-')}</td>
+          <td class="py-2 px-3">${escapeHtmlSafe_(p.Overall_Planned_Progress || 0)}%</td>
+          <td class="py-2 px-3 font-semibold">${escapeHtmlSafe_(p.Overall_Actual_Progress || 0)}%</td>
+          <td class="py-2 px-3"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-medium">${escapeHtmlSafe_(p.Project_Status || '-')}</span></td>
+          <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Health || '-')}</td>
           <td class="py-2 px-3 text-right">
             <button onclick="selectProjectWorkspace(${safeJsArg_(p.Project_ID)})" class="text-indigo-600 hover:underline font-semibold">Open</button>
           </td>
@@ -2212,13 +2212,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           <tr class="hover:bg-slate-50">
             <td class="py-2 px-3 font-mono">${escapeHtmlSafe_(p.Project_ID)}</td>
             <td class="py-2 px-3 font-semibold">${escapeHtmlSafe_(p.Project_Name)}</td>
-            <td class="py-2 px-3">${p.Client || '-'}</td>
-            <td class="py-2 px-3">${p.Project_Location || '-'}</td>
-            <td class="py-2 px-3">${p.Project_Status || '-'}</td>
-            <td class="py-2 px-3">${p.Project_Health || '-'}</td>
-            <td class="py-2 px-3">${p.Overall_Actual_Progress || 0}% / ${p.Overall_Planned_Progress || 0}%</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(p.Client || '-')}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Location || '-')}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Status || '-')}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(p.Project_Health || '-')}</td>
+            <td class="py-2 px-3">${escapeHtmlSafe_(p.Overall_Actual_Progress || 0)}% / ${escapeHtmlSafe_(p.Overall_Planned_Progress || 0)}%</td>
             <td class="py-2 px-3 text-right space-x-2">
-              <button onclick='startEditProject(${JSON.stringify(p).replace(/'/g, "&#39;")})' class="text-indigo-600 hover:underline font-medium">Edit</button>
+              <button onclick='startEditProject(JSON.parse(${safeJsArg_(JSON.stringify(p))}))' class="text-indigo-600 hover:underline font-medium">Edit</button>
               <button onclick="archiveProject(${safeJsArg_(p.Project_ID)}, ${!archived})" class="text-amber-700 hover:underline font-medium">${archived ? 'Restore' : 'Archive'}</button>
             </td>
           </tr>
@@ -2389,13 +2389,13 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
           const mgrSel = document.getElementById('filter-manager');
           const curMgr = mgrSel.value;
           mgrSel.innerHTML = '<option value="ALL">All Project Managers</option>' +
-            (pRes.filterOptions.managers || []).map(m => `<option value="${m}">${m}</option>`).join('');
+            (pRes.filterOptions.managers || []).map(m => `<option value="${escapeHtmlSafe_(m)}">${escapeHtmlSafe_(m)}</option>`).join('');
           mgrSel.value = curMgr || 'ALL';
 
           const cliSel = document.getElementById('filter-client');
           const curCli = cliSel.value;
           cliSel.innerHTML = '<option value="ALL">All Clients</option>' +
-            (pRes.filterOptions.clients || []).map(c => `<option value="${c}">${c}</option>`).join('');
+            (pRes.filterOptions.clients || []).map(c => `<option value="${escapeHtmlSafe_(c)}">${escapeHtmlSafe_(c)}</option>`).join('');
           cliSel.value = curCli || 'ALL';
 
           renderKPIs(pRes.kpis);
@@ -2465,7 +2465,7 @@ body.pmo-auth-logged-out #auth-login-panel { display: block !important; width: m
             const p = res.context.permissions[mod];
             return `
               <tr>
-                <td class="py-2 px-3 font-medium">${mod}</td>
+                <td class="py-2 px-3 font-medium">${escapeHtmlSafe_(mod)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.view)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.create)}</td>
                 <td class="py-2 px-3 text-center">${badge(p.edit)}</td>
