@@ -427,3 +427,9 @@ test('procurement and financial tables escape all text fields', () => {
   }
   assert.ok(html.includes('safeJsArg_(activeSub)'));
 });
+
+
+test('team workload rollup escapes position and department values', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(html.includes("escapeHtmlSafe_([r.position, r.department].filter(Boolean).join(' • ') || '-')"));
+});
