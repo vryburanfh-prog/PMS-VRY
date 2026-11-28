@@ -238,6 +238,5 @@ test('project creation uses atomic insert for generated IDs and locked duplicate
 test('generated-ID inventory gate: legacy allocator has no active call sites in Code.gs', () => {
   const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
   const matches = code.match(/generateNextId_\s*\(/g) || [];
-  // One match is the legacy helper declaration itself; all call sites must be migrated.
-  assert.equal(matches.length, 1, 'No API should call the unlocked legacy ID allocator.');
+  assert.equal(matches.length, 0, 'No API should call the unlocked legacy ID allocator.');
 });
