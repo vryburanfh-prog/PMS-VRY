@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `9c470ab5a1abcb48ac331649c8064ec5d38fc5e9` (run [46099164629](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46099164629)).  
+**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `ee676f4627d96c4ac2d0357aa1f6cebd0ba1eeac` (run [46099470247](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46099470247)).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -57,6 +57,7 @@ Do not use a helper that only locks ID generation and then releases before inser
 - **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. Baseline revision calculation and direct source-table snapshot reads now execute under the same insertion lock. Other multi-write operations remain non-transactional across tables.
 - **Stage E — inventory gate:** completed. Static tests confirm no active `generateNextId_` call sites remain in `Code.gs` or `Security.gs`; the legacy allocator declaration remains in `Database.gs` for compatibility.
 - **Stage F — targeted UI XSS hardening:** completed for reviewed modules (registry, WBS/schedule, project register/portfolio, progress logs, weekly reports/print exports, workload, procurement, financials, governance audit, portfolio roll-up). Remaining innerHTML taint tracing is still open.
+- **Stage G — auth/data uniqueness and export defense:** completed for atomic user-email/credential-username uniqueness, rollback on credential creation failure, Google ID-token claim validation, and CSV formula-prefix protection; CI passed.
 - **Stage G — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior. Runtime steps are documented in `PHASE1_RUNTIME_TEST_PLAN.md`.
 
 ## Acceptance criteria
