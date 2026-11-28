@@ -1966,7 +1966,7 @@ function apiSaveWeeklyReport(projectId, payload) {
     ? Number(payload.Overall_Actual_Progress) || 0
     : defaultActual;
 
-  const reportId = isUpdate ? rawId : generateNextId_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4);
+  let reportId = isUpdate ? rawId : '';
 
   const record = {
     Report_ID: reportId,
@@ -2006,7 +2006,7 @@ function apiSaveWeeklyReport(projectId, payload) {
     updateRecordById_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', reportId, record);
     writeAuditLog_(ctx, 'UPDATE_WEEKLY_REPORT', 'Weekly_Reports', reportId, prevClean, record, 'Updated weekly project report');
   } else {
-    insertRecord_(DB_CONFIG.TABS.WEEKLY_REPORTS, record);
+    reportId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.WEEKLY_REPORTS, 'Report_ID', 'WKR', 4, record);
     writeAuditLog_(ctx, 'CREATE_WEEKLY_REPORT', 'Weekly_Reports', reportId, null, record, 'Created weekly project report');
   }
 
