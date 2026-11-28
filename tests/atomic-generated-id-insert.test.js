@@ -535,3 +535,14 @@ test('Google ID token login safely handles malformed claims and validates audien
   assert.ok(fn.includes('issuedAt > nowSeconds + 60'));
   assert.ok(fn.includes('nowSeconds - issuedAt > 3600'));
 });
+
+
+test('password credential username uniqueness is checked inside atomic insertion lock', () => {
+  const security = fs.readFileSync(path.join(__dirname, '..', 'Security.gs'), 'utf8');
+  const start = security.indexOf('function createPasswordCredential_(');
+  const end = security.indexOf('\nfunction ', start + 1);
+  const fn = security.slice(start, end < 0 ? security.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credentialRecord, function(recordObj, headers, rows)"));
+  assert.ok(fn.includes("rows.some(row => String(row[usernameIndex] || '').trim().toLowerCase() === normalized)"));
+  assert.ok(!fn.includes("getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS)"));
+});
