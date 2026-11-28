@@ -1579,9 +1579,7 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
 
   const ctx = assertPermission_(cfg.module, isUpdate ? 'edit' : 'create', pid);
 
-  const recordId = isUpdate
-    ? rawId
-    : generateNextId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad);
+  let recordId = isUpdate ? rawId : '';
 
   const cleanRecord = Object.assign({}, payload);
   delete cleanRecord._rowIndex;
@@ -1607,7 +1605,7 @@ function apiSaveProjectControlRecord(projectId, registryKey, payload) {
     writeAuditLog_(ctx, 'UPDATE_' + cfg.module.toUpperCase(), cfg.module, recordId, res.previous, res.updated, 'Updated ' + registryKey + ' record');
     return { success: true, record: res.updated };
   } else {
-    insertRecord_(cfg.tab, cleanRecord);
+    recordId = insertRecordWithGeneratedId_(cfg.tab, cfg.idCol, cfg.prefix, cfg.pad, cleanRecord);
     writeAuditLog_(ctx, 'CREATE_' + cfg.module.toUpperCase(), cfg.module, recordId, null, cleanRecord, 'Created ' + registryKey + ' record');
     return { success: true, record: cleanRecord };
   }
