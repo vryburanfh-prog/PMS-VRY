@@ -315,6 +315,8 @@ test('project-controls registry rendering escapes untrusted text and restricts l
   const tableEnd = html.indexOf('\nfunction ', tableStart + 1);
   const table = html.slice(tableStart, tableEnd < 0 ? html.length : tableEnd);
   assert.ok(table.includes("const safeVal = escapeHtmlSafe_(val)"));
+  assert.ok(table.includes('${safeVal}</span></td>'));
+  assert.ok(table.includes('${safeVal}</td>'));
   assert.ok(table.includes("const safeLinkUrl = /^https?:"));
   assert.ok(table.includes(".test(rawUrl)"));
   assert.ok(table.includes("rel=\"noopener noreferrer\""));
