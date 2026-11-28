@@ -1199,9 +1199,7 @@ function apiSaveActivity(payload) {
   const refFinish = payload.Actual_Finish_Date || payload.Forecast_Finish_Date || '';
   const varianceDays = calculateScheduleVarianceDays_(payload.Baseline_Finish_Date, refFinish);
 
-  const actId = isUpdate
-    ? String(payload.Activity_ID).trim()
-    : generateNextId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4);
+  let actId = isUpdate ? String(payload.Activity_ID).trim() : '';
 
   const record = {
     Activity_ID: actId,
@@ -1238,7 +1236,7 @@ function apiSaveActivity(payload) {
     const res = updateRecordById_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', actId, record);
     writeAuditLog_(ctx, 'UPDATE_ACTIVITY', 'WBS_Schedule', actId, res.previous, res.updated, 'Updated schedule activity');
   } else {
-    insertRecord_(DB_CONFIG.TABS.ACTIVITIES, record);
+    actId = insertRecordWithGeneratedId_(DB_CONFIG.TABS.ACTIVITIES, 'Activity_ID', 'ACT', 4, record);
     writeAuditLog_(ctx, 'CREATE_ACTIVITY', 'WBS_Schedule', actId, null, record, 'Created schedule activity');
   }
 
