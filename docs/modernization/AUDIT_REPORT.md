@@ -26,7 +26,7 @@ The code has useful foundations: a server-side role permission ceiling, project 
 
 **Remediated in PR #102:** `updatePasswordLoginState_` now reads, checks, increments, locks, and resets password failure state under a script lock using the credential sheet row. It applies the five-failure/15-minute policy atomically and invalidates the credential cache after writes. A mocked-runtime regression test verifies increment, threshold lock, blocked further increments, reset, and lock release.
 
-**Still open:** global throttling across accounts, IP-independent controls unavailable in Apps Script, admin recovery flow, lockout auditing, unknown-user timing, and live concurrent-runtime verification.
+**Additional remediation in PR #102:** credential usernames and user emails are now checked for duplicates inside the atomic insert lock; if credential creation fails after a new user row is inserted, that user row is rolled back. Google ID-token claims now safely parse and validate audience, authorized party, subject, issuer, email verification, expiry, and issued-at bounds. **Still open:** global throttling across accounts, IP-independent controls unavailable in Apps Script, admin recovery flow, lockout auditing, unknown-user timing, and live concurrent-runtime verification.
 **Severity:** High residual risk until broader controls and runtime validation are complete.
 
 
