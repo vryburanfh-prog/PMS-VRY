@@ -27,8 +27,13 @@ PR #100 adds a lock-protected ID allocation specifically for PMO snapshots. This
 | `apiSaveTeamWorkloadAssignment` | Team_Workload | Assignment_ID | WASG | 4 | Create/update |
 | `apiSaveProcurementItem` | Procurement_Logistics | Procurement_ID | PRC | 4 | Create/update |
 | `apiSaveFinancialItem` | Financial_Monitoring | Financial_ID | FIN | 4 | Create/update |
+| `applyManagementViewAllPagesPolicy_` | Role_Permissions | Permission_ID | PRM | 4 | Add missing Management permissions |
+| `createPasswordCredential_` | Auth_Credentials | Credential_ID | CRD | 5 | Create-only |
+| `apiLoginWithPassword` | Auth_Sessions | Session_ID | SES | 6 | Session creation |
+| `apiLoginWithGoogleCredential` | Auth_Sessions | Session_ID | SES | 6 | Session creation |
+| `writeAuditLog_` | Audit_Logs | Audit_ID | AUD | 5 | Audit append |
 
-**Inventory count:** 14 call sites in 13 API/function paths. The project-create path allocates two IDs in separate tables; the activity-save path can allocate an activity ID and a dependency ID. All 14 call sites have now been migrated to atomic insert helpers. A static inventory gate verifies that `generateNextId_` has no remaining callers in `Code.gs`.
+**Initial Code.gs inventory:** 14 call sites in 13 API/function paths. The project-create path allocates two IDs in separate tables; the activity-save path can allocate an activity ID and a dependency ID. The broader Security.gs inventory adds five more calls. All 14 call sites have now been migrated to atomic insert helpers. A static inventory gate verifies that `generateNextId_` has no remaining callers in `Code.gs`.
 
 ## Proposed remediation architecture
 
@@ -50,7 +55,7 @@ Do not use a helper that only locks ID generation and then releases before inser
 - **Stage B — create-only handlers:** completed. User and project baseline create-only paths migrated.
 - **Stage C — mixed create/update handlers:** completed. Weekly report, team workload, procurement, financial, progress log, Main WBS, Sub WBS, project-control registry, and activity create branches migrated; update paths remain unchanged.
 - **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. These multi-write operations remain non-transactional across tables.
-- **Stage E — inventory gate:** completed. Static test confirms no active `generateNextId_` call sites remain in `Code.gs`; the legacy allocator declaration remains in `Database.gs` for compatibility but is no longer used by the API paths.
+- **Stage E — inventory gate:** completed. Static tests confirm no active `generateNextId_` call sites remain in `Code.gs` or `Security.gs`; the legacy allocator declaration remains in `Database.gs for compatibility.
 - **Stage F — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
 
 ## Acceptance criteria
