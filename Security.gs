@@ -49,23 +49,45 @@ function getTrustedAdminEmails_() {
 }
 
 function setTrustedAdminEmails_(emails) {
-  const normalized = (emails || []).map(function (x) { return String(x || '').trim().toLowerCase(); })
-    .filter(function (x, i, all) { return x && all.indexOf(x) === i; });
-  PropertiesService.getScriptProperties().setProperty('PM_ADMIN_EMAILS', JSON.stringify(normalized));
-  return normalized;
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const normalized = (emails || []).map(function (x) { return String(x || '').trim().toLowerCase(); })
+      .filter(function (x, i, all) { return x && all.indexOf(x) === i; });
+    PropertiesService.getScriptProperties().setProperty('PM_ADMIN_EMAILS', JSON.stringify(normalized));
+    return normalized;
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
 
 function addTrustedAdminEmail_(email) {
   const normalized = String(email || '').trim().toLowerCase();
   if (!normalized) return getTrustedAdminEmails_();
-  return setTrustedAdminEmails_(getTrustedAdminEmails_().concat([normalized]));
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const current = getTrustedAdminEmails_();
+    if (current.indexOf(normalized) !== -1) return current;
+    return setTrustedAdminEmails_(current.concat([normalized]));
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
 
 function removeTrustedAdminEmail_(email) {
   const normalized = String(email || '').trim().toLowerCase();
-  return setTrustedAdminEmails_(getTrustedAdminEmails_().filter(function (x) { return x !== normalized; }));
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    return setTrustedAdminEmails_(getTrustedAdminEmails_().filter(function (x) { return x !== normalized; }));
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
-
 function isTrustedAdministratorEmail_(email) {
   return getTrustedAdminEmails_().indexOf(String(email || '').trim().toLowerCase()) !== -1;
 }
@@ -280,8 +302,7 @@ function applyManagementViewAllPagesPolicy_() {
         }
       });
     } else {
-      values.Permission_ID = generateNextId_(tabName, 'Permission_ID', 'PRM', 4);
-      insertRecord_(tabName, values);
+      insertRecordWithGeneratedId_(tabName, 'Permission_ID', 'PRM', 4, values);
       added++;
     }
   });
@@ -380,18 +401,25 @@ var AUTH_CREDENTIAL_HEADERS_ = ['Credential_ID','User_ID','Username','Password_S
 var AUTH_SESSION_HEADERS_ = ['Session_ID','Token_Hash','User_ID','Username','Identity_Email','Auth_Method','Created_At','Expires_At','Revoked_At'];
 
 function ensureHybridAuthTables_() {
-  const ss = getMasterSpreadsheet_();
-  [[DB_CONFIG.TABS.AUTH_CREDENTIALS, AUTH_CREDENTIAL_HEADERS_],[DB_CONFIG.TABS.AUTH_SESSIONS, AUTH_SESSION_HEADERS_]].forEach(function(pair) {
-    let sh = ss.getSheetByName(pair[0]);
-    if (!sh) { sh = ss.insertSheet(pair[0]); sh.getRange(1,1,1,pair[1].length).setValues([pair[1]]); sh.setFrozenRows(1); }
-    else if (sh.getLastRow() === 0) sh.getRange(1,1,1,pair[1].length).setValues([pair[1]]);
-    else {
-      const lastCol = Math.max(sh.getLastColumn(), 1);
-      const existing = sh.getRange(1,1,1,lastCol).getValues()[0].map(v => String(v || '').trim());
-      const missing = pair[1].filter(h => existing.indexOf(h) === -1);
-      if (missing.length) sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]);
-    }
-  });
+  const lock = LockService.getScriptLock();
+  const ownsLock = !lock.hasLock();
+  if (ownsLock) lock.waitLock(10000);
+  try {
+    const ss = getMasterSpreadsheet_();
+    [[DB_CONFIG.TABS.AUTH_CREDENTIALS, AUTH_CREDENTIAL_HEADERS_],[DB_CONFIG.TABS.AUTH_SESSIONS, AUTH_SESSION_HEADERS_]].forEach(function(pair) {
+      let sh = ss.getSheetByName(pair[0]);
+      if (!sh) { sh = ss.insertSheet(pair[0]); sh.getRange(1,1,1,pair[1].length).setValues([pair[1]]); sh.setFrozenRows(1); }
+      else if (sh.getLastRow() === 0) sh.getRange(1,1,1,pair[1].length).setValues([pair[1]]);
+      else {
+        const lastCol = Math.max(sh.getLastColumn(), 1);
+        const existing = sh.getRange(1,1,1,lastCol).getValues()[0].map(v => String(v || '').trim());
+        const missing = pair[1].filter(h => existing.indexOf(h) === -1);
+        if (missing.length) sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]);
+      }
+    });
+  } finally {
+    if (ownsLock) lock.releaseLock();
+  }
 }
 function authRandomToken_() { return Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,''); }
 function hashToken_(token) { return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(token), Utilities.Charset.UTF_8)); }
@@ -409,10 +437,12 @@ function hashPassword_(password, salt) {
 function createPasswordCredential_(userId, username, password) {
   ensureHybridAuthTables_();
   const normalized = String(username || '').trim().toLowerCase();
-  const all = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  if (all.some(r => String(r.Username || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
   const salt = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, authRandomToken_(), Utilities.Charset.UTF_8));
-  insertRecord_(DB_CONFIG.TABS.AUTH_CREDENTIALS, { Credential_ID: generateNextId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5), User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() });
+  const credential = { Credential_ID: '', User_ID: userId, Username: normalized, Password_Salt: salt, Password_Hash: hashPassword_(password, salt), Is_Active: 'TRUE', Failed_Attempts: 0, Locked_Until: '', Created_At: getNowTimestamp_(), Updated_At: getNowTimestamp_() };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', 'CRD', 5, credential, function() {
+    const all = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+    if (all.some(r => String(r.Username || '').trim().toLowerCase() === normalized)) throw new Error('Username is already registered.');
+  });
 }
 function findValidAuthSession_(token) {
   const raw = String(token || '').trim();
@@ -443,23 +473,69 @@ function apiLoginWithPassword(username, password) {
   const pass = String(password || '');
   if (!name || !pass) return { success:false, error:'Enter your username and password.' };
   const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-  const cred = creds.find(r => String(r.Username || '').toLowerCase() === name && isTruthySheetFlag_(r.Is_Active));
-  if (!cred) { Utilities.sleep(500); return { success:false, error:'Invalid username or password.' }; }
-  if (cred.Locked_Until && new Date(cred.Locked_Until).getTime() > Date.now()) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
-  const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.User_ID) === String(cred.User_ID));
-  if (!user || !isTruthySheetFlag_(user.Is_Active) || normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') return { success:false, error:'This account is inactive or not eligible for password login.' };
-  const candidate = hashPassword_(pass, cred.Password_Salt);
-  if (candidate !== String(cred.Password_Hash || '')) {
-    const attempts = Number(cred.Failed_Attempts || 0) + 1;
-    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts: attempts, Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '', Updated_At: getNowTimestamp_() });
-    Utilities.sleep(500); return { success:false, error:'Invalid username or password.' };
+  const initialCred = creds.find(r => String(r.Username || '').trim().toLowerCase() === name);
+  if (!initialCred || !isTruthySheetFlag_(initialCred.Is_Active)) {
+    Utilities.sleep(500);
+    return { success:false, error:'Invalid username or password.' };
   }
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
+  if (initialCred.Locked_Until && new Date(initialCred.Locked_Until).getTime() > Date.now()) {
+    return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
+  }
+
+  const candidate = hashPassword_(pass, initialCred.Password_Salt);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  var outcome = 'invalid';
+  var authenticatedCredential = null;
+  var authenticatedUser = null;
+  try {
+    invalidateTableCache_(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+    invalidateTableCache_(DB_CONFIG.TABS.USERS);
+    const latestCreds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
+    const current = latestCreds.find(r => String(r.Username || '').trim().toLowerCase() === name);
+    if (!current || !isTruthySheetFlag_(current.Is_Active)) {
+      outcome = 'invalid';
+    } else if (current.Locked_Until && new Date(current.Locked_Until).getTime() > Date.now()) {
+      outcome = 'locked';
+    } else if (candidate !== String(current.Password_Hash || '')) {
+      const attempts = Number(current.Failed_Attempts || 0) + 1;
+      updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', current.Credential_ID, {
+        Failed_Attempts: attempts,
+        Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '',
+        Updated_At: getNowTimestamp_()
+      });
+      outcome = 'invalid';
+    } else {
+      const users = getTableRecords_(DB_CONFIG.TABS.USERS) || [];
+      const currentUser = users.find(u => String(u.User_ID) === String(current.User_ID));
+      if (!currentUser || !isTruthySheetFlag_(currentUser.Is_Active) || normalizeRoleName_(currentUser.Role_Name || currentUser.Role_ID) === 'Administrator') {
+        outcome = 'ineligible';
+      } else {
+        updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', current.Credential_ID, {
+          Failed_Attempts: 0, Locked_Until: '', Updated_At: getNowTimestamp_()
+        });
+        authenticatedCredential = current;
+        authenticatedUser = currentUser;
+        outcome = 'success';
+      }
+    }
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (outcome === 'locked') return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
+  if (outcome === 'ineligible') return { success:false, error:'This account is inactive or not eligible for password login.' };
+  if (outcome !== 'success') {
+    Utilities.sleep(500);
+    return { success:false, error:'Invalid username or password.' };
+  }
+
   const token = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
-  writeAuditLog_({email:'username:'+name,fullName:user.Full_Name,user:{email:'username:'+name,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'PASSWORD'}, 'Password login');
-  return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name, role:normalizeRoleName_(user.Role_Name || user.Role_ID)} };
+  const session = { Session_ID:'', Token_Hash:hashToken_(token), User_ID:authenticatedUser.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, session);
+  writeAuditLog_({email:'username:'+name,fullName:authenticatedUser.Full_Name,user:{email:'username:'+name,fullName:authenticatedUser.Full_Name}}, 'LOGIN', 'Authentication', authenticatedUser.User_ID, null, {Auth_Method:'PASSWORD'}, 'Password login');
+  return { success:true, token:token, expiresAt:expiry.toISOString(), user:{fullName:authenticatedUser.Full_Name, role:normalizeRoleName_(authenticatedUser.Role_Name || authenticatedUser.Role_ID)} };
 }
 function apiLoginWithGoogleCredential(idToken) {
   ensureHybridAuthTables_();
@@ -471,10 +547,11 @@ function apiLoginWithGoogleCredential(idToken) {
   if (response.getResponseCode() !== 200) return { success:false, error:'Google could not verify this sign-in. Please try again.' };
   const claims = JSON.parse(response.getContentText() || '{}');
   const email = String(claims.email || '').trim().toLowerCase();
+  const subject = String(claims.sub || '').trim();
   const issuer = String(claims.iss || '');
   const expires = Number(claims.exp || 0);
   const verified = String(claims.email_verified || '').toLowerCase() === 'true';
-  if (String(claims.aud || '') !== clientId || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
+  if (String(claims.aud || '') !== clientId || !subject || !['accounts.google.com','https://accounts.google.com'].includes(issuer) || !verified || !email || expires <= Math.floor(Date.now()/1000)) {
     return { success:false, error:'Google identity verification failed.' };
   }
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.Email || '').trim().toLowerCase() === email);
@@ -484,7 +561,8 @@ function apiLoginWithGoogleCredential(idToken) {
   if (role === 'Administrator' && !isAdmin) return { success:false, error:'Administrator access requires a trusted Google account.' };
   const bearer = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
-  insertRecord_(DB_CONFIG.TABS.AUTH_SESSIONS, { Session_ID:generateNextId_(DB_CONFIG.TABS.AUTH_SESSIONS,'Session_ID','SES',6), Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' });
+  const session = { Session_ID:'', Token_Hash:hashToken_(bearer), User_ID:user.User_ID, Username:'', Identity_Email:email, Auth_Method:'GOOGLE_OAUTH', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUTH_SESSIONS, 'Session_ID', 'SES', 6, session);
   writeAuditLog_({email:email,fullName:user.Full_Name,user:{email:email,fullName:user.Full_Name}}, 'LOGIN', 'Authentication', user.User_ID, null, {Auth_Method:'GOOGLE_OAUTH'}, 'Google OAuth login');
   return { success:true, token:bearer, expiresAt:expiry.toISOString(), user:{fullName:user.Full_Name,role:role,isAdmin:isAdmin} };
 }
@@ -603,13 +681,13 @@ function writeAuditLog_(userCtx, action, moduleName, recordId, prevVal, newVal, 
     (userCtx && userCtx.email) || Session.getActiveUser().getEmail() || 'unknown';
   const actorName = (userCtx && userCtx.user && userCtx.user.fullName) ||
     (userCtx && userCtx.fullName) || actorEmail;
-  const auditId = generateNextId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5);
-  insertRecord_(DB_CONFIG.TABS.AUDIT_LOGS, {
-    Audit_ID: auditId, Timestamp: getNowTimestamp_(), User_Email: actorEmail,
+  const auditRecord = {
+    Audit_ID: '', Timestamp: getNowTimestamp_(), User_Email: actorEmail,
     User_Name: actorName, Action: action, Module_Name: moduleName,
     Record_ID: recordId || '',
     Previous_Value: prevVal !== undefined && prevVal !== null ? JSON.stringify(prevVal) : '',
     Updated_Value: newVal !== undefined && newVal !== null ? JSON.stringify(newVal) : '',
     Reason_For_Change: reason || ''
-  });
+  };
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.AUDIT_LOGS, 'Audit_ID', 'AUD', 5, auditRecord);
 }
