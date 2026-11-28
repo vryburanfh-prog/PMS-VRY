@@ -125,3 +125,14 @@ test('financial item create path uses atomic ID insert and keeps update path', (
   assert.ok(!fn.includes("generateNextId_(finTab"));
   assert.ok(fn.includes("updateRecordById_(finTab, 'Financial_ID'"));
 });
+
+
+test('progress log create path uses atomic ID insert and keeps update behavior', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveProgressLog(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID', 'LOG', 4, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROGRESS_UPDATES"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID'"));
+});
