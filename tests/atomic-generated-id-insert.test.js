@@ -315,6 +315,15 @@ test('project-controls registry rendering escapes untrusted text and restricts l
   const tableEnd = html.indexOf('\nfunction ', tableStart + 1);
   const table = html.slice(tableStart, tableEnd < 0 ? html.length : tableEnd);
   assert.ok(table.includes("const safeVal = escapeHtmlSafe_(val)"));
-  assert.ok(table.includes("/^https?:\\/\\//i.test(rawUrl)"));
+  assert.ok(table.includes("const safeLinkUrl = /^https?:"));
+  assert.ok(table.includes(".test(rawUrl)"));
   assert.ok(table.includes("rel=\"noopener noreferrer\""));
+});
+
+
+test('inline JavaScript in index.html parses after registry rendering changes', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(m => m[1]).filter(s => s.trim());
+  assert.ok(scripts.length > 0);
+  scripts.forEach((source, i) => assert.doesNotThrow(() => new vm.Script(source), 'inline script ' + i + ' must parse'));
 });
