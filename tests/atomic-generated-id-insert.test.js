@@ -208,14 +208,7 @@ test('provided-ID insert helper checks duplicates and appends under a single scr
   const end = dbSource.indexOf('\nfunction ', start + 1);
   assert.notEqual(start, -1);
   const helper = dbSource.slice(start, end < 0 ? dbSource.length : end);
-  const h = harness(['BL-001'], false);
-  const fn = vm.runInNewContext('(' + helper + ')', {
-    LockService: { getScriptLock: () => ({ waitLock: ms => h.events.push('lock:' + ms), releaseLock: () => h.events.push('unlock') }) },
-    getMasterSpreadsheet_: () => ({ getSheetByName: () => ({ getLastColumn: () => 4, getLastRow: () => h.rows.length, getRange: (...args) => h.fn.__sheetRange ? h.fn.__sheetRange(...args) : null }) }),
-    invalidateTableCache_: tab => h.events.push('invalidate:' + tab),
-    String, Error
-  });
-  // Use the shared harness sheet-range adapter directly by constructing a second sheet.
+  // Isolated mock sheet for the caller-supplied-ID helper.
   const headers = ['Name','Project_ID','Baseline_ID','Remarks'];
   const rows = [headers,['existing','P-1','BL-001','']];
   const sheet = {getLastColumn:()=>headers.length,getLastRow:()=>rows.length,getRange(row,col,numRows,numCols){return {getValues:()=>row===1?[headers.slice(col-1,col-1+numCols)]:rows.slice(row-1,row-1+numRows).map(r=>r.slice(col-1,col-1+numCols)),setValues:v=>rows.push(v[0])};}};
@@ -238,4 +231,12 @@ test('project creation uses atomic insert for generated IDs and locked duplicate
   assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3, record)"));
   assert.ok(fn.includes("insertRecordWithProvidedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId, record)"));
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECTS"));
+});
+
+
+test('generated-ID inventory gate: legacy allocator has no active call sites in Code.gs', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const matches = code.match(/generateNextId_\s*\(/g) || [];
+  // One match is the legacy helper declaration itself; all call sites must be migrated.
+  assert.equal(matches.length, 1, 'No API should call the unlocked legacy ID allocator.');
 });
