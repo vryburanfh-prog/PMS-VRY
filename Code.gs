@@ -205,15 +205,8 @@ function apiCreateUser(userPayload) {
     throw new Error('Google email or password-login credentials, Full Name, and Role are required.');
   }
 
-  if (wantsPasswordLogin) {
-    ensureHybridAuthTables_();
-    const existingCredentials = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
-    if (existingCredentials.some(r => String(r.Username || '').trim().toLowerCase() === username)) throw new Error('Username is already registered.');
-  }
-  const existingUsers = getTableRecords_(DB_CONFIG.TABS.USERS);
-  if (email && existingUsers.some(u => String(u.Email || '').trim().toLowerCase() === email)) {
-    throw new Error('A user with email "' + email + '" already exists.');
-  }
+  if (wantsPasswordLogin) ensureHybridAuthTables_();
+
   // Validate project references before creating the user row so an invalid
   // assignment cannot leave a partially-created account behind.
   const requestedAssignments = Array.isArray(userPayload.assignedProjectIds) ? userPayload.assignedProjectIds : [];
@@ -238,9 +231,20 @@ function apiCreateUser(userPayload) {
     Updated_At: getNowTimestamp_()
   };
 
-  insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser);
+  insertRecordWithGeneratedId_(DB_CONFIG.TABS.USERS, 'User_ID', 'USR', 3, newUser, function(recordObj, headers, rows) {
+    const emailIndex = headers.indexOf('Email');
+    if (emailIndex < 0) throw new Error('User Email column is missing.');
+    if (email && rows.some(row => String(row[emailIndex] || '').trim().toLowerCase() === email)) throw new Error('A user with email "' + email + '" already exists.');
+  });
   if (canonicalRole === 'Administrator') addTrustedAdminEmail_(email);
-  if (wantsPasswordLogin) createPasswordCredential_(newUser.User_ID, username, initialPassword);
+  if (wantsPasswordLogin) {
+    try {
+      createPasswordCredential_(newUser.User_ID, username, initialPassword);
+    } catch (credentialError) {
+      deleteRecordById_(DB_CONFIG.TABS.USERS, 'User_ID', newUser.User_ID);
+      throw credentialError;
+    }
+  }
   const assignedProjectIds = syncUserProjectAssignments_(newUser, userPayload.assignedProjectIds || [], ctx);
   writeAuditLog_(ctx, 'CREATE_USER', 'Users_Admin', newUser.User_ID, null, newUser, 'Registered new system user');
 
