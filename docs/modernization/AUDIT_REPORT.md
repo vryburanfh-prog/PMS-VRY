@@ -22,10 +22,13 @@ The code has useful foundations: a server-side role permission ceiling, project 
 **Severity:** High pending crypto validation.
 
 ### P1 — High: Login throttling may be bypassable / lacks global controls
-**Evidence:** Password login tracks Failed_Attempts per credential and applies a 15-minute lock at 5 attempts, with 500 ms sleep on failures. Need inspect locking/atomicity, reset behavior, unknown-user timing, and whether attacker can trigger simultaneous requests to race counters.
-**Impact:** Credential guessing or denial of service by locking legitimate accounts.
-**Recommendation:** Add atomic failure counters, progressive backoff, global/IP-independent controls available in Apps Script, administrator recovery, audit for lockout events, and equalized failure responses/timing where practical.
-**Severity:** High pending validation.
+**Original finding:** Failed_Attempts was read from a cached record and updated separately, so simultaneous failures could lose increments and undercount lockouts.
+
+**Remediated in PR #102:** `updatePasswordLoginState_` now reads, checks, increments, locks, and resets password failure state under a script lock using the credential sheet row. It applies the five-failure/15-minute policy atomically and invalidates the credential cache after writes. A mocked-runtime regression test verifies increment, threshold lock, blocked further increments, reset, and lock release.
+
+**Still open:** global throttling across accounts, IP-independent controls unavailable in Apps Script, admin recovery flow, lockout auditing, unknown-user timing, and live concurrent-runtime verification.
+**Severity:** High residual risk until broader controls and runtime validation are complete.
+
 
 ### P1 — High: Google token validation and network error handling needs hardening
 **Evidence:** Google sign-in validates token via tokeninfo endpoint, checks audience, issuer, email_verified and expiry. It uses UrlFetchApp.fetch with muteHttpExceptions, then JSON.parse after 200. Need verify timeout/error behavior, claim validation (including subject), and token handling/redirect URI context.
@@ -61,9 +64,14 @@ The code has useful foundations: a server-side role permission ceiling, project 
 **Recommendation:** Centralize mutations, invalidate affected caches, and use short TTL for permission/configuration caches or bypass caches for security-sensitive decisions.
 
 ### P2 — Medium: UI rendering uses innerHTML extensively
-**Evidence:** index.html dynamically builds module HTML with innerHTML. Many paths use escapeHtmlSafe_, but complete taint tracing and safe-JS argument validation are not finished.
-**Impact:** XSS if unescaped database/API values reach markup, attributes, event handlers, URLs, or script contexts.
-**Recommendation:** Audit every dynamic insertion, use context-specific encoding, avoid inline handler construction with untrusted values, validate URLs and use DOM text APIs for plain text. Add XSS regression payload tests.
+**Evidence:** index.html dynamically builds module HTML with innerHTML. The project Controls Registry renderer had unescaped status values, field options/labels, WBS names, and record-cell values; link fields also accepted arbitrary schemes.
+
+**Remediated in PR #102:** Registry status/options/labels/WBS names and table cell values are HTML-escaped; registry links are restricted to HTTP(S), escaped in the href context, and rendered with `noopener noreferrer`. Regression tests check the encoding/scheme guard and parse inline scripts after substituting the Apps Script template directive.
+
+**Still open:** full taint tracing across the remaining innerHTML paths, safe JS argument review, and XSS testing for other modules.
+**Impact:** XSS remains possible in any other unreviewed rendering path.
+**Severity:** Medium residual risk.
+
 
 ### P2 — Medium: Google Sheets is the current datastore and needs scale controls
 **Evidence:** Database helpers read full table ranges; getTableRecords_ materializes all rows and columns. The project data is spreadsheet-backed.
