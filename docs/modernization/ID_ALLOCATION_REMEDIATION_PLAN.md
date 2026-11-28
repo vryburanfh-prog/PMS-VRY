@@ -1,6 +1,6 @@
 # Phase 1 — Generated ID Allocation Inventory and Remediation Plan
 
-**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `b8cf50e8beb6e49288648c3f5eabd6d274554087` (run [46098906334](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46098906334)).  
+**Status:** Full source inventory of 19 generated-ID call sites across Code.gs and Security.gs is migrated to atomic helpers. Consolidated CI passed on commit `9c470ab5a1abcb48ac331649c8064ec5d38fc5e9` (run [46099164629](https://github.com/vryburanfh-prog/PMS-VRY/actions/runs/46099164629)).  
 **Scope:** Data-integrity remediation only. This document does not change application code or production data.
 
 ## Finding
@@ -54,10 +54,10 @@ Do not use a helper that only locks ID generation and then releases before inser
 - **Stage A — helper + harness:** completed. Both generated-ID and caller-supplied-ID insert helpers are implemented. Tests cover ID-column/header mapping, generated ID assignment, lock/read/write ordering, duplicate supplied-ID rejection, and lock release after write failure.
 - **Stage B — create-only handlers:** completed. User and project baseline create-only paths migrated.
 - **Stage C — mixed create/update handlers:** completed. Weekly report, team workload, procurement, financial, progress log, Main WBS, Sub WBS, project-control registry, and activity create branches migrated; update paths remain unchanged.
-- **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. These multi-write operations remain non-transactional across tables.
+- **Stage D — multi-record/multi-table paths:** completed for ID atomicity. Project creation uses atomic generated-ID insertion or locked supplied-ID insertion; creator assignment and activity dependency IDs use atomic insertion. Baseline revision calculation and direct source-table snapshot reads now execute under the same insertion lock. Other multi-write operations remain non-transactional across tables.
 - **Stage E — inventory gate:** completed. Static tests confirm no active `generateNextId_` call sites remain in `Code.gs` or `Security.gs`; the legacy allocator declaration remains in `Database.gs` for compatibility.
 - **Stage F — targeted UI XSS hardening:** completed for reviewed modules (registry, WBS/schedule, project register/portfolio, progress logs, weekly reports/print exports, workload, procurement, financials, governance audit, portfolio roll-up). Remaining innerHTML taint tracing is still open.
-- **Stage G — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior.
+- **Stage G — Apps Script runtime test:** pending. Validate against a non-production test spreadsheet/deployment. Mocked Node tests do not prove actual Apps Script runtime or concurrent behavior. Runtime steps are documented in `PHASE1_RUNTIME_TEST_PLAN.md`.
 
 ## Acceptance criteria
 
