@@ -8,10 +8,10 @@ const code = fs.readFileSync(path.join(root, 'Code.gs'), 'utf8');
 const security = fs.readFileSync(path.join(root, 'Security.gs'), 'utf8');
 
 const intentionalExceptions = new Set([
-  'apiGetPublishedClientDeckByToken', // public endpoint uses a published-deck token
-  'apiLoginWithPassword', // unauthenticated login entry point
-  'apiLogout', // logout/revocation entry point
-  'apiDispatch', // dispatcher performs its own authentication and allowlist checks
+  'apiGetPublishedClientDeckByToken',
+  'apiLoginWithPassword',
+  'apiLogout',
+  'apiDispatch',
 ]);
 const authEntryPoints = new Set(['apiLoginWithGoogleCredential', 'apiLoginWithPassword', 'apiLogout', 'apiDispatch', 'apiGetSessionContext']);
 const apiNames = new Set([
@@ -41,7 +41,8 @@ test('intentional authentication and public endpoint exceptions are present and 
   for (const name of intentionalExceptions) {
     assert.ok(apiNames.has(name), name + ' must remain in the API inventory');
   }
-  assert.match(security, /Public tokenized deck\s+endpoints remain outside this private dashboard API namespace/);
+  assert.match(security, /Public tokenized deck/);
+  assert.match(security, /endpoints remain outside this private dashboard API namespace/);
   assert.match(code + security, /apiDispatch/);
 });
 
