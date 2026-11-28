@@ -147,3 +147,14 @@ test('Main WBS create path uses atomic generated ID insert and retains edit path
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.MAIN_WBS"));
   assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'"));
 });
+
+
+test('Sub WBS create path uses atomic generated ID insert and retains edit path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveSubWbs(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID', 'SWBS', 3, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.SUB_WBS"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.SUB_WBS, 'Sub_WBS_ID'"));
+});
