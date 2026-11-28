@@ -200,3 +200,42 @@ test('project creator assignment uses atomic generated-ID insert', () => {
   assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS, 'Assignment_ID', 'ASG', 4, assignmentRecord)"));
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECT_ASSIGNMENTS"));
 });
+
+
+test('provided-ID insert helper checks duplicates and appends under a single script lock', () => {
+  const dbSource = fs.readFileSync(path.join(__dirname, '..', 'Database.gs'), 'utf8');
+  const start = dbSource.indexOf('function insertRecordWithProvidedId_(');
+  const end = dbSource.indexOf('\nfunction ', start + 1);
+  assert.notEqual(start, -1);
+  const helper = dbSource.slice(start, end < 0 ? dbSource.length : end);
+  const h = harness(['BL-001'], false);
+  const fn = vm.runInNewContext('(' + helper + ')', {
+    LockService: { getScriptLock: () => ({ waitLock: ms => h.events.push('lock:' + ms), releaseLock: () => h.events.push('unlock') }) },
+    getMasterSpreadsheet_: () => ({ getSheetByName: () => ({ getLastColumn: () => 4, getLastRow: () => h.rows.length, getRange: (...args) => h.fn.__sheetRange ? h.fn.__sheetRange(...args) : null }) }),
+    invalidateTableCache_: tab => h.events.push('invalidate:' + tab),
+    String, Error
+  });
+  // Use the shared harness sheet-range adapter directly by constructing a second sheet.
+  const headers = ['Name','Project_ID','Baseline_ID','Remarks'];
+  const rows = [headers,['existing','P-1','BL-001','']];
+  const sheet = {getLastColumn:()=>headers.length,getLastRow:()=>rows.length,getRange(row,col,numRows,numCols){return {getValues:()=>row===1?[headers.slice(col-1,col-1+numCols)]:rows.slice(row-1,row-1+numRows).map(r=>r.slice(col-1,col-1+numCols)),setValues:v=>rows.push(v[0])};}};
+  const testEvents=[];
+  const fn2=vm.runInNewContext('('+helper+')',{LockService:{getScriptLock:()=>({waitLock:ms=>testEvents.push('lock'),releaseLock:()=>testEvents.push('unlock')})},getMasterSpreadsheet_:()=>({getSheetByName:()=>sheet}),invalidateTableCache_:()=>testEvents.push('invalidate'),String,Error});
+  const record={Name:'Caller ID record',Project_ID:'P-1',Remarks:'manual'};
+  assert.equal(fn2('Project_Baselines','Baseline_ID','BL-002',record),'BL-002');
+  assert.equal(record.Baseline_ID,'BL-002');
+  assert.deepEqual(rows.at(-1),['Caller ID record','P-1','BL-002','manual']);
+  assert.ok(testEvents.indexOf('lock') < testEvents.indexOf('invalidate'));
+  assert.ok(testEvents.includes('unlock'));
+  assert.throws(()=>fn2('Project_Baselines','Baseline_ID','BL-001',{}),/Duplicate ID/);
+});
+
+test('project creation uses atomic insert for generated IDs and locked duplicate-check insert for caller IDs', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiCreateProject(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', 'PRJ', 3, record)"));
+  assert.ok(fn.includes("insertRecordWithProvidedId_(DB_CONFIG.TABS.PROJECTS, 'Project_ID', newId, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROJECTS"));
+});
