@@ -438,6 +438,58 @@ function findValidAuthSession_(token) {
   return record;
 }
 
+/**
+ * Reads or updates password-login failure state from the credential sheet
+ * under one script lock, so simultaneous failed logins cannot lose increments.
+ * mode: check | failure | reset
+ */
+function updatePasswordLoginState_(credentialId, mode) {
+  const action = String(mode || '').trim().toLowerCase();
+  if (['check', 'failure', 'reset'].indexOf(action) === -1) throw new Error('Invalid password-login state operation.');
+  const id = String(credentialId || '').trim();
+  if (!id) throw new Error('Credential_ID is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getMasterSpreadsheet_().getSheetByName(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+    if (!sheet) throw new Error('Authentication credentials table is missing.');
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
+    const idCol = headers.indexOf('Credential_ID') + 1;
+    const attemptsCol = headers.indexOf('Failed_Attempts') + 1;
+    const lockedCol = headers.indexOf('Locked_Until') + 1;
+    const updatedCol = headers.indexOf('Updated_At') + 1;
+    if (!idCol || !attemptsCol || !lockedCol || !updatedCol) throw new Error('Password-login state columns are missing.');
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) throw new Error('Credential not found.');
+    const ids = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
+    let rowNumber = -1;
+    for (let i = 0; i < ids.length; i++) if (String(ids[i][0] || '').trim() === id) { rowNumber = i + 2; break; }
+    if (rowNumber < 0) throw new Error('Credential not found.');
+    const attempts = Number(sheet.getRange(rowNumber, attemptsCol).getValue()) || 0;
+    const lockedUntil = String(sheet.getRange(rowNumber, lockedCol).getValue() || '');
+    const locked = lockedUntil && new Date(lockedUntil).getTime() > Date.now();
+    if (action === 'check') return { locked: Boolean(locked), lockedUntil: lockedUntil, attempts: attempts };
+    if (action === 'failure') {
+      if (locked) return { locked: true, lockedUntil: lockedUntil, attempts: attempts };
+      const nextAttempts = attempts + 1;
+      const nextLockedUntil = nextAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : '';
+      sheet.getRange(rowNumber, attemptsCol).setValue(nextAttempts);
+      sheet.getRange(rowNumber, lockedCol).setValue(nextLockedUntil);
+      sheet.getRange(rowNumber, updatedCol).setValue(getNowTimestamp_());
+      invalidateTableCache_(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+      return { locked: Boolean(nextLockedUntil), lockedUntil: nextLockedUntil, attempts: nextAttempts };
+    }
+    sheet.getRange(rowNumber, attemptsCol).setValue(0);
+    sheet.getRange(rowNumber, lockedCol).setValue('');
+    sheet.getRange(rowNumber, updatedCol).setValue(getNowTimestamp_());
+    invalidateTableCache_(DB_CONFIG.TABS.AUTH_CREDENTIALS);
+    return { locked: false, lockedUntil: '', attempts: 0 };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function apiLoginWithPassword(username, password) {
   ensureHybridAuthTables_();
   const name = String(username || '').trim().toLowerCase();
@@ -446,16 +498,16 @@ function apiLoginWithPassword(username, password) {
   const creds = getTableRecords_(DB_CONFIG.TABS.AUTH_CREDENTIALS) || [];
   const cred = creds.find(r => String(r.Username || '').toLowerCase() === name && isTruthySheetFlag_(r.Is_Active));
   if (!cred) { Utilities.sleep(500); return { success:false, error:'Invalid username or password.' }; }
-  if (cred.Locked_Until && new Date(cred.Locked_Until).getTime() > Date.now()) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
+  const loginState = updatePasswordLoginState_(cred.Credential_ID, 'check');
+  if (loginState.locked) return { success:false, error:'Account temporarily locked. Contact an Administrator.' };
   const user = (getTableRecords_(DB_CONFIG.TABS.USERS) || []).find(u => String(u.User_ID) === String(cred.User_ID));
   if (!user || !isTruthySheetFlag_(user.Is_Active) || normalizeRoleName_(user.Role_Name || user.Role_ID) === 'Administrator') return { success:false, error:'This account is inactive or not eligible for password login.' };
   const candidate = hashPassword_(pass, cred.Password_Salt);
   if (candidate !== String(cred.Password_Hash || '')) {
-    const attempts = Number(cred.Failed_Attempts || 0) + 1;
-    updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts: attempts, Locked_Until: attempts >= 5 ? new Date(Date.now()+15*60*1000).toISOString() : '', Updated_At: getNowTimestamp_() });
+    updatePasswordLoginState_(cred.Credential_ID, 'failure');
     Utilities.sleep(500); return { success:false, error:'Invalid username or password.' };
   }
-  updateRecordById_(DB_CONFIG.TABS.AUTH_CREDENTIALS, 'Credential_ID', cred.Credential_ID, { Failed_Attempts:0, Locked_Until:'', Updated_At:getNowTimestamp_() });
+  updatePasswordLoginState_(cred.Credential_ID, 'reset');
   const token = authRandomToken_();
   const expiry = new Date(Date.now() + AUTH_SESSION_HOURS_*60*60*1000);
   const sessionRecord = { Session_ID:'', Token_Hash:hashToken_(token), User_ID:user.User_ID, Username:name, Identity_Email:'', Auth_Method:'PASSWORD', Created_At:getNowTimestamp_(), Expires_At:expiry.toISOString(), Revoked_At:'' };
