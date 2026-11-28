@@ -136,3 +136,14 @@ test('progress log create path uses atomic ID insert and keeps update behavior',
   assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.PROGRESS_UPDATES"));
   assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.PROGRESS_UPDATES, 'Log_ID'"));
 });
+
+
+test('Main WBS create path uses atomic generated ID insert and retains edit path', () => {
+  const code = fs.readFileSync(path.join(__dirname, '..', 'Code.gs'), 'utf8');
+  const start = code.indexOf('function apiSaveMainWbs(');
+  const end = code.indexOf('\nfunction ', start + 1);
+  const fn = code.slice(start, end < 0 ? code.length : end);
+  assert.ok(fn.includes("insertRecordWithGeneratedId_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID', 'MWBS', 3, record)"));
+  assert.ok(!fn.includes("generateNextId_(DB_CONFIG.TABS.MAIN_WBS"));
+  assert.ok(fn.includes("updateRecordById_(DB_CONFIG.TABS.MAIN_WBS, 'Main_WBS_ID'"));
+});
